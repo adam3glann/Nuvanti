@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Product — Nuvanti</title>
+<meta name="description" content="Shop premium clothing from Nuvanti." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/tokens.css" />
+<link rel="stylesheet" href="assets/css/base.css" />
+<link rel="stylesheet" href="assets/css/components.css" />
+<link rel="stylesheet" href="assets/css/pages.css" />
+</head>
+<body>
+<a href="#main" class="skip-link">Skip to content</a>
+<div id="site-header"></div>
+
+<main id="main">
+  <div class="container" id="productRoot">
+    <nav class="breadcrumb" aria-label="Breadcrumb" id="breadcrumb" style="margin-top:1.5rem"></nav>
+
+    <div class="product-detail">
+      <div class="gallery" id="gallery"></div>
+      <div id="productInfo"></div>
+    </div>
+
+    <div class="product-tabs-section">
+      <div class="info-accordion" id="infoAccordion" style="max-width:760px"></div>
+    </div>
+
+    <section class="section" id="relatedSection">
+      <div class="section-head">
+        <div class="section-head__title"><h2>You May Also Like</h2></div>
+      </div>
+      <div class="product-grid" id="relatedGrid"></div>
+    </section>
+
+    <section class="section section--tight" id="recentlyViewedSection">
+      <div class="section-head">
+        <div class="section-head__title"><h2>Recently Viewed</h2></div>
+      </div>
+      <div class="product-grid" id="recentlyViewedGrid"></div>
+    </section>
+  </div>
+</main>
+
+<div id="site-footer"></div>
+<script type="module" src="assets/js/pages/product.js"></script>
+</body>
+</html>

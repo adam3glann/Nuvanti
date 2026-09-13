@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Shop All — Nuvanti</title>
+<meta name="description" content="Shop the full Nuvanti collection: knitted polos, embroidered tank tops, and wide-leg sweatpants. Filter by size, color and price." />
+<link rel="canonical" href="https://nuvanti.wuiltstore.com/en" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/tokens.css" />
+<link rel="stylesheet" href="assets/css/base.css" />
+<link rel="stylesheet" href="assets/css/components.css" />
+<link rel="stylesheet" href="assets/css/pages.css" />
+</head>
+<body>
+<a href="#main" class="skip-link">Skip to content</a>
+<div id="site-header"></div>
+
+<main id="main">
+  <div class="container">
+    <nav class="breadcrumb" aria-label="Breadcrumb" style="margin-top:1.5rem">
+      <a href="index.html">Home</a><span class="breadcrumb-sep">›</span><span>Shop</span>
+    </nav>
+  </div>
+
+  <div class="page-hero container" style="border:none;padding-top:0">
+    <h1>Shop All</h1>
+    <p class="text-muted">Every piece from the current Nuvanti collection, in one place.</p>
+  </div>
+
+  <div class="container">
+    <div class="shop-toolbar">
+      <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+        <button class="btn btn-outline mobile-filter-btn" id="openFilterDrawer">Filters</button>
+        <span class="text-muted" id="resultCount" style="font-size:.875rem"></span>
+      </div>
+      <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap">
+        <label class="visually-hidden" for="shopSearch">Search products</label>
+        <input type="search" id="shopSearch" class="input" placeholder="Search…" />
+        <label class="visually-hidden" for="sortSelect">Sort products</label>
+        <select id="sortSelect" class="input">
+          <option value="featured">Sort: Featured</option>
+          <option value="newest">Newest</option>
+          <option value="price-asc">Price: Low to High</option>
+          <option value="price-desc">Price: High to Low</option>
+          <option value="name-asc">Name: A–Z</option>
+        </select>
+        <div style="display:flex;border:1px solid var(--color-border);border-radius:10px;overflow:hidden">
+          <button class="icon-btn" id="viewGrid" aria-pressed="true" aria-label="Grid view"></button>
+          <button class="icon-btn" id="viewList" aria-pressed="false" aria-label="List view"></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="shop-layout">
+      <aside class="filters" id="filters" aria-label="Filter products"></aside>
+      <div>
+        <div class="product-grid" id="productResults"></div>
+        <div id="loadMoreWrap" style="text-align:center;margin-top:3rem" hidden>
+          <button class="btn btn-outline" id="loadMore">Load More</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div id="site-footer"></div>
+
+<!-- Mobile filter drawer -->
+<div class="scrim" id="filterDrawerScrim" data-open="false"></div>
+<div class="filter-drawer" id="filterDrawer" data-open="false" aria-label="Filters">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem">
+    <h3 class="h3">Filters</h3>
+    <button class="icon-btn" id="closeFilterDrawer" aria-label="Close filters">✕</button>
+  </div>
+  <div id="filterDrawerBody"></div>
+  <div style="display:flex;gap:.75rem;margin-top:1.5rem">
+    <button class="btn btn-text" id="clearFilters">Clear All</button>
+    <button class="btn btn-primary btn-block" id="applyFilters">Show Results</button>
+  </div>
+</div>
+
+<script type="module" src="assets/js/pages/shop.js"></script>
+</body>
+</html>

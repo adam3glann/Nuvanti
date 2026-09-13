@@ -1,0 +1,86 @@
+/* =========================================================
+   NUVANTI ADMIN — Design Tokens
+   A distinct system from the storefront: cool neutrals, a
+   single working accent, and status colors that carry real
+   meaning in tables and badges.
+   ========================================================= */
+
+:root {
+  --a-bg: #F3F4F7;
+  --a-surface: #FFFFFF;
+  --a-surface-raised: #FFFFFF;
+  --a-sidebar-bg: #16181D;
+  --a-sidebar-text: #C7CAD1;
+  --a-sidebar-text-active: #FFFFFF;
+  --a-sidebar-border: #262931;
+  --a-sidebar-hover: #202329;
+
+  --a-text: #14161A;
+  --a-muted: #6B7280;
+  --a-muted-2: #9CA3AF;
+  --a-border: #E3E6EA;
+  --a-border-strong: #CDD2D9;
+
+  --a-primary: #33447A;
+  --a-primary-hover: #283561;
+  --a-primary-tint: #E8EAF4;
+
+  --a-success: #157347;
+  --a-success-tint: #E4F5EC;
+  --a-warning: #92600C;
+  --a-warning-tint: #FCF1DA;
+  --a-danger: #A32A2A;
+  --a-danger-tint: #FBE9E9;
+  --a-info: #1F5EBD;
+  --a-info-tint: #E7EFFC;
+
+  --a-font: 'Archivo', 'Helvetica Neue', Arial, sans-serif;
+  --a-mono: ui-monospace, 'SF Mono', 'Roboto Mono', Consolas, monospace;
+
+  --a-radius-sm: 4px;
+  --a-radius-md: 8px;
+  --a-sidebar-w: 264px;
+  --a-sidebar-w-collapsed: 76px;
+  --a-header-h: 64px;
+
+  --a-shadow-card: 0 1px 2px rgba(20,22,26,0.04);
+  --a-shadow-pop: 0 12px 32px rgba(20,22,26,0.18);
+
+  --a-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --a-dur: 180ms;
+}
+
+[data-theme="dark"] {
+  --a-bg: #101216;
+  --a-surface: #16181D;
+  --a-surface-raised: #1C1F26;
+  --a-sidebar-bg: #0B0C0F;
+  --a-sidebar-border: #1E2027;
+  --a-sidebar-hover: #16181D;
+
+  --a-text: #EDEEF1;
+  --a-muted: #9CA3AF;
+  --a-muted-2: #6B7280;
+  --a-border: #262931;
+  --a-border-strong: #33363E;
+
+  --a-primary: #7B8FE0;
+  --a-primary-hover: #96A6E8;
+  --a-primary-tint: #232A45;
+
+  --a-success: #4ADE94;
+  --a-success-tint: #123326;
+  --a-warning: #F2B84B;
+  --a-warning-tint: #382C10;
+  --a-danger: #F27171;
+  --a-danger-tint: #3A1717;
+  --a-info: #6FA3F5;
+  --a-info-tint: #17263D;
+
+  --a-shadow-card: 0 1px 2px rgba(0,0,0,0.4);
+  --a-shadow-pop: 0 12px 32px rgba(0,0,0,0.55);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --a-dur: 0ms; }
+}

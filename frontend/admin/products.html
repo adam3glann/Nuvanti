@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Products — Nuvanti Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/tokens.css" />
+<link rel="stylesheet" href="assets/css/base.css" />
+<link rel="stylesheet" href="assets/css/components.css" />
+</head>
+<body>
+<div class="admin-shell" id="adminShell">
+  <div id="admin-sidebar-mount"></div>
+  <div class="admin-main">
+    <div id="admin-header-mount"></div>
+    <div class="admin-content">
+      <div class="page-title-row">
+        <div><h1>Products</h1><p>Manage your catalog, pricing, and publication status.</p></div>
+        <a href="product-edit.html" class="btn btn-primary" id="newProductBtn">+ New Product</a>
+      </div>
+
+      <div class="card" id="productsCard">
+        <div class="filter-bar">
+          <input type="search" id="searchInput" placeholder="Search by name or SKU…" style="min-width:220px" />
+          <select id="categoryFilter"></select>
+          <select id="statusFilter">
+            <option value="">All Statuses</option>
+            <option value="active">Active</option>
+            <option value="draft">Draft</option>
+          </select>
+          <select id="sortSelect" style="margin-left:auto">
+            <option value="">Sort: Default</option>
+            <option value="price-asc">Price: Low to High</option>
+            <option value="price-desc">Price: High to Low</option>
+            <option value="name-asc">Name: A–Z</option>
+          </select>
+        </div>
+        <div class="bulk-bar" id="bulkBar">
+          <span id="bulkCount">0 selected</span>
+          <button class="btn btn-outline btn-sm" id="bulkPublish">Publish</button>
+          <button class="btn btn-outline btn-sm" id="bulkUnpublish">Unpublish</button>
+          <button class="btn btn-danger btn-sm" id="bulkDelete">Delete</button>
+        </div>
+        <div class="table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th class="row-checkbox-col"><input type="checkbox" id="selectAll" /></th>
+                <th>Product</th><th>Category</th><th>Price</th><th>Stock</th><th>Status</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="productsBody"></tbody>
+          </table>
+        </div>
+        <div id="paginationWrap"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script type="module" src="assets/js/pages/products.js"></script>
+</body>
+</html>

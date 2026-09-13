@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Admin Users — Nuvanti Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/tokens.css" />
+<link rel="stylesheet" href="assets/css/base.css" />
+<link rel="stylesheet" href="assets/css/components.css" />
+</head>
+<body>
+<div class="admin-shell" id="adminShell">
+  <div id="admin-sidebar-mount"></div>
+  <div class="admin-main">
+    <div id="admin-header-mount"></div>
+    <div class="admin-content" id="adminUsersRoot">
+      <div class="page-title-row">
+        <div><h1>Admin Users</h1><p>Manage who has access to this dashboard and what they can do.</p></div>
+        <button class="btn btn-primary" id="newAdminBtn">+ New Administrator</button>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table class="admin-table">
+            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Last Login</th><th>Created</th><th></th></tr></thead>
+            <tbody id="usersBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script type="module" src="assets/js/pages/users.js"></script>
+</body>
+</html>

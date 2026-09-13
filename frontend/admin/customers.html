@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Customers — Nuvanti Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/tokens.css" />
+<link rel="stylesheet" href="assets/css/base.css" />
+<link rel="stylesheet" href="assets/css/components.css" />
+</head>
+<body>
+<div class="admin-shell" id="adminShell">
+  <div id="admin-sidebar-mount"></div>
+  <div class="admin-main">
+    <div id="admin-header-mount"></div>
+    <div class="admin-content">
+      <div class="page-title-row"><div><h1>Customers</h1><p>Everyone who has shopped at Nuvanti.</p></div></div>
+      <div class="card">
+        <div class="filter-bar">
+          <input type="search" id="searchInput" placeholder="Search by name or email…" style="min-width:220px" />
+          <select id="statusFilter"><option value="">All Statuses</option><option value="active">Active</option><option value="disabled">Disabled</option></select>
+          <select id="sortSelect" style="margin-left:auto">
+            <option value="recent">Most Recent Order</option>
+            <option value="spent-desc">Highest Spend</option>
+            <option value="orders-desc">Most Orders</option>
+          </select>
+        </div>
+        <div class="table-wrap">
+          <table class="admin-table">
+            <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Orders</th><th>Total Spent</th><th>Last Order</th><th>Status</th></tr></thead>
+            <tbody id="custBody"></tbody>
+          </table>
+        </div>
+        <div id="paginationWrap"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script type="module" src="assets/js/pages/customers.js"></script>
+</body>
+</html>

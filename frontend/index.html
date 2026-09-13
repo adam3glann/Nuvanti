@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Nuvanti — Considered Clothing</title>
+<meta name="description" content="Nuvanti is a modern clothing brand built on hand-worked embroidery and heavyweight knits. Shop the Knitted Embroidered Polo, Embroidered Tank Top, and Nuv Sweatpants." />
+<link rel="canonical" href="https://nuvanti.wuiltstore.com/en" />
+<meta property="og:title" content="Nuvanti — Considered Clothing" />
+<meta property="og:description" content="Heavyweight cottons, considered proportions, quiet detailing. Shop the new Nuvanti collection." />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://nuvanti.wuiltstore.com/en" />
+<meta property="og:image" content="assets/img/lifestyle/campaign-tanktop.webp" />
+<meta name="twitter:card" content="summary_large_image" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/tokens.css" />
+<link rel="stylesheet" href="assets/css/base.css" />
+<link rel="stylesheet" href="assets/css/components.css" />
+<link rel="stylesheet" href="assets/css/pages.css" />
+</head>
+<body>
+<a href="#main" class="skip-link">Skip to content</a>
+<div id="site-header"></div>
+
+<main id="main">
+
+  <section class="hero-slider" id="heroSlider" aria-roledescription="carousel" aria-label="Featured collections"></section>
+
+  <section class="section section--ink featured-collection" aria-labelledby="featured-heading">
+    <div class="container">
+      <div class="section-head">
+        <div class="section-head__title">
+          <h2 id="featured-heading">Featured This Week</h2>
+          <p>A working edit of the pieces we're wearing most right now.</p>
+        </div>
+        <a href="shop.html" class="btn-text">View All Products</a>
+      </div>
+      <div class="product-grid" id="featuredGrid">
+        <div class="skeleton" style="aspect-ratio:4/5"></div>
+        <div class="skeleton" style="aspect-ratio:4/5"></div>
+        <div class="skeleton" style="aspect-ratio:4/5"></div>
+        <div class="skeleton" style="aspect-ratio:4/5"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section collection-nav section--tight reveal" aria-labelledby="category-heading">
+    <div class="container">
+      <div class="section-head">
+        <div class="section-head__title">
+          <h2 id="category-heading">Shop by Category</h2>
+        </div>
+      </div>
+      <div class="category-grid" id="categoryGrid"></div>
+    </div>
+  </section>
+
+  <section class="section section--surface new-arrivals" aria-labelledby="new-heading">
+    <div class="container">
+      <div class="section-head">
+        <div class="section-head__title">
+          <h2 id="new-heading">New Arrivals</h2>
+          <p>Fresh into the shop — see it before it's gone.</p>
+        </div>
+        <div class="carousel__nav">
+          <button class="hero-arrow" style="color:var(--color-text);border-color:var(--color-border)" id="naPrev" aria-label="Scroll left">‹</button>
+          <button class="hero-arrow" style="color:var(--color-text);border-color:var(--color-border)" id="naNext" aria-label="Scroll right">›</button>
+        </div>
+      </div>
+      <div class="carousel">
+        <div class="carousel__track" id="newArrivalsTrack"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section editorial-section reveal" aria-labelledby="editorial-heading">
+    <div class="container editorial-split">
+      <div class="editorial-split__img">
+        <img src="assets/img/lifestyle/editorial-polo-navy.webp" alt="Nuvanti chest embroidery detail on the Knitted Embroidered Polo" loading="lazy" />
+      </div>
+      <div class="editorial-split__text">
+        <p class="label">Our Approach</p>
+        <h2 id="editorial-heading">Small details, worked by hand.</h2>
+        <p>Every Nuvanti piece starts with the embroidery — the script signature, the star crest, the graffiti-style patch — worked directly onto ribbed knits and heavyweight cotton rather than printed on top of them.</p>
+        <p>We keep the catalog small on purpose: a handful of styles, each offered in the colors people actually reach for, restocked rather than replaced every season.</p>
+        <a href="about.html" class="btn btn-outline">Our Story</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="campaign campaign--atelier reveal" aria-labelledby="campaign-heading">
+    <img src="assets/img/lifestyle/campaign-banner.webp" alt="" loading="lazy" />
+    <div class="campaign__content">
+      <p class="label" style="color:var(--color-text-inverse)">SUMMER '26</p>
+      <h2 id="campaign-heading" class="campaign__title font-display">Worn Together</h2>
+      <p style="color:var(--color-muted-inverse);margin-block:1rem 1.5rem">Knitted polos, embroidered tanks, and wide-leg sweatpants — made to be mixed and matched.</p>
+      <a href="shop.html" class="btn btn-ink-outline">Shop the Collection</a>
+    </div>
+  </section>
+
+  <section class="section section--surface bestsellers" aria-labelledby="bestseller-heading">
+    <div class="container">
+      <div class="section-head">
+        <div class="section-head__title">
+          <h2 id="bestseller-heading">Best Sellers</h2>
+          <p>The pieces our customers keep coming back for.</p>
+        </div>
+        <a href="shop.html?filter=bestseller" class="btn-text">Shop Best Sellers</a>
+      </div>
+      <div class="product-grid" id="bestsellerGrid"></div>
+    </div>
+  </section>
+
+  <section class="section section--ink section--tight reveal" aria-labelledby="social-heading">
+    <div class="container">
+      <div class="section-head">
+        <div class="section-head__title">
+          <h2 id="social-heading">@_.nuvanti._</h2>
+          <p>Tag us to be featured.</p>
+        </div>
+      </div>
+    </div>
+    <div class="social-grid" id="socialGrid"></div>
+  </section>
+
+  <section class="section section--ink newsletter reveal" aria-labelledby="newsletter-heading">
+    <div class="container" style="max-width:640px">
+      <p class="label" style="color:var(--color-muted-inverse)">Stay Connected</p>
+      <h2 id="newsletter-heading">Stay in the Nuvanti circle.</h2>
+      <p style="color:var(--color-muted-inverse);margin-top:0.75rem">First access to new arrivals, restocks, and the occasional archive sale. No noise.</p>
+      <form class="newsletter__form" id="newsletterForm">
+        <label class="visually-hidden" for="newsletterEmail">Email address</label>
+        <input type="email" id="newsletterEmail" required placeholder="Email address" style="background:transparent;border:1px solid var(--color-border-inverse);color:var(--color-text-inverse);padding:0.85rem 1rem;border-radius:10px" />
+        <button class="btn btn-ink-outline" type="submit">Subscribe</button>
+      </form>
+      <p class="newsletter__success" id="newsletterSuccess" hidden>You're on the list. Watch your inbox.</p>
+      <p style="color:var(--color-muted-inverse);font-size:var(--fs-micro);margin-top:1rem">By subscribing you agree to receive marketing emails. Unsubscribe anytime.</p>
+    </div>
+  </section>
+
+</main>
+
+<div id="site-footer"></div>
+
+<script type="module" src="assets/js/pages/home.js"></script>
+</body>
+</html>

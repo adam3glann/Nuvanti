@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Analytics — Nuvanti Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/tokens.css" />
+<link rel="stylesheet" href="assets/css/base.css" />
+<link rel="stylesheet" href="assets/css/components.css" />
+</head>
+<body>
+<div class="admin-shell" id="adminShell">
+  <div id="admin-sidebar-mount"></div>
+  <div class="admin-main">
+    <div id="admin-header-mount"></div>
+    <div class="admin-content">
+      <div class="page-title-row">
+        <div><h1>Analytics</h1><p>Store performance at a glance.</p></div>
+        <select id="rangeSelect" style="padding:.5rem .7rem;border:1px solid var(--a-border-strong);border-radius:4px">
+          <option value="7d">Last 7 days</option>
+          <option value="30d" selected>Last 30 days</option>
+          <option value="90d">Last 90 days</option>
+          <option value="1y">Last year</option>
+        </select>
+      </div>
+
+      <div class="stat-grid" id="statGrid"></div>
+
+      <div class="card" style="margin-bottom:1.25rem">
+        <div class="card-head"><h2>Revenue</h2></div>
+        <div class="card-pad" id="revenueChart"></div>
+      </div>
+      <div class="card" style="margin-bottom:1.25rem">
+        <div class="card-head"><h2>Orders</h2></div>
+        <div class="card-pad" id="ordersChart"></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem" class="an-grid">
+        <div class="card">
+          <div class="card-head"><h2>Top Products</h2></div>
+          <div class="table-wrap">
+            <table class="admin-table">
+              <thead><tr><th>Product</th><th>Units Sold</th><th>Revenue</th></tr></thead>
+              <tbody id="topProductsBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Revenue by Category</h2></div>
+          <div class="card-pad" id="categoryChart"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<style>@media (max-width:960px){ .an-grid{ grid-template-columns:1fr !important; } }</style>
+<script type="module" src="assets/js/pages/analytics.js"></script>
+</body>
+</html>

@@ -1,0 +1,113 @@
+/* =========================================================
+   NUVANTI — Design Tokens (Modern Mineral)
+   An original premium system: graphite, warm stone, mineral green,
+   and a quiet, tactile surface scale.
+   ========================================================= */
+
+:root {
+  /* ---- Color: core ---- */
+  --color-ink: #18201D;
+  --color-ink-soft: #26312D;
+  --color-dark-surface: #33403A;
+  --color-dark-surface-raised: #415149;
+  --color-paper: #E9E6DE;
+  --color-surface: #F5F3EE;
+  --color-surface-raised: #FFFFFF;
+  --color-soft-surface: #D7DDD4;
+
+  --color-text: #1E2723;
+  --color-text-inverse: #F7F5EF;
+  --color-muted: #59645D;
+  --color-muted-inverse: #D2D8D0;
+  --color-border: #CDD2C9;
+  --color-border-inverse: #65736B;
+  --color-white: #FFFFFF;
+
+  --color-accent: #35604A;
+  --color-accent-strong: #254635;
+  --color-accent-tint: #DDE9E0;
+  --color-accent-2: #82926A;
+  --color-accent-2-tint: #E7EADB;
+
+  --gradient-brand: linear-gradient(125deg, var(--color-accent) 0%, var(--color-accent-2) 100%);
+  --gradient-brand-soft: linear-gradient(125deg, rgba(53,96,74,0.24) 0%, rgba(130,146,106,0.18) 100%);
+  --gradient-ink: linear-gradient(135deg, var(--color-ink) 0%, var(--color-ink-soft) 65%, var(--color-dark-surface) 100%);
+
+  --color-success: #087753;
+  --color-warning: #8D5A00;
+  --color-error: #B42318;
+
+  --glass-dark: rgba(24, 32, 29, 0.76);
+  --glass-dark-border: rgba(247, 245, 239, 0.24);
+  --glass-light: rgba(245, 243, 238, 0.82);
+  --glass-light-border: rgba(255, 255, 255, 0.72);
+  --overlay-ink-strong: rgba(24, 32, 29, 0.78);
+  --overlay-ink-medium: rgba(24, 32, 29, 0.58);
+  --overlay-ink-soft: rgba(24, 32, 29, 0.28);
+  --overlay-white-soft: rgba(255, 255, 255, 0.20);
+  --overlay-white-medium: rgba(255, 255, 255, 0.52);
+  --surface-float: rgba(255, 255, 255, 0.94);
+  --border-ink-alpha: rgba(24, 32, 29, 0.30);
+  --inset-white-alpha: rgba(255, 255, 255, 0.50);
+  --shadow-color: rgba(24, 32, 29, 0.16);
+  --shadow-glow-color: rgba(53, 96, 74, 0.28);
+
+  /* ---- Typography ---- */
+  --font-display: 'Bricolage Grotesque', 'Archivo', 'Helvetica Neue', Arial, sans-serif;
+  --font-body: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+
+  --fs-hero: clamp(3.4rem, 7vw, 7rem);
+  --fs-h1: clamp(2.25rem, 4.5vw, 3.75rem);
+  --fs-h2: clamp(1.85rem, 3.4vw, 2.75rem);
+  --fs-h3: clamp(1.25rem, 2vw, 1.65rem);
+  --fs-lead: clamp(1.05rem, 1.4vw, 1.3rem);
+  --fs-body: 1rem;
+  --fs-small: 0.875rem;
+  --fs-micro: 0.75rem;
+
+  --lh-tight: 1.02;
+  --lh-snug: 1.22;
+  --lh-body: 1.62;
+
+  --ls-tight: -0.03em;
+  --ls-label: 0.08em;
+
+  /* ---- Spacing scale ---- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4.5rem;
+  --space-9: 6.5rem;
+
+  /* ---- Layout ---- */
+  --container-max: 1400px;
+  --container-pad: clamp(1.25rem, 4vw, 3rem);
+  --header-h: 84px;
+  --radius-sm: 12px;
+  --radius-md: 24px;
+  --radius-lg: 40px;
+  --radius-pill: 999px;
+
+  /* ---- Motion ---- */
+  --ease-editorial: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 180ms;
+  --dur-med: 320ms;
+  --dur-slow: 560ms;
+
+  /* ---- Elevation ---- */
+  --shadow-card: 0 6px 20px var(--shadow-color);
+  --shadow-hover: 0 24px 52px rgba(11, 16, 32, 0.24);
+  --shadow-glow: 0 14px 36px var(--shadow-glow-color);
+  --shadow-glow-lg: 0 22px 52px rgba(110, 84, 247, 0.42);
+  --shadow-drawer: -20px 0 56px rgba(11, 16, 32, 0.24);
+  --shadow-modal: 0 32px 72px rgba(11, 16, 32, 0.32);
+  --shadow-glass: 0 8px 32px rgba(11, 16, 32, 0.20);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur-fast: 0ms; --dur-med: 0ms; --dur-slow: 0ms; }
+}

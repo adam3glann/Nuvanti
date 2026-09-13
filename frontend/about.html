@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>About — Nuvanti</title>
+<meta name="description" content="Nuvanti is designed around heavier fabrics, considered proportions, and fewer, better releases. Read our story." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/tokens.css" />
+<link rel="stylesheet" href="assets/css/base.css" />
+<link rel="stylesheet" href="assets/css/components.css" />
+<link rel="stylesheet" href="assets/css/pages.css" />
+</head>
+<body>
+<a href="#main" class="skip-link">Skip to content</a>
+<div id="site-header"></div>
+<main id="main">
+  <div class="campaign" style="min-height:60vh">
+    <img src="assets/img/lifestyle/about-hero.webp" alt="Nuvanti studio" />
+    <div class="campaign__content">
+      <p class="label" style="color:var(--color-text-inverse)">About Nuvanti</p>
+      <h1 class="campaign__title font-display">Fewer things, made properly.</h1>
+    </div>
+  </div>
+
+  <section class="section" id="story">
+    <div class="container editorial-split">
+      <div class="editorial-split__text">
+        <p class="label">Our Story</p>
+        <h2>Started with a polo we couldn't buy anywhere else.</h2>
+        <p>Nuvanti began with a knitted polo — contrast tipping, a hand-embroidered signature, a fit that didn't lose its shape after a few wears. We couldn't find one built the way we wanted, so we made it ourselves.</p>
+        <p>That polo became the starting point for everything since: the embroidered tanks, the wide-leg sweatpants, each one built around the same small details worked by hand rather than printed on.
+      </div>
+      <div class="editorial-split__img">
+        <img src="assets/img/lifestyle/about-detail-1.webp" alt="Nuvanti fabric detail" loading="lazy" />
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--tight">
+    <div class="container editorial-split">
+      <div class="editorial-split__img">
+        <img src="assets/img/lifestyle/about-detail-2.webp" alt="Nuvanti design process" loading="lazy" />
+      </div>
+      <div class="editorial-split__text">
+        <p class="label">Design Philosophy</p>
+        <h2>Proportion first, decoration last.</h2>
+        <p>We design around how a piece sits on a body in motion, not how it photographs flat. Logos stay small or disappear entirely. Colors are chosen to work across a wardrobe, not to stand out in a single outfit.</p>
+        <p>We release fewer collections than most brands our size — usually three or four a year — because getting a fit right takes longer than a monthly drop calendar allows.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--ink">
+    <div class="container" style="max-width:760px">
+      <p class="label" style="color:var(--color-muted-inverse)">Quality</p>
+      <h2 style="margin-bottom:1.25rem">Built to outlast the season it was made for.</h2>
+      <p style="color:var(--color-muted-inverse)">We keep every style in ribbed knits and heavyweight cottons that hold their shape wash after wash, and every embroidery — the script signature, the star crest, the graffiti patch — is worked directly into the fabric rather than printed on top of it. We stand behind it with a 30-day return window.</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container" style="text-align:center;max-width:560px;margin-inline:auto">
+      <h2>See it for yourself.</h2>
+      <p class="text-muted" style="margin:1rem 0 1.75rem">Browse the current collection.</p>
+      <a href="shop.html" class="btn btn-primary">Shop Nuvanti</a>
+    </div>
+  </section>
+</main>
+<div id="site-footer"></div>
+<script type="module">
+  import { initShell } from './assets/js/main.js';
+  initShell({ currentPage: 'about' });
+</script>
+</body>
+</html>
