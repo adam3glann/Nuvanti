@@ -407,6 +407,11 @@
   justify-content: center;
   box-shadow: 0 4px 14px var(--shadow-color);
   transition: transform var(--dur-fast) var(--ease-editorial);
+  /* The badge itself is always a light circle, on light or dark sections
+     alike, so the icon needs its own fixed dark color instead of
+     inheriting the surrounding text color (which is white on dark
+     "ink" sections and would otherwise disappear on the white badge). */
+  color: var(--color-ink);
 }
 .product-card__wishlist:hover {
   transform: scale(1.1);
@@ -747,6 +752,7 @@
   background: var(--gradient-ink);
   color: var(--color-text-inverse);
   padding-top: var(--space-8);
+  margin-top: var(--space-7);
 }
 .footer-grid {
   display: grid;
