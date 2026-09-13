@@ -1,0 +1,176 @@
+[
+  {
+    "id": "p-001",
+    "slug": "embroidered-tank-top",
+    "name": "Embroidered Tank Top",
+    "description": "A fitted ribbed tank in soft cream cotton, finished with a hand-drawn embroidery on the chest. Pick the martini \"Cup\" motif or the Nuvanti Star crest — both sit on the same close-knit rib body that layers cleanly under a shirt or wears alone.",
+    "price": 250,
+    "compareAtPrice": 300,
+    "category": "tank-tops",
+    "collection": "womens",
+    "colors": [
+      "Cup",
+      "Nuvanti Star"
+    ],
+    "sizes": [
+      "S",
+      "M",
+      "L"
+    ],
+    "images": [
+      "assets/img/products/embroidered-tank-top/cup-1.webp",
+      "assets/img/products/embroidered-tank-top/cup-2.webp",
+      "assets/img/products/embroidered-tank-top/cup-3.webp",
+      "assets/img/products/embroidered-tank-top/nuvanti-star-1.webp",
+      "assets/img/products/embroidered-tank-top/nuvanti-star-2.webp"
+    ],
+    "material": "Ribbed cotton-elastane blend",
+    "sku": "SKU1",
+    "badges": [
+      "SALE"
+    ],
+    "featured": true,
+    "bestseller": true,
+    "newArrival": false,
+    "inventory": {
+      "S": 8,
+      "M": 12,
+      "L": 6
+    }
+  },
+  {
+    "id": "p-002",
+    "slug": "men-tank-top",
+    "name": "Men Tank Top",
+    "description": "A clean ribbed tank built for warm-weather layering — minimal branding, close-to-body fit, and a length made to sit right whether it's worn alone or under an open shirt.",
+    "price": 200,
+    "compareAtPrice": 250,
+    "category": "tank-tops",
+    "collection": "mens",
+    "colors": [
+      "Black",
+      "Grey"
+    ],
+    "sizes": [
+      "S",
+      "M",
+      "L"
+    ],
+    "images": [
+      "assets/img/products/men-tank-top/black-1.webp",
+      "assets/img/products/men-tank-top/black-2.webp",
+      "assets/img/products/men-tank-top/grey-1.webp",
+      "assets/img/products/men-tank-top/grey-2.webp"
+    ],
+    "material": "Ribbed cotton",
+    "sku": "SKU4",
+    "badges": [
+      "SALE"
+    ],
+    "featured": true,
+    "bestseller": false,
+    "newArrival": false,
+    "inventory": {
+      "S": 10,
+      "M": 14,
+      "L": 9
+    }
+  },
+  {
+    "id": "p-003",
+    "slug": "nuv-sweatpants",
+    "name": "Nuv Sweatpants",
+    "description": "Wide-leg sweatpants crafted from premium cotton for elevated everyday comfort. A relaxed drape through the leg, a zip phone pocket at the thigh, and a graffiti-style Nuvanti patch on the back pocket — built for movement, not just standing still.",
+    "price": 500,
+    "compareAtPrice": 680,
+    "category": "sweatpants",
+    "collection": "unisex",
+    "colors": [
+      "Black",
+      "Olive",
+      "Grey"
+    ],
+    "sizes": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "images": [
+      "assets/img/products/nuv-sweatpants/olive-1.webp",
+      "assets/img/products/nuv-sweatpants/olive-2.webp",
+      "assets/img/products/nuv-sweatpants/olive-3.webp",
+      "assets/img/products/nuv-sweatpants/olive-4.webp",
+      "assets/img/products/nuv-sweatpants/black-1.webp",
+      "assets/img/products/nuv-sweatpants/black-2.webp",
+      "assets/img/products/nuv-sweatpants/black-3.webp",
+      "assets/img/products/nuv-sweatpants/black-4.webp",
+      "assets/img/products/nuv-sweatpants/grey-1.webp",
+      "assets/img/products/nuv-sweatpants/grey-2.webp",
+      "assets/img/products/nuv-sweatpants/grey-3.webp",
+      "assets/img/products/nuv-sweatpants/grey-4.webp"
+    ],
+    "material": "Premium cotton fleece",
+    "sku": "SKU3",
+    "badges": [
+      "LIMITED"
+    ],
+    "featured": true,
+    "bestseller": true,
+    "newArrival": false,
+    "inventory": {
+      "S": 0,
+      "M": 0,
+      "L": 0,
+      "XL": 0
+    }
+  },
+  {
+    "id": "p-004",
+    "slug": "knitted-embroidered-polo",
+    "name": "Knitted Embroidered Polo",
+    "description": "A ribbed knit polo with contrast tipping at the collar and cuffs, the Nuvanti script embroidered on the chest and the star crest on the back shoulder. Soft-touch knit that layers well over a tee or wears solo with wide trousers.",
+    "price": 630,
+    "compareAtPrice": 700,
+    "category": "polos",
+    "collection": "unisex",
+    "colors": [
+      "Navy",
+      "Off-White",
+      "Olive"
+    ],
+    "sizes": [
+      "M",
+      "L",
+      "XL"
+    ],
+    "images": [
+      "assets/img/products/knitted-embroidered-polo/navy-1.webp",
+      "assets/img/products/knitted-embroidered-polo/navy-2.webp",
+      "assets/img/products/knitted-embroidered-polo/navy-3.webp",
+      "assets/img/products/knitted-embroidered-polo/navy-4.webp",
+      "assets/img/products/knitted-embroidered-polo/navy-5.webp",
+      "assets/img/products/knitted-embroidered-polo/off-white-1.webp",
+      "assets/img/products/knitted-embroidered-polo/off-white-2.webp",
+      "assets/img/products/knitted-embroidered-polo/off-white-3.webp",
+      "assets/img/products/knitted-embroidered-polo/off-white-4.webp",
+      "assets/img/products/knitted-embroidered-polo/olive-1.webp",
+      "assets/img/products/knitted-embroidered-polo/olive-2.webp",
+      "assets/img/products/knitted-embroidered-polo/olive-3.webp"
+    ],
+    "material": "Knitted cotton blend",
+    "sku": "SKU2",
+    "badges": [
+      "SALE",
+      "BESTSELLER"
+    ],
+    "featured": true,
+    "bestseller": true,
+    "newArrival": true,
+    "inventory": {
+      "M": 11,
+      "L": 7,
+      "XL": 4
+    }
+  }
+]
