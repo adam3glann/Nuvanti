@@ -1,52 +1,384 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Product — Nuvanti</title>
-<meta name="description" content="Shop premium clothing from Nuvanti." />
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="assets/css/tokens.css" />
-<link rel="stylesheet" href="assets/css/base.css" />
-<link rel="stylesheet" href="assets/css/components.css" />
-<link rel="stylesheet" href="assets/css/pages.css" />
-</head>
-<body>
-<a href="#main" class="skip-link">Skip to content</a>
-<div id="site-header"></div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-<main id="main">
-  <div class="container" id="productRoot">
-    <nav class="breadcrumb" aria-label="Breadcrumb" id="breadcrumb" style="margin-top:1.5rem"></nav>
+    <title>Product — Nuvanti</title>
+    <meta name="description" content="Shop premium clothing from Nuvanti." />
 
-    <div class="product-detail">
-      <div class="gallery" id="gallery"></div>
-      <div id="productInfo"></div>
-    </div>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
-    <div class="product-tabs-section">
-      <div class="info-accordion" id="infoAccordion" style="max-width:760px"></div>
-    </div>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
 
-    <section class="section" id="relatedSection">
-      <div class="section-head">
-        <div class="section-head__title"><h2>You May Also Like</h2></div>
+    <link rel="stylesheet" href="assets/css/tokens.css" />
+    <link rel="stylesheet" href="assets/css/base.css" />
+    <link rel="stylesheet" href="assets/css/components.css" />
+    <link rel="stylesheet" href="assets/css/pages.css" />
+
+    <!-- Product gallery improvements -->
+    <style>
+      /* =========================================================
+       PREMIUM PRODUCT GALLERY
+       ========================================================= */
+
+      .product-detail {
+        align-items: start;
+      }
+
+      .gallery {
+        width: 100%;
+        min-width: 0;
+      }
+
+      /* Main image frame */
+      .gallery__main {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 4 / 5;
+        min-height: 520px;
+
+        overflow: hidden;
+        background: #f5f5f3;
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        cursor: zoom-in;
+
+        border-radius: 2px;
+      }
+
+      /*
+      IMPORTANT:
+      contain means the ENTIRE clothing photo stays visible.
+      No heads, shoes, sleeves, etc. get accidentally cropped.
+    */
+      .gallery__main img {
+        width: 100%;
+        height: 100%;
+
+        object-fit: contain;
+        object-position: center;
+
+        display: block;
+
+        transition:
+          opacity 0.25s ease,
+          transform 0.45s cubic-bezier(0.2, 0.7, 0.2, 1);
+
+        user-select: none;
+        -webkit-user-drag: none;
+      }
+
+      /* Desktop zoom */
+      .gallery__main.is-zoomed {
+        cursor: zoom-out;
+      }
+
+      .gallery__main.is-zoomed img {
+        transform: scale(1.65);
+      }
+
+      /* =========================================================
+       THUMBNAILS
+       ========================================================= */
+
+      .gallery__thumbs {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 10px;
+
+        width: 100%;
+        margin-top: 12px;
+      }
+
+      .gallery__thumb {
+        position: relative;
+
+        width: 100%;
+        aspect-ratio: 4 / 5;
+
+        padding: 0;
+        margin: 0;
+
+        border: 1px solid transparent;
+        border-radius: 2px;
+
+        overflow: hidden;
+
+        background: #f5f5f3;
+
+        cursor: pointer;
+
+        opacity: 0.62;
+
+        transition:
+          opacity 0.2s ease,
+          border-color 0.2s ease,
+          transform 0.2s ease;
+      }
+
+      .gallery__thumb:hover {
+        opacity: 0.9;
+        transform: translateY(-1px);
+      }
+
+      .gallery__thumb[data-active="true"] {
+        opacity: 1;
+        border-color: var(--color-text, #111);
+      }
+
+      .gallery__thumb img {
+        width: 100%;
+        height: 100%;
+
+        display: block;
+
+        object-fit: cover;
+        object-position: center;
+
+        user-select: none;
+        -webkit-user-drag: none;
+      }
+
+      /* =========================================================
+       LIGHTBOX
+       ========================================================= */
+
+      .lightbox {
+        position: fixed;
+        inset: 0;
+
+        z-index: 9999;
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        padding: 32px;
+
+        background: rgba(10, 10, 10, 0.96);
+
+        opacity: 0;
+        visibility: hidden;
+
+        transition:
+          opacity 0.25s ease,
+          visibility 0.25s ease;
+      }
+
+      .lightbox[data-open="true"] {
+        opacity: 1;
+        visibility: visible;
+      }
+
+      .lightbox > img {
+        width: min(90vw, 1100px);
+        height: min(90vh, 900px);
+
+        object-fit: contain;
+        object-position: center;
+
+        display: block;
+
+        user-select: none;
+        -webkit-user-drag: none;
+
+        border-radius: 2px;
+      }
+
+      .lightbox__close,
+      .lightbox__arrow {
+        position: absolute;
+
+        z-index: 2;
+
+        width: 48px;
+        height: 48px;
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        border: 1px solid rgba(255, 255, 255, 0.22);
+
+        background: rgba(255, 255, 255, 0.08);
+        color: white;
+
+        border-radius: 50%;
+
+        cursor: pointer;
+
+        backdrop-filter: blur(10px);
+
+        transition:
+          background 0.2s ease,
+          transform 0.2s ease;
+      }
+
+      .lightbox__close:hover,
+      .lightbox__arrow:hover {
+        background: rgba(255, 255, 255, 0.18);
+      }
+
+      .lightbox__close {
+        top: 24px;
+        right: 24px;
+      }
+
+      .lightbox__arrow--prev {
+        left: 24px;
+        top: 50%;
+
+        transform: translateY(-50%);
+      }
+
+      .lightbox__arrow--next {
+        right: 24px;
+        top: 50%;
+
+        transform: translateY(-50%);
+      }
+
+      .lightbox__arrow--prev:hover {
+        transform: translateY(-50%) scale(1.05);
+      }
+
+      .lightbox__arrow--next:hover {
+        transform: translateY(-50%) scale(1.05);
+      }
+
+      /* =========================================================
+       MOBILE
+       ========================================================= */
+
+      @media (max-width: 900px) {
+        .gallery__main {
+          min-height: 0;
+          aspect-ratio: 4 / 5;
+        }
+
+        .gallery__thumbs {
+          grid-template-columns: repeat(5, 1fr);
+          gap: 7px;
+          margin-top: 8px;
+        }
+
+        .gallery__main.is-zoomed img {
+          transform: none;
+        }
+      }
+
+      @media (max-width: 600px) {
+        .gallery__main {
+          aspect-ratio: 4 / 5;
+          border-radius: 0;
+        }
+
+        .gallery__thumbs {
+          gap: 6px;
+        }
+
+        .gallery__thumb {
+          border-radius: 0;
+        }
+
+        .lightbox {
+          padding: 12px;
+        }
+
+        .lightbox > img {
+          width: 100vw;
+          height: 100vh;
+          max-width: 100%;
+          max-height: 100%;
+        }
+
+        .lightbox__close,
+        .lightbox__arrow {
+          width: 42px;
+          height: 42px;
+        }
+
+        .lightbox__close {
+          top: 14px;
+          right: 14px;
+        }
+
+        .lightbox__arrow--prev {
+          left: 10px;
+        }
+
+        .lightbox__arrow--next {
+          right: 10px;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <a href="#main" class="skip-link">Skip to content</a>
+
+    <div id="site-header"></div>
+
+    <main id="main">
+      <div class="container" id="productRoot">
+        <nav
+          class="breadcrumb"
+          aria-label="Breadcrumb"
+          id="breadcrumb"
+          style="margin-top: 1.5rem"
+        ></nav>
+
+        <div class="product-detail">
+          <!-- PRODUCT IMAGE GALLERY -->
+          <div class="gallery" id="gallery"></div>
+
+          <!-- PRODUCT INFORMATION -->
+          <div id="productInfo"></div>
+        </div>
+
+        <!-- PRODUCT INFORMATION ACCORDION -->
+        <div class="product-tabs-section">
+          <div
+            class="info-accordion"
+            id="infoAccordion"
+            style="max-width: 760px"
+          ></div>
+        </div>
+
+        <!-- RELATED PRODUCTS -->
+        <section class="section" id="relatedSection">
+          <div class="section-head">
+            <div class="section-head__title">
+              <h2>You May Also Like</h2>
+            </div>
+          </div>
+
+          <div class="product-grid" id="relatedGrid"></div>
+        </section>
+
+        <!-- RECENTLY VIEWED -->
+        <section class="section section--tight" id="recentlyViewedSection">
+          <div class="section-head">
+            <div class="section-head__title">
+              <h2>Recently Viewed</h2>
+            </div>
+          </div>
+
+          <div class="product-grid" id="recentlyViewedGrid"></div>
+        </section>
       </div>
-      <div class="product-grid" id="relatedGrid"></div>
-    </section>
+    </main>
 
-    <section class="section section--tight" id="recentlyViewedSection">
-      <div class="section-head">
-        <div class="section-head__title"><h2>Recently Viewed</h2></div>
-      </div>
-      <div class="product-grid" id="recentlyViewedGrid"></div>
-    </section>
-  </div>
-</main>
+    <div id="site-footer"></div>
 
-<div id="site-footer"></div>
-<script type="module" src="assets/js/pages/product.js"></script>
-</body>
+    <script type="module" src="assets/js/pages/product.js"></script>
+  </body>
 </html>
