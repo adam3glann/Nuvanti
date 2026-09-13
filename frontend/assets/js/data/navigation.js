@@ -17,19 +17,18 @@ export const footerNav = {
   ],
   Help: [
     { label: 'Contact', href: 'contact.html' },
-    { label: 'Shipping', href: 'faq.html#shipping' },
-    { label: 'Returns', href: 'faq.html#returns' },
+    { label: 'Shipping', href: 'shipping-policy.html' },
+    { label: 'Returns', href: 'refund-policy.html' },
     { label: 'Size Guide', href: 'size-guide.html' },
     { label: 'FAQ', href: 'faq.html' },
   ],
   Company: [
     { label: 'About', href: 'about.html' },
     { label: 'Our Story', href: 'about.html#story' },
-    { label: 'Contact', href: 'contact.html' },
   ],
   Legal: [
-    { label: 'Privacy Policy', href: '#' },
-    { label: 'Terms of Service', href: '#' },
-    { label: 'Cookie Policy', href: '#' },
+    { label: 'Privacy Policy', href: 'privacy-policy.html' },
+    { label: 'Terms & Conditions', href: 'terms.html' },
+    { label: 'Exchange & Refund Policy', href: 'refund-policy.html' },
   ],
 };

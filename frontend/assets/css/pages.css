@@ -489,3 +489,71 @@
   font-size: clamp(4rem, 12vw, 8rem);
   line-height: 1;
 }
+
+/* ---- Policy pages (Terms, Privacy, Shipping, Exchange & Refund) ---- */
+.policy-section {
+  margin-bottom: var(--space-7);
+}
+.policy-section:last-child {
+  margin-bottom: 0;
+}
+.policy-section h2 {
+  margin-bottom: var(--space-3);
+}
+.policy-section p {
+  color: var(--color-muted);
+  margin-bottom: var(--space-3);
+}
+.policy-section ul {
+  list-style: none;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.policy-section ul li {
+  position: relative;
+  padding-left: 1.25rem;
+  color: var(--color-muted);
+}
+.policy-section ul li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+.policy-callout {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-5);
+  background: var(--color-surface-alt, var(--color-border));
+  margin-bottom: var(--space-7);
+}
+.policy-callout p {
+  margin-bottom: 0;
+  color: var(--color-text);
+}
+.policy-page nav.policy-jump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-7);
+}
+.policy-page nav.policy-jump a {
+  font-size: var(--fs-micro);
+  text-transform: uppercase;
+  letter-spacing: var(--ls-label);
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  color: var(--color-text);
+}
+.policy-page nav.policy-jump a:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
