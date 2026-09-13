@@ -551,3 +551,33 @@
   .filter-drawer .btn { min-height: 46px; }
   #loadMoreWrap { margin-top: var(--space-6) !important; }
 }
+
+/* =========================================================
+   Disable decorative :hover zoom/lift effects on touch devices
+   ---------------------------------------------------------
+   Touch browsers apply the CSS :hover state on tap (and can leave it
+   "stuck" until the next tap elsewhere), so any scale/zoom/lift effect
+   meant as a mouse-over hint instead fires the moment someone taps a
+   product card, button, or icon — which reads as the item suddenly
+   "zooming in". This block turns those effects off for anyone without
+   a real pointing device. It targets the shared component classes
+   (.product-card, .category-card, .btn, .icon-btn, etc.), not any
+   specific product, so it applies automatically to every item already
+   in the catalog and to anything added later — nothing to redo per
+   product.
+   ========================================================= */
+@media (hover: none), (pointer: coarse) {
+  .product-card:hover .product-card__media { box-shadow: none; transform: none; }
+  .product-card:hover .product-card__media img:not(.img-alt) { transform: none; }
+  .product-card:hover .product-card__media img.img-alt { opacity: 0; }
+  .product-card__wishlist:hover { transform: none; }
+  .category-card:hover { box-shadow: none; transform: none; }
+  .category-card:hover img { transform: none; }
+  .social-item:hover img { transform: none; }
+  .icon-btn:hover { transform: none; }
+  .btn-primary:hover { transform: none; box-shadow: var(--shadow-glow); }
+  .btn-outline:hover { transform: none; box-shadow: none; }
+  .btn-ink-outline:hover { transform: none; }
+  .primary-nav__link--summer:hover { transform: none; filter: none; }
+  .hero-arrow:hover { transform: none; }
+}
