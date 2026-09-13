@@ -10,13 +10,40 @@
 .product-detail { display: grid; grid-template-columns: 1fr; gap: var(--space-7); }
 @media (min-width: 900px) { .product-detail { grid-template-columns: 1.1fr 0.9fr; } }
 
-.gallery__main { position: relative; aspect-ratio: 4/5; overflow: hidden; background: var(--color-border); cursor: zoom-in; }
+.gallery__main { position: relative; aspect-ratio: 4/5; overflow: hidden; background: var(--color-border); touch-action: manipulation; }
 .gallery__main img { width: 100%; height: 100%; object-fit: cover; transition: transform var(--dur-med) var(--ease-editorial); }
-.gallery__main.is-zoomed img { transform: scale(1.6); cursor: zoom-out; }
-.gallery__thumbs { display: flex; gap: var(--space-3); margin-top: var(--space-3); overflow-x: auto; }
-.gallery__thumb { width: 68px; height: 84px; flex: 0 0 auto; overflow: hidden; border: 1px solid transparent; opacity: 0.65; }
+/* Click-to-zoom is a mouse-hover affordance; only offer it on devices that actually have a mouse.
+   On touch devices the tap instead opens the full-screen lightbox (see .lightbox below), which is
+   a far clearer interaction than an unlabeled tap-to-scale toggle. */
+@media (hover: hover) and (pointer: fine) {
+  .gallery__main { cursor: zoom-in; }
+  .gallery__main.is-zoomed img { transform: scale(1.6); cursor: zoom-out; }
+}
+.gallery__thumbs { display: flex; gap: var(--space-3); margin-top: var(--space-3); overflow-x: auto; touch-action: manipulation; }
+.gallery__thumb { width: 68px; height: 84px; flex: 0 0 auto; overflow: hidden; border: 1px solid transparent; opacity: 0.65; touch-action: manipulation; }
 .gallery__thumb[data-active="true"] { border-color: var(--color-ink); opacity: 1; }
 .gallery__thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+/* ---- Fullscreen lightbox (mobile/touch "view bigger" — opened by tapping the main image) ---- */
+.lightbox {
+  position: fixed; inset: 0; z-index: 260; background: var(--color-ink);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none; transition: opacity var(--dur-med) var(--ease-editorial);
+}
+.lightbox[data-open="true"] { opacity: 1; pointer-events: auto; }
+.lightbox img { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
+.lightbox__close {
+  position: absolute; top: var(--space-4); right: var(--space-4); z-index: 2;
+  width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: var(--glass-dark); color: var(--color-text-inverse); backdrop-filter: blur(8px);
+}
+.lightbox__arrow {
+  position: absolute; top: 50%; transform: translateY(-50%); z-index: 2;
+  width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: var(--glass-dark); color: var(--color-text-inverse); backdrop-filter: blur(8px);
+}
+.lightbox__arrow--prev { left: var(--space-4); }
+.lightbox__arrow--next { right: var(--space-4); }
 
 .product-info__eyebrow { color: var(--color-muted); }
 .product-info__name { margin-block: var(--space-2) var(--space-3); }

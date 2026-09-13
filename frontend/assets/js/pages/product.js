@@ -67,15 +67,62 @@ function renderGallery() {
         </button>`).join('')}
     </div>
   `;
-  el.querySelectorAll('.gallery__thumb').forEach((btn) => {
+  let activeIndex = 0;
+  el.querySelectorAll('.gallery__thumb').forEach((btn, i) => {
     btn.addEventListener('click', () => {
       el.querySelectorAll('.gallery__thumb').forEach((b) => (b.dataset.active = 'false'));
       btn.dataset.active = 'true';
+      activeIndex = i;
       document.getElementById('galleryMainImg').src = btn.dataset.src;
     });
   });
+
   const main = document.getElementById('galleryMain');
-  main.addEventListener('click', () => main.classList.toggle('is-zoomed'));
+  const hasMouse = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+
+  if (hasMouse) {
+    // Desktop/mouse: click toggles the inline zoom, as before.
+    main.addEventListener('click', () => main.classList.toggle('is-zoomed'));
+  } else {
+    // Touch devices: tapping the photo opens a full-screen lightbox instead. This avoids the
+    // confusing "tap makes the photo huge with no obvious way back" issue — the lightbox fits the
+    // whole image on screen (object-fit: contain) and has an explicit close button.
+    main.addEventListener('click', () => openLightbox(activeIndex));
+  }
+}
+
+function openLightbox(startIndex) {
+  let index = startIndex;
+  let box = document.getElementById('productLightbox');
+  if (!box) {
+    box = document.createElement('div');
+    box.className = 'lightbox';
+    box.id = 'productLightbox';
+    box.innerHTML = `
+      <button class="lightbox__close" aria-label="Close">${icon('close')}</button>
+      <button class="lightbox__arrow lightbox__arrow--prev" aria-label="Previous image">${icon('chevronLeft')}</button>
+      <img id="lightboxImg" alt="${product.name}" />
+      <button class="lightbox__arrow lightbox__arrow--next" aria-label="Next image">${icon('chevronRight')}</button>
+    `;
+    document.body.appendChild(box);
+    box.querySelector('.lightbox__close').addEventListener('click', () => close());
+    box.addEventListener('click', (e) => { if (e.target === box) close(); });
+    box.querySelector('.lightbox__arrow--prev').addEventListener('click', () => nav(-1));
+    box.querySelector('.lightbox__arrow--next').addEventListener('click', () => nav(1));
+    document.addEventListener('keydown', (e) => {
+      if (box.dataset.open !== 'true') return;
+      if (e.key === 'Escape') close();
+      if (e.key === 'ArrowLeft') nav(-1);
+      if (e.key === 'ArrowRight') nav(1);
+    });
+  }
+  function render() { document.getElementById('lightboxImg').src = product.images[index]; }
+  function nav(dir) { index = (index + dir + product.images.length) % product.images.length; render(); }
+  function close() { box.dataset.open = 'false'; document.body.style.overflow = ''; }
+
+  render();
+  box.dataset.open = 'true';
+  document.body.style.overflow = 'hidden';
 }
 
 function renderInfo() {
