@@ -9,12 +9,13 @@ const FAQS = {
     { q: 'Can I change or cancel my order?', a: 'Contact us within 2 hours of placing your order and we\'ll do our best to adjust it before it enters fulfillment.' },
   ],
   shipping: [
-    { q: 'How much does shipping cost?', a: 'Standard shipping is free on orders over 3,000 EGP, otherwise a flat 75 EGP. Express shipping is available for 150 EGP.' },
-    { q: 'How long does delivery take?', a: 'Standard delivery takes 4–7 business days. Express delivery takes 1–2 business days.' },
+    { q: 'Where do you ship?', a: 'We currently ship inside Egypt only.' },
+    { q: 'How much does shipping cost?', a: 'Shipping fees are calculated based on your location and are displayed at checkout.' },
+    { q: 'How long does delivery take?', a: 'Orders are processed within 1–3 business days. Delivery to Cairo &amp; Giza takes 2–6 business days.' },
   ],
   returns: [
-    { q: 'What is your return policy?', a: 'Unworn items with tags attached can be returned within 30 days of delivery for a full refund.' },
-    { q: 'How do I start a return?', a: 'Go to your account under Orders and select "Start a Return," or contact us directly with your order number.' },
+    { q: 'What is your exchange policy?', a: 'We offer exchange only within 14 days from the delivery date. The item must be unused, in its original condition and packaging, with the original invoice provided.' },
+    { q: 'Can I get a refund?', a: 'Refunds are not available. You can check your order while the courier is at your door — if it fits, keep it. If not, return it immediately to the courier, as returns aren\'t accepted afterward. In case of a manufacturing defect, report it within 48 hours with photos or video and you may receive a replacement or refund.' },
   ],
   payments: [
     { q: 'What payment methods do you accept?', a: 'We accept Visa, Mastercard, Meeza, and Cash on Delivery within Egypt.' },

@@ -840,12 +840,11 @@ function renderInfo() {
     >
 
       <span>
-        Free shipping on orders over
-        ${formatPrice(3000)}.
+        Ships inside Egypt only — Cairo &amp; Giza in 2–6 business days.
       </span>
 
       <span>
-        Free returns within 30 days.
+        Exchange within 14 days of delivery. Refunds are not available.
       </span>
 
       <span>
@@ -1209,13 +1208,13 @@ function renderAccordion() {
     {
       title: "Shipping",
 
-      body: "Standard shipping (4–7 business days) is free on orders over 3,000 EGP, otherwise a flat 75 EGP. Express shipping (1–2 business days) is available at checkout for 150 EGP.",
+      body: "We ship inside Egypt only. Orders are processed within 1–3 business days, with delivery to Cairo &amp; Giza in 2–6 business days. Shipping fees are calculated based on your location and shown at checkout.",
     },
 
     {
       title: "Returns",
 
-      body: "Unworn items with tags attached can be returned within 30 days of delivery for a full refund. Start a return from your account or contact us.",
+      body: "We offer exchange only, within 14 days of delivery, for unused items in original condition with the invoice. Refunds are not available except in the case of a reported manufacturing defect. See our full <a href=\"refund-policy.html\">Exchange &amp; Refund Policy</a>.",
     },
 
     {
