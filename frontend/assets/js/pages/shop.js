@@ -26,11 +26,17 @@ const state = {
   view: 'grid',
 };
 
-renderFilters();
-renderToolbar();
-initViewToggle();
-bindLayoutEvents();
-runFilter();
+function initShop() {
+  renderFilters();
+  renderToolbar();
+  initViewToggle();
+  bindLayoutEvents();
+  document.getElementById('shopSearch').value = state.query;
+  syncFilterUI();
+  // Start after the mobile browser has completed its initial layout. This avoids
+  // an iOS Safari race where the skeleton state can remain painted indefinitely.
+  requestAnimationFrame(() => runFilter());
+}
 
 function renderFilters() {
   const html = `
@@ -158,23 +164,35 @@ function initViewToggle() {
 }
 
 let cache = [];
+let activeRequest = 0;
 async function runFilter(append = false) {
+  const requestId = ++activeRequest;
   const resultsEl = document.getElementById('productResults');
   if (!append) {
     resultsEl.innerHTML = Array.from({ length: 8 }).map(() => '<div class="skeleton" style="aspect-ratio:4/5"></div>').join('');
   }
-  cache = await fetchProducts({
-    category: state.category || undefined,
-    collection: state.collection || undefined,
-    colors: state.colors.length ? state.colors : undefined,
-    sizes: state.sizes.length ? state.sizes : undefined,
-    minPrice: state.minPrice,
-    maxPrice: state.maxPrice,
-    availability: state.availability || undefined,
-    badge: state.badge || undefined,
-    query: state.query || undefined,
-    sort: state.sort === 'featured' ? undefined : state.sort,
-  });
+  try {
+    cache = await fetchProducts({
+      category: state.category || undefined,
+      collection: state.collection || undefined,
+      colors: state.colors.length ? state.colors : undefined,
+      sizes: state.sizes.length ? state.sizes : undefined,
+      minPrice: state.minPrice,
+      maxPrice: state.maxPrice,
+      availability: state.availability || undefined,
+      badge: state.badge || undefined,
+      query: state.query || undefined,
+      sort: state.sort === 'featured' ? undefined : state.sort,
+    });
+  } catch (error) {
+    // The storefront is frontend-only: show the local catalog even if a mobile
+    // browser interrupts the small async mock-service delay.
+    console.warn('Catalog service unavailable; using local catalog.', error);
+    cache = [...allProducts];
+  }
+
+  // Ignore a delayed result if the shopper changed sort/filter while it loaded.
+  if (requestId !== activeRequest) return;
 
   const visibleCount = state.page * state.perPage;
   const visible = cache.slice(0, visibleCount);
@@ -214,8 +232,8 @@ function debounce(fn, ms) {
   return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
 }
 
-// initial search box + sync
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('shopSearch').value = state.query;
-  syncFilterUI();
-});
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initShop, { once: true });
+} else {
+  initShop();
+}
