@@ -1,0 +1,15 @@
+{
+  "name": "nuvanti-backend",
+  "version": "1.0.0",
+  "description": "Minimal REST API for the Nuvanti storefront. Reads/writes JSON files under data/ — no database setup required to get started. Swap the lib/store.js file for a real database later without touching the routes.",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2"
+  }
+}
