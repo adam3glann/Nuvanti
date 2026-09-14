@@ -1,12 +1,13 @@
-// productService — currently reads from local mock data.
+// productService — reads from the shared product store (localStorage,
+// seeded from local mock data and kept in sync with the admin panel).
 // Later: replace bodies with `fetch('/api/products...')` calls.
 // Every function stays async so call sites never need to change.
-import { products, getProductBySlug as _bySlug } from '../data/products.js';
+import { getPublishedProducts, getProductBySlug as _bySlug } from '../data/productStore.js';
 import { categories as categoryList } from '../data/categories.js';
 
 export async function fetchProducts(filters = {}) {
   await tick();
-  let list = [...products];
+  let list = [...getPublishedProducts()];
 
   if (filters.category) list = list.filter((p) => p.category === filters.category);
   if (filters.collection) list = list.filter((p) => p.collection === filters.collection);
@@ -37,27 +38,29 @@ export async function fetchProducts(filters = {}) {
 
 export async function fetchProductBySlug(slug) {
   await tick();
-  return _bySlug(slug) || null;
+  const product = _bySlug(slug);
+  if (!product || (product.status && product.status !== 'active')) return null;
+  return product;
 }
 
 export async function fetchFeatured() {
   await tick();
-  return products.filter((p) => p.featured);
+  return getPublishedProducts().filter((p) => p.featured);
 }
 
 export async function fetchBestsellers() {
   await tick();
-  return products.filter((p) => p.bestseller);
+  return getPublishedProducts().filter((p) => p.bestseller);
 }
 
 export async function fetchNewArrivals() {
   await tick();
-  return products.filter((p) => p.newArrival);
+  return getPublishedProducts().filter((p) => p.newArrival);
 }
 
 export async function fetchRelated(product, count = 4) {
   await tick();
-  return products.filter((p) => p.category === product.category && p.id !== product.id).slice(0, count);
+  return getPublishedProducts().filter((p) => p.category === product.category && p.id !== product.id).slice(0, count);
 }
 
 export async function fetchCategories() {
@@ -69,7 +72,7 @@ export async function searchProducts(query) {
   await tick();
   if (!query) return [];
   const q = query.toLowerCase();
-  return products.filter((p) => p.name.toLowerCase().includes(q) || p.category.includes(q)).slice(0, 8);
+  return getPublishedProducts().filter((p) => p.name.toLowerCase().includes(q) || p.category.includes(q)).slice(0, 8);
 }
 
 function tick(ms = 120) {

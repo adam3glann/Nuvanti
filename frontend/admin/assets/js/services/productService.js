@@ -1,15 +1,17 @@
-// productService (admin) — reads/writes the in-memory copy of the shared
-// catalog. A real backend replaces every function body with a fetch() to
-// /api/admin/products; call sites elsewhere never need to change.
-import { products as sourceProducts } from '../../../../assets/js/data/products.js';
-
-let store = sourceProducts.map((p) => ({ ...p, status: 'active', cost: Math.round(p.price * 0.42), sku: `NV-${p.id.toUpperCase()}` }));
+// productService (admin) — reads/writes the same shared catalog the
+// storefront reads from (see assets/js/data/productStore.js), so any
+// change made here is what customers see in the shop. A real backend
+// replaces every function body with a fetch() to /api/admin/products;
+// call sites elsewhere never need to change.
+import {
+  getAllProducts, getProductById, addProduct, updateProduct, deleteProduct,
+} from '../../../../assets/js/data/productStore.js';
 
 function tick(ms = 150) { return new Promise((r) => setTimeout(r, ms)); }
 
 export async function fetchAdminProducts({ query, category, status, page = 1, perPage = 10, sort } = {}) {
   await tick();
-  let list = [...store];
+  let list = [...getAllProducts()];
   if (query) {
     const q = query.toLowerCase();
     list = list.filter((p) => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q));
@@ -26,28 +28,31 @@ export async function fetchAdminProducts({ query, category, status, page = 1, pe
 
 export async function fetchAdminProduct(id) {
   await tick();
-  return store.find((p) => p.id === id) || null;
+  return getProductById(id);
+}
+
+export async function createAdminProduct(data) {
+  await tick();
+  return addProduct(data);
 }
 
 export async function updateAdminProduct(id, patch) {
   await tick();
-  store = store.map((p) => (p.id === id ? { ...p, ...patch } : p));
-  return store.find((p) => p.id === id);
+  return updateProduct(id, patch);
 }
 
 export async function deleteAdminProduct(id) {
   await tick();
-  store = store.filter((p) => p.id !== id);
+  deleteProduct(id);
   return true;
 }
 
 export async function duplicateAdminProduct(id) {
   await tick();
-  const original = store.find((p) => p.id === id);
+  const original = getProductById(id);
   if (!original) return null;
-  const copy = { ...original, id: `${original.id}-copy-${Date.now()}`, name: `${original.name} (Copy)`, status: 'draft' };
-  store = [copy, ...store];
-  return copy;
+  const { id: _oldId, ...rest } = original;
+  return addProduct({ ...rest, name: `${original.name} (Copy)`, status: 'draft', sku: undefined });
 }
 
 export function productStockTotal(product) {

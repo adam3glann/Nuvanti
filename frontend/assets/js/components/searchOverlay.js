@@ -73,8 +73,8 @@ export function mountSearchOverlay() {
     renderRecentChips();
 
     // rebind product list reference for quick-add
-    const module = await import('../data/products.js');
-    bindProductCardEvents(resultsWrap, { products: module.products, onCartChange: refreshCartDrawer });
+    const module = await import('../data/productStore.js');
+    bindProductCardEvents(resultsWrap, { products: module.getPublishedProducts(), onCartChange: refreshCartDrawer });
 
     if (results.length === 0) {
       resultsWrap.innerHTML = `

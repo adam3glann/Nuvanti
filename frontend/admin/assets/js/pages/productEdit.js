@@ -1,7 +1,7 @@
 import { initAdminShell } from '../components/shell.js';
 import { icon } from '../components/icons.js';
 import { showAdminToast } from '../components/toast.js';
-import { fetchAdminProduct, updateAdminProduct } from '../services/productService.js';
+import { fetchAdminProduct, updateAdminProduct, createAdminProduct } from '../services/productService.js';
 import { fetchCategories, fetchCollections } from '../services/categoryService.js';
 
 const session = initAdminShell({ page: 'products', title: 'Edit Product' });
@@ -141,11 +141,32 @@ function renderForm(product, cats, cols) {
       bestseller: document.getElementById('fBestseller').checked,
       newArrival: document.getElementById('fNewArrival').checked,
       seoTitle: val('fSeoTitle'), seoDescription: val('fSeoDesc'),
+      images: product.images || [],
+      colors: product.colors || [],
+      sizes: product.sizes || [],
+      inventory: readInventory(product),
     };
-    if (!isNew) await updateAdminProduct(product.id, patch);
-    showAdminToast(isNew ? 'Product created as draft.' : 'Product saved.', 'success');
+    if (isNew) {
+      await createAdminProduct(patch);
+    } else {
+      await updateAdminProduct(product.id, patch);
+    }
+    showAdminToast(isNew ? 'Product created.' : 'Product saved — live in the store now.', 'success');
     setTimeout(() => { location.href = 'products.html'; }, 500);
   });
+}
+
+function readInventory(product) {
+  const inventory = {};
+  (product.sizes || []).forEach((size) => {
+    const input = document.querySelector(`[data-stock-size="${cssEscape(size)}"]`);
+    inventory[size] = input ? Math.max(0, Number(input.value) || 0) : (product.inventory?.[size] ?? 0);
+  });
+  return inventory;
+}
+
+function cssEscape(s) {
+  return String(s).replace(/[^a-zA-Z0-9_-]/g, (c) => `\\${c}`);
 }
 
 function renderImages(images) {
@@ -179,9 +200,21 @@ function renderVariants(product) {
     <tr>
       <td>${r.color}</td><td>${r.size}</td>
       <td class="mono">${r.sku}</td>
-      <td><input type="number" value="${r.stock}" style="width:80px" /></td>
+      <td><input type="number" min="0" value="${r.stock}" data-stock-size="${esc(r.size)}" style="width:80px" /></td>
     </tr>
-  `).join('') : `<tr><td colspan="4" style="color:var(--a-muted)">No variants yet — add colors and sizes to generate variant rows.</td></tr>`;
+  `).join('') + `<tr><td colspan="3" style="color:var(--a-muted)">Stock is tracked per size — editing one color's row updates that size for all colors.</td></tr>`
+    : `<tr><td colspan="4" style="color:var(--a-muted)">No variants yet — add colors and sizes to generate variant rows.</td></tr>`;
+
+  // Stock is stored per size (not per color), so keep every row for the
+  // same size in sync as the admin types.
+  document.getElementById('variantBody').querySelectorAll('[data-stock-size]').forEach((input) => {
+    input.addEventListener('input', () => {
+      const size = input.dataset.stockSize;
+      document.querySelectorAll(`[data-stock-size="${cssEscape(size)}"]`).forEach((other) => {
+        if (other !== input) other.value = input.value;
+      });
+    });
+  });
 }
 
 function val(id) { return document.getElementById(id).value; }

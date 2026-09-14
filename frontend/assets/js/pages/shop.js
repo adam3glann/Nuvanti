@@ -4,7 +4,10 @@ import { productCardHTML, bindProductCardEvents } from '../components/productCar
 import { refreshCartDrawer } from '../components/cartDrawer.js';
 import { fetchProducts } from '../services/productService.js';
 import { categories } from '../data/categories.js';
-import { colorHex, products as allProducts } from '../data/products.js';
+import { colorHex } from '../data/products.js';
+import { getPublishedProducts } from '../data/productStore.js';
+
+const allProducts = getPublishedProducts();
 
 initShell({ currentPage: 'shop' });
 

@@ -19,10 +19,12 @@ import {
 
 import {
   colorHex,
-  products as allProducts,
   stockFor,
   isInStock,
 } from "../data/products.js";
+import { getPublishedProducts } from "../data/productStore.js";
+
+const allProducts = getPublishedProducts();
 
 import { addToCart } from "../services/cartService.js";
 

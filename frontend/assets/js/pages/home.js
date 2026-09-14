@@ -5,7 +5,9 @@ import { refreshCartDrawer } from '../components/cartDrawer.js';
 import {
   fetchFeatured, fetchBestsellers, fetchNewArrivals, fetchCategories,
 } from '../services/productService.js';
-import { products } from '../data/products.js';
+import { getPublishedProducts } from '../data/productStore.js';
+
+const products = getPublishedProducts();
 
 initShell({ transparentHeader: true, currentPage: 'index' });
 

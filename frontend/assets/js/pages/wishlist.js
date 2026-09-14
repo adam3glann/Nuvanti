@@ -3,7 +3,9 @@ import { icon } from '../components/icons.js';
 import { formatPrice } from '../components/productCard.js';
 import { refreshCartDrawer } from '../components/cartDrawer.js';
 import { getWishlist, removeFromWishlist } from '../services/wishlistService.js';
-import { products } from '../data/products.js';
+import { getPublishedProducts } from '../data/productStore.js';
+
+const products = getPublishedProducts();
 import { addToCart } from '../services/cartService.js';
 import { showToast } from '../components/toast.js';
 
