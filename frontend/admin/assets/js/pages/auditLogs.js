@@ -3,6 +3,8 @@ import { formatDateTime, paginationHTML } from '../components/utils.js';
 import { hasPermission } from '../components/permissions.js';
 import { fetchAuditLogs, uniqueUsers } from '../services/auditLogService.js';
 
+const state = { query: '', user: '', page: 1, perPage: 15 };
+
 const session = initAdminShell({ page: 'audit', title: 'Audit Logs' });
 
 if (session && !hasPermission(session.role, 'audit.view')) {
@@ -10,8 +12,6 @@ if (session && !hasPermission(session.role, 'audit.view')) {
 } else if (session) {
   init();
 }
-
-const state = { query: '', user: '', page: 1, perPage: 15 };
 
 function init() {
   document.getElementById('userFilter').innerHTML = `<option value="">All Admins</option>${uniqueUsers().map((u) => `<option value="${u}">${u}</option>`).join('')}`;

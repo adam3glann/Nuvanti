@@ -102,10 +102,10 @@ h3, .h3 { font-family: var(--font-display); font-size: var(--fs-h3); line-height
   white-space: nowrap;
 }
 .btn-primary {
-  background: var(--gradient-brand); background-size: 140% 140%; background-position: 0% 50%;
+  background: var(--gradient-brand);
   color: var(--color-white); box-shadow: var(--shadow-glow);
 }
-.btn-primary:hover { background-position: 100% 50%; box-shadow: var(--shadow-glow-lg); transform: translateY(-2px) scale(1.02); }
+.btn-primary:hover { box-shadow: var(--shadow-glow-lg); transform: translateY(-2px) scale(1.02); }
 .btn-primary:active { transform: translateY(0) scale(0.99); }
 .btn-outline { border-color: var(--color-border); color: var(--color-text); background: var(--color-surface); }
 .btn-outline:hover { border-color: var(--color-accent); color: var(--color-accent); transform: translateY(-2px); box-shadow: var(--shadow-card); }

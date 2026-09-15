@@ -40,7 +40,7 @@ function render(order) {
               <tbody>
                 ${order.items.map((it) => `
                   <tr>
-                    <td><div style="display:flex;align-items:center;gap:.6rem"><img src="${it.image}" width="34" height="42" style="object-fit:cover;border-radius:3px" alt="" /><span>${it.name}</span></div></td>
+                    <td><div style="display:flex;align-items:center;gap:.6rem"><img src="../${it.image}" width="34" height="42" style="object-fit:cover;border-radius:3px" alt="" /><span>${it.name}</span></div></td>
                     <td>${it.color} / ${it.size}</td><td>${it.quantity}</td>
                     <td>${formatPrice(it.price)}</td><td>${formatPrice(it.price * it.quantity)}</td>
                   </tr>`).join('')}

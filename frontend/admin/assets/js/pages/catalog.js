@@ -9,11 +9,11 @@ import {
   fetchCollections, toggleCollectionStatus, deleteCollection, createCollection,
 } from '../services/categoryService.js';
 
-const session = initAdminShell({ page: 'categories', title: 'Categories & Collections' });
-if (session) init();
-
 const params = new URLSearchParams(location.search);
 let tab = params.get('tab') === 'collections' ? 'collections' : 'categories';
+
+const session = initAdminShell({ page: 'categories', title: 'Categories & Collections' });
+if (session) init();
 
 function init() {
   renderTabs();

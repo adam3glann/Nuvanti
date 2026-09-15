@@ -2,9 +2,6 @@ import { initAdminShell } from '../components/shell.js';
 import { showAdminToast } from '../components/toast.js';
 import { icon } from '../components/icons.js';
 
-const session = initAdminShell({ page: 'content', title: 'Homepage & CMS' });
-if (session) init();
-
 const STORAGE_KEY = 'nuvanti_admin_content_v1';
 const DEFAULTS = {
   hero: [
@@ -17,6 +14,11 @@ const DEFAULTS = {
     { q: 'What is your return policy?', a: 'Unworn items can be returned within 30 days of delivery.' },
   ],
 };
+let tab = 'hero';
+
+const session = initAdminShell({ page: 'content', title: 'Homepage & CMS' });
+if (session) init();
+
 
 function getContent() {
   try { return { ...DEFAULTS, ...(JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}) }; } catch { return DEFAULTS; }
@@ -24,8 +26,6 @@ function getContent() {
 function saveContent(next) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
 }
-
-let tab = 'hero';
 
 function init() {
   renderTabs();

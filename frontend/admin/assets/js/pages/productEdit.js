@@ -174,7 +174,7 @@ function renderImages(images) {
   el.innerHTML = images.map((img, i) => `
     <div class="image-tile" data-primary="${i === 0}">
       ${i === 0 ? '<span class="image-tile__primary">Primary</span>' : ''}
-      <img src="${img}" alt="" />
+      <img src="../${img}" alt="" />
       <button class="image-tile__remove" data-remove-image="${i}" aria-label="Remove image">${icon('x')}</button>
     </div>
   `).join('') + `<button class="image-tile-add" id="addImageBtn">${icon('upload')}<span>Upload</span></button>`;

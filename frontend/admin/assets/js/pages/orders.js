@@ -3,11 +3,11 @@ import { formatPrice, formatDate, paginationHTML } from '../components/utils.js'
 import { statusBadge } from '../components/statusBadge.js';
 import { fetchAdminOrders } from '../services/orderService.js';
 
-const session = initAdminShell({ page: 'orders', title: 'Orders' });
-if (session) init();
-
 const params = new URLSearchParams(location.search);
 const state = { query: params.get('q') || '', status: params.get('status') || '', payment: '', page: 1, perPage: 10, sort: 'newest' };
+
+const session = initAdminShell({ page: 'orders', title: 'Orders' });
+if (session) init();
 
 function init() {
   document.getElementById('searchInput').value = state.query;

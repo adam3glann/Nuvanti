@@ -1733,11 +1733,17 @@
 }
 .btn-primary {
   background: var(--gradient-brand);
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-position: center;
   color: var(--color-white);
   box-shadow: var(--shadow-glow);
 }
 .btn-primary:hover {
   background: var(--gradient-brand);
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-position: center;
   box-shadow: var(--shadow-glow-lg);
   color: var(--color-white);
 }

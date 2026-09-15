@@ -75,6 +75,7 @@ h3, .h3 { font-size: 1rem; font-weight: 700; }
 .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--a-primary); }
 select {
   appearance: none; -webkit-appearance: none; -moz-appearance: none;
+  background-color: var(--a-surface); color: var(--a-text);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2314161A' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
   background-repeat: no-repeat; background-position: right 0.7rem center; background-size: 13px;
   padding-right: 2.1rem !important; cursor: pointer;
@@ -120,3 +121,10 @@ table.admin-table { width: 100%; border-collapse: collapse; min-width: 640px; }
 .a-skeleton { background: linear-gradient(90deg, var(--a-border) 0%, var(--a-bg) 50%, var(--a-border) 100%); background-size: 200% 100%; animation: a-shimmer 1.3s var(--a-ease) infinite; border-radius: var(--a-radius-sm); }
 @keyframes a-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .a-skeleton { animation: none; opacity: 0.6; } }
+
+/* Dark theme: the dropdown chevron is baked into the select's
+   background-image as a fixed dark stroke color, so it disappears
+   against a dark surface unless swapped for a light one here. */
+[data-theme="dark"] select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23EDEEF1' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+}

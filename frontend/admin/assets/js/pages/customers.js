@@ -3,10 +3,10 @@ import { formatPrice, formatDate, paginationHTML } from '../components/utils.js'
 import { statusBadge } from '../components/statusBadge.js';
 import { fetchAdminCustomers } from '../services/customerService.js';
 
+const state = { query: '', status: '', page: 1, perPage: 10, sort: 'recent' };
+
 const session = initAdminShell({ page: 'customers', title: 'Customers' });
 if (session) init();
-
-const state = { query: '', status: '', page: 1, perPage: 10, sort: 'recent' };
 
 function init() {
   document.getElementById('searchInput').addEventListener('input', debounce((e) => { state.query = e.target.value; state.page = 1; load(); }, 250));

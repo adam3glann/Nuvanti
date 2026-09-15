@@ -61,7 +61,7 @@ async function load() {
       <td class="row-checkbox-col"><input type="checkbox" class="row-check" data-id="${p.id}" ${selected.has(p.id) ? 'checked' : ''} /></td>
       <td>
         <div style="display:flex;align-items:center;gap:.6rem">
-          <img src="${p.images[0]}" alt="" width="36" height="45" style="object-fit:cover;border-radius:3px" />
+          <img src="../${p.images[0]}" alt="" width="36" height="45" style="object-fit:cover;border-radius:3px" />
           <div><a href="product-edit.html?id=${p.id}" style="font-weight:600;color:var(--a-text)">${p.name}</a><br /><span class="mono" style="color:var(--a-muted)">${p.sku}</span></div>
         </div>
       </td>

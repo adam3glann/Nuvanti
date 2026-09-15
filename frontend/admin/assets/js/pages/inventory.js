@@ -5,10 +5,10 @@ import { showAdminToast } from '../components/toast.js';
 import { createAdminDrawer } from '../components/modal.js';
 import { fetchInventory, rowStatus, adjustStock, inventoryStats } from '../services/inventoryService.js';
 
+const state = { query: '', status: '', page: 1, perPage: 12 };
+
 const session = initAdminShell({ page: 'inventory', title: 'Inventory' });
 if (session) init();
-
-const state = { query: '', status: '', page: 1, perPage: 12 };
 
 async function init() {
   const stats = inventoryStats();
@@ -30,7 +30,7 @@ async function load() {
   const tbody = document.getElementById('invBody');
   tbody.innerHTML = items.map((r) => `
     <tr>
-      <td><div style="display:flex;align-items:center;gap:.6rem"><img src="${r.image}" width="32" height="40" style="object-fit:cover;border-radius:3px" alt="" /><span>${r.productName}</span></div></td>
+      <td><div style="display:flex;align-items:center;gap:.6rem"><img src="../${r.image}" width="32" height="40" style="object-fit:cover;border-radius:3px" alt="" /><span>${r.productName}</span></div></td>
       <td>${r.size}</td>
       <td class="mono">${r.sku}</td>
       <td>${r.stock}</td>
