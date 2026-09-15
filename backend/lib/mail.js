@@ -1,7 +1,7 @@
 import nodemailer from 'nodemailer';
 
 function configured() {
-  return ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS', 'MAIL_FROM'].every((key) => Boolean(process.env[key]));
+  return ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS', 'MAIL_FROM'].every((key) => Boolean(process.env[key]) && !process.env[key].startsWith('PASTE_'));
 }
 
 export async function sendPasswordReset({ to, resetUrl }) {

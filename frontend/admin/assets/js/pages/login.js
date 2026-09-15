@@ -1,6 +1,7 @@
 import { confirmAdminPasswordReset, getAdminSession, mockAdminLogin, requestAdminPasswordReset } from '../services/adminAuthService.js';
 
-if (getAdminSession() && !new URLSearchParams(location.search).has('reset')) location.href = 'index.html';
+const initialQuery = new URLSearchParams(location.search);
+if (getAdminSession() && !initialQuery.has('reset') && initialQuery.get('forgot') !== '1') location.href = 'index.html';
 const form = document.getElementById('loginForm');
 const errorBox = document.getElementById('loginError');
 const passwordInput = document.getElementById('password');
