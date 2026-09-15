@@ -1,18 +1,10 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { query } from '../lib/db.js';
-
+import { toPublicProduct } from '../lib/catalog.js';
 const router = Router();
-const listQuery = z.object({ category: z.string().max(80).optional(), collection: z.string().max(80).optional(), search: z.string().max(100).optional(), limit: z.coerce.number().int().min(1).max(100).default(24), offset: z.coerce.number().int().min(0).default(0) });
-
-router.get('/', async (req, res) => {
-  const { category, collection, search, limit, offset } = listQuery.parse(req.query);
-  const { rows } = await query(`SELECT id, slug, name, description, price_cents AS "priceCents", category, collection, images, colors, sizes, inventory FROM products WHERE is_active = true AND ($1::text IS NULL OR category = $1) AND ($2::text IS NULL OR collection = $2) AND ($3::text IS NULL OR name ILIKE $3 OR description ILIKE $3) ORDER BY created_at DESC LIMIT $4 OFFSET $5`, [category || null, collection || null, search ? `%${search}%` : null, limit, offset]);
-  res.json(rows);
-});
-router.get('/:slug', async (req, res) => {
-  const { rows } = await query('SELECT id, slug, name, description, price_cents AS "priceCents", category, collection, images, colors, sizes, inventory FROM products WHERE slug = $1 AND is_active = true', [req.params.slug]);
-  if (!rows[0]) return res.status(404).json({ error: 'Product not found.' });
-  res.json(rows[0]);
-});
+const listQuery = z.object({ category: z.string().max(80).optional(), collection: z.string().max(80).optional(), search: z.string().max(100).optional(), limit: z.coerce.number().int().min(1).max(100).default(100), offset: z.coerce.number().int().min(0).default(0) });
+const columns = 'id, slug, name, description, price_cents, category, collection, images, colors, sizes, inventory, is_active, metadata';
+router.get('/', async (req, res) => { const { category, collection, search, limit, offset } = listQuery.parse(req.query); const { rows } = await query(`SELECT ${columns} FROM products WHERE is_active = true AND ($1::text IS NULL OR category = $1) AND ($2::text IS NULL OR collection = $2) AND ($3::text IS NULL OR name ILIKE $3 OR description ILIKE $3) ORDER BY created_at DESC LIMIT $4 OFFSET $5`, [category || null, collection || null, search ? `%${search}%` : null, limit, offset]); res.json(rows.map(toPublicProduct)); });
+router.get('/:slug', async (req, res) => { const { rows } = await query(`SELECT ${columns} FROM products WHERE slug = $1 AND is_active = true`, [req.params.slug]); if (!rows[0]) return res.status(404).json({ error: 'Product not found.' }); res.json(toPublicProduct(rows[0])); });
 export default router;

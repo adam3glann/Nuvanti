@@ -11,7 +11,7 @@ const session = initAdminShell({ page: 'inventory', title: 'Inventory' });
 if (session) init();
 
 async function init() {
-  const stats = inventoryStats();
+  const stats = await inventoryStats();
   document.getElementById('statGrid').innerHTML = `
     <div class="stat-card"><p class="stat-card__label">Tracked SKUs</p><p class="stat-card__value">${stats.total}</p></div>
     <div class="stat-card"><p class="stat-card__label">Low Stock</p><p class="stat-card__value" style="color:var(--a-warning)">${stats.low}</p></div>
@@ -30,7 +30,7 @@ async function load() {
   const tbody = document.getElementById('invBody');
   tbody.innerHTML = items.map((r) => `
     <tr>
-      <td><div style="display:flex;align-items:center;gap:.6rem"><img src="../${r.image}" width="32" height="40" style="object-fit:cover;border-radius:3px" alt="" /><span>${r.productName}</span></div></td>
+      <td><div style="display:flex;align-items:center;gap:.6rem"><img src="${/^https?:\/\//i.test(r.image) ? r.image : `../${r.image}`}" width="32" height="40" style="object-fit:cover;border-radius:3px" alt="" /><span>${r.productName}</span></div></td>
       <td>${r.size}</td>
       <td class="mono">${r.sku}</td>
       <td>${r.stock}</td>

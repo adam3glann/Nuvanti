@@ -12,11 +12,28 @@ This backend uses **PostgreSQL** and treats the admin area as a separate, protec
 cd backend
 npm install
 npm run migrate
+npm run seed:catalog
 npm run seed:admin -- owner@example.com use-a-long-unique-password "Owner Name"
 npm start
 ```
 
 Public API: `http://localhost:4000` · protected admin: `http://localhost:4001/login.html`.
+
+## Live catalog connection
+
+The public storefront and admin catalog now share PostgreSQL. Run `npm run seed:catalog` once after migrating to import the supplied starting products and categories. After that, product creation, publishing, price changes, and inventory edits made in the Admin portal are reflected by the public shop through `/api/products` on its next load.
+
+## Cloudinary product photos
+
+The Admin product editor can securely upload JPEG, PNG, WebP, and GIF product images (maximum 10 MB) to Cloudinary. Add these private values to `backend/.env`, then restart the backend:
+
+```env
+CLOUDINARY_CLOUD_NAME=your-cloud-name
+CLOUDINARY_API_KEY=your-api-key
+CLOUDINARY_API_SECRET=your-api-secret
+```
+
+Find them in Cloudinary's Dashboard → API Keys. Keep the API secret in `.env` only—never put it in frontend JavaScript or commit it to Git. Once configured, edit a product in Admin, select **Upload**, choose an image, then **Save Changes**. The returned HTTPS image URL is stored with that product in PostgreSQL and appears on the public store.
 
 ## Reset an admin password
 

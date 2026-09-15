@@ -12,8 +12,8 @@ const session = initAdminShell({ page: 'dashboard', title: 'Dashboard' });
 if (session) render();
 
 async function render() {
-  const rev = revenueStats();
-  const ord = orderStats();
+  const rev = await revenueStats();
+  const ord = await orderStats();
   const cust = customerStats();
   const { total: totalProducts, items: sampleProducts } = await fetchAdminProducts({ perPage: 999 });
   const outOfStock = sampleProducts.filter((p) => productStockStatus(p) === 'out').length;
@@ -55,7 +55,7 @@ async function render() {
     </tr>
   `).join('');
 
-  const alerts = lowStockAlerts(5);
+  const alerts = await lowStockAlerts(5);
   document.getElementById('lowStockList').innerHTML = alerts.length
     ? alerts.map((a) => `
       <div class="alert-list-item">

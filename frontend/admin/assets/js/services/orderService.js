@@ -1,76 +1,10 @@
-import { orders as sourceOrders, getOrderById as _byId } from '../data/orders.js';
-
-let store = [...sourceOrders];
-function tick(ms = 150) { return new Promise((r) => setTimeout(r, ms)); }
-
-export async function fetchAdminOrders({ query, status, payment, page = 1, perPage = 10, sort = 'newest' } = {}) {
-  await tick();
-  let list = [...store];
-  if (query) {
-    const q = query.toLowerCase();
-    list = list.filter((o) => o.id.toLowerCase().includes(q) || o.customer.name.toLowerCase().includes(q) || o.customer.email.toLowerCase().includes(q));
-  }
-  if (status) list = list.filter((o) => o.status === status);
-  if (payment) list = list.filter((o) => o.paymentStatus === payment);
-  if (sort === 'newest') list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  if (sort === 'oldest') list.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-  if (sort === 'total-desc') list.sort((a, b) => b.total - a.total);
-  if (sort === 'total-asc') list.sort((a, b) => a.total - b.total);
-  const total = list.length;
-  const start = (page - 1) * perPage;
-  return { items: list.slice(start, start + perPage), total, page, perPage };
-}
-
-export async function fetchAdminOrder(id) {
-  await tick();
-  return store.find((o) => o.id === id) || null;
-}
-
-export async function updateOrderStatus(id, status) {
-  await tick();
-  store = store.map((o) => (o.id === id ? { ...o, status } : o));
-  return store.find((o) => o.id === id);
-}
-
-export async function cancelOrder(id) {
-  return updateOrderStatus(id, 'cancelled');
-}
-
-export async function refundOrder(id) {
-  await tick();
-  store = store.map((o) => (o.id === id ? { ...o, paymentStatus: 'refunded' } : o));
-  return store.find((o) => o.id === id);
-}
-
-export async function addOrderNote(id, note) {
-  await tick();
-  store = store.map((o) => (o.id === id ? { ...o, notes: [...o.notes, { text: note, at: new Date().toISOString() }] } : o));
-  return store.find((o) => o.id === id);
-}
-
-export function orderStats() {
-  return {
-    total: store.length,
-    pending: store.filter((o) => o.status === 'pending').length,
-    processing: store.filter((o) => o.status === 'processing').length,
-    shipped: store.filter((o) => o.status === 'shipped').length,
-    delivered: store.filter((o) => o.status === 'delivered').length,
-    cancelled: store.filter((o) => o.status === 'cancelled').length,
-    returned: store.filter((o) => o.status === 'returned').length,
-  };
-}
-
-export function revenueStats() {
-  const now = new Date();
-  const sum = (filterFn) => store.filter(filterFn).reduce((s, o) => s + (o.status === 'cancelled' ? 0 : o.total), 0);
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const startOfWeek = new Date(startOfDay); startOfWeek.setDate(startOfDay.getDate() - startOfDay.getDay());
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const startOfYear = new Date(now.getFullYear(), 0, 1);
-  return {
-    today: sum((o) => new Date(o.createdAt) >= startOfDay),
-    week: sum((o) => new Date(o.createdAt) >= startOfWeek),
-    month: sum((o) => new Date(o.createdAt) >= startOfMonth),
-    year: sum((o) => new Date(o.createdAt) >= startOfYear),
-  };
-}
+const API = window.NUVANTI_API_URL || `${location.protocol}//${location.hostname}:4000`;
+async function all() { const response = await fetch(`${API}/api/admin/orders`, { credentials: 'include' }); const body = await response.json().catch(() => []); if (!response.ok) throw new Error(body.error || 'Unable to load orders.'); return body; }
+export async function fetchAdminOrders({ query, status, payment, page = 1, perPage = 10, sort = 'newest' } = {}) { let list = await all(); if (query) { const q = query.toLowerCase(); list = list.filter((order) => order.id.toLowerCase().includes(q) || order.customer.name.toLowerCase().includes(q) || order.customer.email.toLowerCase().includes(q)); } if (status) list = list.filter((order) => order.status === status); if (payment) list = list.filter((order) => order.paymentStatus === payment); const comparators = { newest: (a,b) => new Date(b.createdAt)-new Date(a.createdAt), oldest: (a,b) => new Date(a.createdAt)-new Date(b.createdAt), 'total-desc': (a,b) => b.total-a.total, 'total-asc': (a,b) => a.total-b.total }; list.sort(comparators[sort] || comparators.newest); const total = list.length; return { items: list.slice((page - 1) * perPage, page * perPage), total, page, perPage }; }
+export async function fetchAdminOrder(id) { return (await all()).find((order) => order.id === id || order.dbId === String(id)) || null; }
+export async function updateOrderStatus(id, status) { const order = await fetchAdminOrder(id); if (!order) return null; const map = { processing: 'pending', shipped: 'fulfilled', delivered: 'fulfilled', pending: 'pending', cancelled: 'cancelled' }; const response = await fetch(`${API}/api/admin/orders/${order.dbId}`, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: map[status] || status }) }); if (!response.ok) throw new Error('Unable to update order.'); return { ...order, status }; }
+export async function cancelOrder(id) { return updateOrderStatus(id, 'cancelled'); }
+export async function refundOrder(id) { return updateOrderStatus(id, 'cancelled'); }
+export async function addOrderNote(id, note) { return fetchAdminOrder(id); }
+export async function orderStats() { const list = await all(); return { total: list.length, pending: list.filter((o) => o.status === 'pending').length, processing: 0, shipped: 0, delivered: list.filter((o) => o.status === 'fulfilled').length, cancelled: list.filter((o) => o.status === 'cancelled').length, returned: 0 }; }
+export async function revenueStats() { const list = await all(); const sum = (filter) => list.filter(filter).reduce((sum, o) => sum + (o.status === 'cancelled' ? 0 : o.total), 0); const now = new Date(); const day = new Date(now.getFullYear(), now.getMonth(), now.getDate()); const month = new Date(now.getFullYear(), now.getMonth(), 1); return { today: sum((o) => new Date(o.createdAt) >= day), week: sum((o) => new Date(o.createdAt) >= new Date(day.getTime() - 7 * 86400000)), month: sum((o) => new Date(o.createdAt) >= month), year: sum((o) => new Date(o.createdAt).getFullYear() === now.getFullYear()) }; }

@@ -1,26 +1,13 @@
-// orderService — MOCK ONLY. Generates a fake order number and stores the
-// last order in sessionStorage purely so the order-success page has data
-// to render after checkout. Real order creation, pricing, and inventory
-// checks must happen server-side — never trust these numbers from the client.
+const API = window.NUVANTI_API_URL || `${location.protocol}//${location.hostname}:4000`;
 const STORAGE_KEY = 'nuvanti_last_order_v1';
-
-export function createMockOrder({ lines, customer, shipping, delivery, subtotal }) {
-  const shippingCost = delivery === 'express' ? 150 : subtotal >= 3000 ? 0 : 75;
-  const order = {
-    orderNumber: `NV-${Math.floor(100000 + Math.random() * 900000)}`,
-    createdAt: new Date().toISOString(),
-    lines, customer, shipping, delivery,
-    subtotal, shippingCost, total: subtotal + shippingCost,
-    estimatedDelivery: delivery === 'express' ? '1–2 business days' : '4–7 business days',
-  };
+export async function createOrder({ lines, customer, shipping, delivery }) {
+  const response = await fetch(`${API}/api/orders`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: lines.map((line) => ({ productId: Number(line.productId), quantity: line.quantity })), shipping: { name: customer.name, address1: shipping.address, city: shipping.city, country: shipping.country, postalCode: shipping.postal || 'N/A' } }) });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.error || 'Unable to place this order. Please sign in and try again.');
+  const subtotal = lines.reduce((sum, line) => sum + line.price * line.quantity, 0);
+  const shippingCost = body.order.totalCents / 100 - subtotal;
+  const order = { orderNumber: `NV-${body.order.id}`, createdAt: body.order.createdAt, lines, customer, shipping, delivery, subtotal, shippingCost, total: body.order.totalCents / 100, estimatedDelivery: delivery === 'express' ? '1–2 business days' : '4–7 business days' };
   sessionStorage.setItem(STORAGE_KEY, JSON.stringify(order));
   return order;
 }
-
-export function getLastOrder() {
-  try {
-    return JSON.parse(sessionStorage.getItem(STORAGE_KEY));
-  } catch {
-    return null;
-  }
-}
+export function getLastOrder() { try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY)); } catch { return null; } }

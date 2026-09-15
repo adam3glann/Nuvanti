@@ -4,7 +4,7 @@ import { requireAuth } from '../lib/auth.js';
 import { transaction, query } from '../lib/db.js';
 
 const router = Router();
-const checkout = z.object({ items: z.array(z.object({ productId: z.coerce.number().int().positive(), quantity: z.coerce.number().int().min(1).max(10) })).min(1).max(30), shipping: z.object({ name: z.string().min(2).max(100), address1: z.string().min(3).max(150), city: z.string().min(2).max(80), country: z.string().length(2), postalCode: z.string().min(3).max(20) }) });
+const checkout = z.object({ items: z.array(z.object({ productId: z.coerce.number().int().positive(), quantity: z.coerce.number().int().min(1).max(10) })).min(1).max(30), shipping: z.object({ name: z.string().min(2).max(100), address1: z.string().min(3).max(150), city: z.string().min(2).max(80), country: z.string().min(2).max(80), postalCode: z.string().min(1).max(20) }) });
 
 router.post('/', requireAuth, async (req, res) => {
   const { items, shipping } = checkout.parse(req.body);

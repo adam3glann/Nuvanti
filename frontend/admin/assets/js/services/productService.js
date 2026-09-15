@@ -1,66 +1,12 @@
-// productService (admin) — reads/writes the same shared catalog the
-// storefront reads from (see assets/js/data/productStore.js), so any
-// change made here is what customers see in the shop. A real backend
-// replaces every function body with a fetch() to /api/admin/products;
-// call sites elsewhere never need to change.
-import {
-  getAllProducts, getProductById, addProduct, updateProduct, deleteProduct,
-} from '../../../../assets/js/data/productStore.js';
-
-function tick(ms = 150) { return new Promise((r) => setTimeout(r, ms)); }
-
-export async function fetchAdminProducts({ query, category, status, page = 1, perPage = 10, sort } = {}) {
-  await tick();
-  let list = [...getAllProducts()];
-  if (query) {
-    const q = query.toLowerCase();
-    list = list.filter((p) => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q));
-  }
-  if (category) list = list.filter((p) => p.category === category);
-  if (status) list = list.filter((p) => p.status === status);
-  if (sort === 'price-asc') list.sort((a, b) => a.price - b.price);
-  if (sort === 'price-desc') list.sort((a, b) => b.price - a.price);
-  if (sort === 'name-asc') list.sort((a, b) => a.name.localeCompare(b.name));
-  const total = list.length;
-  const start = (page - 1) * perPage;
-  return { items: list.slice(start, start + perPage), total, page, perPage };
-}
-
-export async function fetchAdminProduct(id) {
-  await tick();
-  return getProductById(id);
-}
-
-export async function createAdminProduct(data) {
-  await tick();
-  return addProduct(data);
-}
-
-export async function updateAdminProduct(id, patch) {
-  await tick();
-  return updateProduct(id, patch);
-}
-
-export async function deleteAdminProduct(id) {
-  await tick();
-  deleteProduct(id);
-  return true;
-}
-
-export async function duplicateAdminProduct(id) {
-  await tick();
-  const original = getProductById(id);
-  if (!original) return null;
-  const { id: _oldId, ...rest } = original;
-  return addProduct({ ...rest, name: `${original.name} (Copy)`, status: 'draft', sku: undefined });
-}
-
-export function productStockTotal(product) {
-  return Object.values(product.inventory || {}).reduce((a, b) => a + b, 0);
-}
-export function productStockStatus(product) {
-  const total = productStockTotal(product);
-  if (total === 0) return 'out';
-  if (total <= 10) return 'low';
-  return 'in';
-}
+// Admin catalog calls the same PostgreSQL API used by the public store.
+const API = window.NUVANTI_API_URL || `${location.protocol}//${location.hostname}:4000`;
+async function request(path, options = {}) { const response = await fetch(`${API}${path}`, { credentials: 'include', headers: { 'Content-Type': 'application/json' }, ...options }); if (response.status === 204) return true; const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(body.error || 'Catalog request failed.'); return body; }
+export async function fetchAdminProducts({ query, category, status, page = 1, perPage = 10, sort } = {}) { let list = await request('/api/admin/products'); if (query) { const q = query.toLowerCase(); list = list.filter((p) => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q)); } if (category) list = list.filter((p) => p.category === category); if (status) list = list.filter((p) => p.status === status); if (sort === 'price-asc') list.sort((a,b) => a.price-b.price); if (sort === 'price-desc') list.sort((a,b) => b.price-a.price); if (sort === 'name-asc') list.sort((a,b) => a.name.localeCompare(b.name)); const total = list.length; return { items: list.slice((page - 1) * perPage, page * perPage), total, page, perPage }; }
+export async function fetchAdminProduct(id) { const { items } = await fetchAdminProducts({ perPage: 1000 }); return items.find((p) => p.id === String(id)) || null; }
+export async function createAdminProduct(data) { return request('/api/admin/products', { method: 'POST', body: JSON.stringify(data) }); }
+export async function updateAdminProduct(id, patch) { return request(`/api/admin/products/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }); }
+export async function deleteAdminProduct(id) { return request(`/api/admin/products/${id}`, { method: 'DELETE' }); }
+export async function uploadAdminProductImage(file) { const form = new FormData(); form.append('image', file); const response = await fetch(`${API}/api/admin/uploads/product-image`, { method: 'POST', credentials: 'include', body: form }); const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(body.error || 'Image upload failed.'); return body; }
+export async function duplicateAdminProduct(id) { const product = await fetchAdminProduct(id); if (!product) return null; const copy = { ...product, slug: `${product.slug}-copy-${Date.now()}`, name: `${product.name} (Copy)`, status: 'draft' }; delete copy.id; return createAdminProduct(copy); }
+export function productStockTotal(product) { return Object.values(product.inventory || {}).reduce((sum, value) => sum + Number(value || 0), 0); }
+export function productStockStatus(product) { const total = productStockTotal(product); return total === 0 ? 'out' : total <= 10 ? 'low' : 'in'; }

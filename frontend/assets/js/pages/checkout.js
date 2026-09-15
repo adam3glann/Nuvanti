@@ -1,7 +1,9 @@
 import { initShell } from '../main.js';
 import { formatPrice } from '../components/productCard.js';
 import { getCart, cartSubtotal, clearCart } from '../services/cartService.js';
-import { createMockOrder } from '../services/orderService.js';
+import { createOrder } from '../services/orderService.js';
+import { isLoggedIn } from '../services/authService.js';
+import { showToast } from '../components/toast.js';
 import { refreshCartDrawer } from '../components/cartDrawer.js';
 
 initShell({ currentPage: 'shop' });
@@ -128,7 +130,7 @@ function renderSummary() {
   `;
 }
 
-function onSubmit(e) {
+async function onSubmit(e) {
   e.preventDefault();
   const form = e.target;
   const requiredIds = ['fullName', 'email', 'phone', 'address', 'city', 'country'];
@@ -151,9 +153,16 @@ function onSubmit(e) {
     country: document.getElementById('country').value,
   };
 
-  const order = createMockOrder({ lines, customer, shipping, delivery, subtotal: cartSubtotal() });
+  if (!isLoggedIn()) {
+    showToast('Please sign in or create an account before placing your order.');
+    window.location.href = 'account.html';
+    return;
+  }
+  const button = document.getElementById('placeOrderBtn');
+  button.disabled = true; button.textContent = 'Placing order…';
+  try { await createOrder({ lines, customer, shipping, delivery }); }
+  catch (error) { showToast(error.message); button.disabled = false; button.textContent = 'Place Order'; return; }
   clearCart();
   refreshCartDrawer();
   window.location.href = 'order-success.html';
 }
-

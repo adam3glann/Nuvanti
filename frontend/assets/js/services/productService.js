@@ -1,80 +1,15 @@
-// productService — reads from the shared product store (localStorage,
-// seeded from local mock data and kept in sync with the admin panel).
-// Later: replace bodies with `fetch('/api/products...')` calls.
-// Every function stays async so call sites never need to change.
-import { getPublishedProducts, getProductBySlug as _bySlug } from '../data/productStore.js';
-import { categories as categoryList } from '../data/categories.js';
-
-export async function fetchProducts(filters = {}) {
-  await tick();
-  let list = [...getPublishedProducts()];
-
-  if (filters.category) list = list.filter((p) => p.category === filters.category);
-  if (filters.collection) list = list.filter((p) => p.collection === filters.collection);
-  if (filters.colors?.length) list = list.filter((p) => p.colors.some((c) => filters.colors.includes(c)));
-  if (filters.sizes?.length) list = list.filter((p) => p.sizes.some((s) => filters.sizes.includes(s)));
-  if (filters.minPrice != null) list = list.filter((p) => p.price >= filters.minPrice);
-  if (filters.maxPrice != null) list = list.filter((p) => p.price <= filters.maxPrice);
-  if (filters.availability === 'in-stock') {
-    list = list.filter((p) => Object.values(p.inventory).some((n) => n > 0));
-  }
-  if (filters.badge === 'new') list = list.filter((p) => p.newArrival);
-  if (filters.badge === 'bestseller') list = list.filter((p) => p.bestseller);
-  if (filters.query) {
-    const q = filters.query.toLowerCase();
-    list = list.filter((p) => p.name.toLowerCase().includes(q) || p.category.includes(q));
-  }
-
-  switch (filters.sort) {
-    case 'price-asc': list.sort((a, b) => a.price - b.price); break;
-    case 'price-desc': list.sort((a, b) => b.price - a.price); break;
-    case 'name-asc': list.sort((a, b) => a.name.localeCompare(b.name)); break;
-    case 'newest': list.sort((a, b) => Number(b.newArrival) - Number(a.newArrival)); break;
-    default: break;
-  }
-
-  return list;
-}
-
-export async function fetchProductBySlug(slug) {
-  await tick();
-  const product = _bySlug(slug);
-  if (!product || (product.status && product.status !== 'active')) return null;
-  return product;
-}
-
-export async function fetchFeatured() {
-  await tick();
-  return getPublishedProducts().filter((p) => p.featured);
-}
-
-export async function fetchBestsellers() {
-  await tick();
-  return getPublishedProducts().filter((p) => p.bestseller);
-}
-
-export async function fetchNewArrivals() {
-  await tick();
-  return getPublishedProducts().filter((p) => p.newArrival);
-}
-
-export async function fetchRelated(product, count = 4) {
-  await tick();
-  return getPublishedProducts().filter((p) => p.category === product.category && p.id !== product.id).slice(0, count);
-}
-
-export async function fetchCategories() {
-  await tick();
-  return categoryList;
-}
-
-export async function searchProducts(query) {
-  await tick();
-  if (!query) return [];
-  const q = query.toLowerCase();
-  return getPublishedProducts().filter((p) => p.name.toLowerCase().includes(q) || p.category.includes(q)).slice(0, 8);
-}
-
-function tick(ms = 120) {
-  return new Promise((res) => setTimeout(res, ms));
-}
+// Storefront catalog: PostgreSQL API is the source of truth. The local seed
+// remains only as an offline-development fallback.
+import { getPublishedProducts, getProductBySlug as localBySlug } from '../data/productStore.js';
+import { categories as localCategories } from '../data/categories.js';
+const API = window.NUVANTI_API_URL || `${location.protocol}//${location.hostname}:4000`;
+async function api(path) { const response = await fetch(`${API}${path}`); if (!response.ok) throw new Error('Catalog service unavailable'); return response.json(); }
+function filter(list, filters) { let out = [...list]; if (filters.colors?.length) out = out.filter((p) => p.colors.some((c) => filters.colors.includes(c))); if (filters.sizes?.length) out = out.filter((p) => p.sizes.some((s) => filters.sizes.includes(s))); if (filters.minPrice != null) out = out.filter((p) => p.price >= filters.minPrice); if (filters.maxPrice != null) out = out.filter((p) => p.price <= filters.maxPrice); if (filters.availability === 'in-stock') out = out.filter((p) => Object.values(p.inventory).some((n) => n > 0)); if (filters.badge === 'new') out = out.filter((p) => p.newArrival); if (filters.badge === 'bestseller') out = out.filter((p) => p.bestseller); return out; }
+export async function fetchProducts(filters = {}) { try { const q = new URLSearchParams(); if (filters.category) q.set('category', filters.category); if (filters.collection) q.set('collection', filters.collection); if (filters.query) q.set('search', filters.query); const list = filter(await api(`/api/products?${q}`), filters); const sorts = { 'price-asc': (a,b) => a.price-b.price, 'price-desc': (a,b) => b.price-a.price, 'name-asc': (a,b) => a.name.localeCompare(b.name), newest: (a,b) => Number(b.newArrival)-Number(a.newArrival) }; return sorts[filters.sort] ? list.sort(sorts[filters.sort]) : list; } catch { return filter(getPublishedProducts(), filters); } }
+export async function fetchProductBySlug(slug) { try { return await api(`/api/products/${encodeURIComponent(slug)}`); } catch { return localBySlug(slug) || null; } }
+export async function fetchFeatured() { return (await fetchProducts()).filter((p) => p.featured); }
+export async function fetchBestsellers() { return (await fetchProducts()).filter((p) => p.bestseller); }
+export async function fetchNewArrivals() { return (await fetchProducts()).filter((p) => p.newArrival); }
+export async function fetchRelated(product, count = 4) { return (await fetchProducts({ category: product.category })).filter((p) => p.id !== product.id).slice(0, count); }
+export async function fetchCategories() { try { return await api('/api/categories'); } catch { return localCategories; } }
+export async function searchProducts(query) { return query ? (await fetchProducts({ query })).slice(0, 8) : []; }

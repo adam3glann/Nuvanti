@@ -1,7 +1,7 @@
 import { initAdminShell } from '../components/shell.js';
 import { icon } from '../components/icons.js';
 import { showAdminToast } from '../components/toast.js';
-import { fetchAdminProduct, updateAdminProduct, createAdminProduct } from '../services/productService.js';
+import { fetchAdminProduct, updateAdminProduct, createAdminProduct, uploadAdminProductImage } from '../services/productService.js';
 import { fetchCategories, fetchCollections } from '../services/categoryService.js';
 
 const session = initAdminShell({ page: 'products', title: 'Edit Product' });
@@ -65,7 +65,7 @@ function renderForm(product, cats, cols) {
           <div class="card-head"><h2>Images</h2></div>
           <div class="card-pad">
             <div class="image-grid" id="imageGrid"></div>
-            <p class="hint" style="margin-top:.75rem">Click a tile to set it as the primary image. Upload wiring will connect to real storage once the backend exists.</p>
+            <p class="hint" style="margin-top:.75rem">Upload product photos to secure Cloudinary storage. The first image is the primary storefront image.</p>
           </div>
         </div>
 
@@ -174,13 +174,19 @@ function renderImages(images) {
   el.innerHTML = images.map((img, i) => `
     <div class="image-tile" data-primary="${i === 0}">
       ${i === 0 ? '<span class="image-tile__primary">Primary</span>' : ''}
-      <img src="../${img}" alt="" />
+      <img src="${imageSrc(img)}" alt="" />
       <button class="image-tile__remove" data-remove-image="${i}" aria-label="Remove image">${icon('x')}</button>
     </div>
   `).join('') + `<button class="image-tile-add" id="addImageBtn">${icon('upload')}<span>Upload</span></button>`;
 
   document.getElementById('addImageBtn').addEventListener('click', () => {
-    showAdminToast('Image upload connects once storage is wired to the backend.', 'info');
+    const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/jpeg,image/png,image/webp,image/gif';
+    input.addEventListener('change', async () => {
+      const file = input.files?.[0]; if (!file) return;
+      try { showAdminToast('Uploading image…', 'info'); const image = await uploadAdminProductImage(file); images.push(image.url); renderImages(images); showAdminToast('Image uploaded. Save the product to publish it.', 'success'); }
+      catch (error) { showAdminToast(error.message, 'error'); }
+    });
+    input.click();
   });
   el.querySelectorAll('[data-remove-image]').forEach((btn) => btn.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -218,4 +224,5 @@ function renderVariants(product) {
 }
 
 function val(id) { return document.getElementById(id).value; }
+function imageSrc(url) { return /^https?:\/\//i.test(url) ? url : `../${url}`; }
 function esc(s) { return (s || '').replace(/"/g, '&quot;'); }

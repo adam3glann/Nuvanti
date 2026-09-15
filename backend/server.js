@@ -12,6 +12,7 @@ import ordersRouter from './routes/orders.js';
 import contactRouter from './routes/contact.js';
 import authRouter from './routes/auth.js';
 import adminRouter from './routes/admin.js';
+import uploadsRouter from './routes/uploads.js';
 import { requireAuth, requireRole } from './lib/auth.js';
 import { errorHandler, notFound, sameOrigin } from './middleware/security.js';
 
@@ -37,6 +38,7 @@ app.use('/api/categories', categoriesRouter);
 app.use('/api/orders', ordersRouter);
 app.use('/api/contact', contactRouter);
 app.use('/api/admin', requireAuth, requireRole('admin', 'super_admin'), adminRouter);
+app.use('/api/admin/uploads', requireAuth, requireRole('admin', 'super_admin'), uploadsRouter);
 
 app.use(notFound);
 app.use(errorHandler);
