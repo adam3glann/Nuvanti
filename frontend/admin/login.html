@@ -38,7 +38,7 @@
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem">
         <label class="checkbox-row"><input type="checkbox" id="rememberDevice" /> Remember this device</label>
-        <a href="#" class="btn-ghost" style="font-size:.78rem;font-weight:600;color:var(--a-primary)">Forgot password?</a>
+        <button type="button" id="forgotPassword" class="btn-ghost" style="font-size:.78rem;font-weight:600;color:var(--a-primary)">Forgot password?</button>
       </div>
       <button class="btn btn-primary" type="submit" id="loginSubmit" style="width:100%">Sign In</button>
     </form>
@@ -47,10 +47,7 @@
       <span>This portal is for authorized Nuvanti staff only. All access attempts are logged and monitored.</span>
     </div>
 
-    <div class="demo-accounts">
-      <p class="eyebrow" style="margin-bottom:.6rem">Demo Accounts (development only)</p>
-      <div id="demoAccounts"></div>
-    </div>
+    <p id="passwordHelp" class="security-note" hidden></p>
   </div>
 </div>
 <script type="module" src="assets/js/pages/login.js"></script>

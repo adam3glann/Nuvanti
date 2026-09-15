@@ -47,11 +47,11 @@ function renderAuthForm() {
       <p style="text-align:center;margin-top:1rem"><button class="btn-text" id="toForgot" style="font-size:.85rem">Forgot password?</button></p>
     `;
     switchEl.innerHTML = `Don't have an account? <button class="btn-text" id="toRegister">Create one</button>`;
-    document.getElementById('loginForm').addEventListener('submit', (e) => {
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       if (!checkValid(e.target)) return;
-      mockLogin(document.getElementById('loginEmail').value);
-      render();
+      try { await mockLogin(document.getElementById('loginEmail').value, document.getElementById('loginPassword').value); render(); }
+      catch (error) { showAuthError(error.message); }
     });
     document.getElementById('toForgot').addEventListener('click', () => { authView = 'forgot'; renderAuthForm(); });
     document.getElementById('toRegister').addEventListener('click', () => { authView = 'register'; renderAuthForm(); });
@@ -60,16 +60,16 @@ function renderAuthForm() {
       <form id="registerForm" novalidate>
         <div class="field"><label for="regName">Full Name</label><input type="text" id="regName" required /></div>
         <div class="field"><label for="regEmail">Email</label><input type="email" id="regEmail" required /></div>
-        <div class="field"><label for="regPassword">Password</label><input type="password" id="regPassword" required minlength="6" /><span class="hint">At least 6 characters.</span></div>
+        <div class="field"><label for="regPassword">Password</label><input type="password" id="regPassword" required minlength="8" /><span class="hint">At least 8 characters.</span></div>
         <button class="btn btn-primary btn-block" type="submit">Create Account</button>
       </form>
     `;
     switchEl.innerHTML = `Already have an account? <button class="btn-text" id="toLogin">Sign in</button>`;
-    document.getElementById('registerForm').addEventListener('submit', (e) => {
+    document.getElementById('registerForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       if (!checkValid(e.target)) return;
-      mockRegister(document.getElementById('regName').value, document.getElementById('regEmail').value);
-      render();
+      try { await mockRegister(document.getElementById('regName').value, document.getElementById('regEmail').value, document.getElementById('regPassword').value); render(); }
+      catch (error) { showAuthError(error.message); }
     });
     document.getElementById('toLogin').addEventListener('click', () => { authView = 'login'; renderAuthForm(); });
   } else {
@@ -78,7 +78,7 @@ function renderAuthForm() {
         <p class="text-muted" style="margin-bottom:1rem;font-size:var(--fs-small)">Enter your email and we'll send a reset link.</p>
         <div class="field"><label for="forgotEmail">Email</label><input type="email" id="forgotEmail" required /></div>
         <button class="btn btn-primary btn-block" type="submit">Send Reset Link</button>
-        <p class="text-muted" id="forgotSuccess" style="margin-top:1rem;font-size:var(--fs-small)" hidden>If an account exists for that email, a reset link is on its way.</p>
+        <p class="text-muted" id="forgotSuccess" style="margin-top:1rem;font-size:var(--fs-small)" hidden>Password-reset emails are not enabled yet. Contact the store administrator for help.</p>
       </form>
     `;
     switchEl.innerHTML = `<button class="btn-text" id="toLogin">Back to sign in</button>`;
@@ -144,7 +144,14 @@ function renderDashboard(session, tab) {
 
   document.getElementById('logoutLink').addEventListener('click', (e) => {
     e.preventDefault();
-    logout();
-    render();
+    logout().finally(render);
   });
+}
+
+function showAuthError(message) {
+  const existing = document.getElementById('authError');
+  if (existing) existing.remove();
+  const error = document.createElement('p');
+  error.id = 'authError'; error.className = 'form-error'; error.textContent = message;
+  document.getElementById('authFormWrap').prepend(error);
 }

@@ -18,6 +18,16 @@ npm start
 
 Public API: `http://localhost:4000` · protected admin: `http://localhost:4001/login.html`.
 
+## Reset an admin password
+
+The portal deliberately does not pretend to email a reset link when no email provider is configured. As the store owner, use the secure terminal recovery command from `backend`:
+
+```bash
+npm run reset:admin -- owner@example.com a-new-unique-password
+```
+
+It only resets an active admin/super-admin account and requires a password of at least 12 characters.
+
 ## Security included
 
 - HTTP-only, signed 8-hour session cookies; credentials never go in localStorage.
