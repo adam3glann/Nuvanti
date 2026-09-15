@@ -20,13 +20,21 @@ Public API: `http://localhost:4000` · protected admin: `http://localhost:4001/l
 
 ## Reset an admin password
 
-The portal deliberately does not pretend to email a reset link when no email provider is configured. As the store owner, use the secure terminal recovery command from `backend`:
+The admin login page has a complete **Forgot password** flow. It accepts an authorized admin email, sends a one-time link, then lets the user choose a new password. Links expire after 30 minutes and are invalidated after use.
 
-```bash
-npm run reset:admin -- owner@example.com a-new-unique-password
+To deliver messages to Gmail (and therefore your Gmail app/phone), enable two-step verification on the sending Gmail account and create a Google **App Password**. Put these values in your private `.env` file—never in `.env.example` or Git:
+
+```env
+ADMIN_APP_URL=https://admin.yourdomain.com
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=your-sending-email@gmail.com
+SMTP_PASS=your-16-character-google-app-password
+MAIL_FROM="Nuvanti Security <your-sending-email@gmail.com>"
 ```
 
-It only resets an active admin/super-admin account and requires a password of at least 12 characters.
+The reset email is sent to the account's email address and will appear on the recipient's phone through their email app. In development without SMTP values, the secure reset URL is printed in the backend terminal instead; production refuses to silently skip delivery.
 
 ## Security included
 
@@ -39,4 +47,4 @@ It only resets an active admin/super-admin account and requires a password of at
 
 ## Production notes
 
-Deploy HTTPS with `NODE_ENV=production`, unique long secrets, and exact production `STORE_ORIGIN`/`ADMIN_ORIGIN` values. For `www.example.com`, `admin.example.com`, and `api.example.com`, set `COOKIE_DOMAIN=.example.com` and set `window.NUVANTI_API_URL` in the admin login host to the API origin. Never expose `frontend/admin` through the public static host. Payments are not marked paid until a payment provider's signed webhook is implemented.
+Deploy HTTPS with `NODE_ENV=production`, unique long secrets, and exact production `STORE_ORIGIN`/`ADMIN_ORIGIN` values. The chosen layout is `www.yourdomain.com` for the store, `admin.yourdomain.com` for the protected portal, and `api.yourdomain.com` for this backend. Set `COOKIE_DOMAIN=.yourdomain.com`, `ADMIN_APP_URL=https://admin.yourdomain.com`, and set `window.NUVANTI_API_URL` in the admin host to the API origin. Never expose `frontend/admin` through the public static host. Payments are not marked paid until a payment provider's signed webhook is implemented.

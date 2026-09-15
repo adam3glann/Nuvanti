@@ -15,6 +15,17 @@ export async function mockAdminLogin(email, password) {
     return { ok: true, session };
   } catch { return { ok: false, error: 'Cannot reach the secure backend.' }; }
 }
+export async function requestAdminPasswordReset(email) {
+  const response = await fetch(`${API}/api/auth/password-reset/request`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.error || 'Unable to request a password reset.');
+  return body.message;
+}
+export async function confirmAdminPasswordReset(token, password) {
+  const response = await fetch(`${API}/api/auth/password-reset/confirm`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, password }) });
+  const body = response.status === 204 ? {} : await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.error || 'Unable to reset your password.');
+}
 export async function adminLogout() { sessionStorage.removeItem(STORAGE_KEY); await fetch(`${API}/api/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => {}); location.href = 'login.html'; }
 export function requireAdminAuth() {
   const session = getAdminSession();

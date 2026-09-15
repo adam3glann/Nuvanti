@@ -52,6 +52,7 @@ adminApp.get('/login.html', (req, res) => res.sendFile(path.join(__dirname, '../
 adminApp.use('/assets/css', express.static(path.join(__dirname, '../frontend/admin/assets/css')));
 adminApp.use('/assets/js/services/adminAuthService.js', express.static(path.join(__dirname, '../frontend/admin/assets/js/services/adminAuthService.js')));
 adminApp.use('/assets/js/components/icons.js', express.static(path.join(__dirname, '../frontend/admin/assets/js/components/icons.js')));
+adminApp.use('/assets/js/pages/login.js', express.static(path.join(__dirname, '../frontend/admin/assets/js/pages/login.js')));
 adminApp.use(requireAuth, requireRole('admin', 'super_admin'));
 adminApp.use(express.static(path.join(__dirname, '../frontend/admin'), { index: 'index.html', fallthrough: false }));
 adminApp.use((err, req, res, next) => res.status(err.status === 404 ? 404 : 500).send('Not found'));
