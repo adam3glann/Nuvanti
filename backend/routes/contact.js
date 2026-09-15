@@ -1,20 +1,7 @@
 import { Router } from 'express';
-import { readJSON, writeJSON } from '../lib/store.js';
-
+import { z } from 'zod';
+import { query } from '../lib/db.js';
 const router = Router();
-
-// POST /api/contact — stores contact-form submissions to data/messages.json.
-// Wire up a real email service (e.g. Resend, SendGrid, Nodemailer + SMTP) here later.
-router.post('/', async (req, res) => {
-  const { name, email, message } = req.body || {};
-  if (!name || !email || !message) {
-    return res.status(400).json({ error: 'name, email and message are required' });
-  }
-  let messages = [];
-  try { messages = await readJSON('messages'); } catch { messages = []; }
-  messages.push({ id: `MSG-${Date.now()}`, name, email, message, createdAt: new Date().toISOString() });
-  await writeJSON('messages', messages);
-  res.status(201).json({ ok: true });
-});
-
+const messageSchema = z.object({ name: z.string().min(2).max(100).trim(), email: z.string().email().max(254).transform((v) => v.toLowerCase().trim()), message: z.string().min(10).max(5000).trim() });
+router.post('/', async (req, res) => { const message = messageSchema.parse(req.body); await query('INSERT INTO contact_messages (name, email, message) VALUES ($1, $2, $3)', [message.name, message.email, message.message]); res.status(201).json({ ok: true }); });
 export default router;

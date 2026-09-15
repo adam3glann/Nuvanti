@@ -1,15 +1,25 @@
 {
   "name": "nuvanti-backend",
   "version": "1.0.0",
-  "description": "Minimal REST API for the Nuvanti storefront. Reads/writes JSON files under data/ — no database setup required to get started. Swap the lib/store.js file for a real database later without touching the routes.",
+  "description": "Secure PostgreSQL API and protected admin gateway for Nuvanti.",
   "type": "module",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "migrate": "node scripts/migrate.js",
+    "seed:admin": "node scripts/seed-admin.js"
   },
   "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
-    "express": "^4.19.2"
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.4.0",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.12.0",
+    "zod": "^3.23.8"
   }
 }

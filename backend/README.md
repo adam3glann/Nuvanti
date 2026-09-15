@@ -1,47 +1,32 @@
-# Nuvanti Backend (starter API)
+# Nuvanti secure backend
 
-This is a small, working starter API — not the full backend for every admin
-feature in `frontend/admin`. It gives you real endpoints for the parts of the
-storefront that need a server (products, categories, checkout/orders, the
-contact form), backed by JSON files in `data/` so there's nothing to install
-or configure to try it locally. Swap `lib/store.js` for a real database
-later — the routes don't need to change.
+This backend uses **PostgreSQL** and treats the admin area as a separate, protected application. It is not protected by a hidden URL or frontend localStorage: the admin server verifies a signed, HTTP-only session cookie and an `admin`/`super_admin` role before it sends any admin HTML, JavaScript, or CSS.
 
-## Run it
+## Setup
+
+1. Create a PostgreSQL database named `nuvanti` and a restricted database user.
+2. Copy `.env.example` to `.env`; set `DATABASE_URL` and a unique 32+ character `JWT_SECRET`.
+3. Install and initialize:
 
 ```bash
 cd backend
 npm install
-npm start        # http://localhost:4000
-# or, for auto-restart on save:
-npm run dev
+npm run migrate
+npm run seed:admin -- owner@example.com use-a-long-unique-password "Owner Name"
+npm start
 ```
 
-## Endpoints
+Public API: `http://localhost:4000` · protected admin: `http://localhost:4001/login.html`.
 
-- `GET  /api/health`
-- `GET  /api/products` — optional query params: `category`, `collection`, `search`
-- `GET  /api/products/:slug`
-- `GET  /api/products/:slug/related?limit=4`
-- `GET  /api/categories`
-- `GET  /api/orders`
-- `GET  /api/orders/:id`
-- `POST /api/orders` — body: `{ items: [...], customer: { email, name, ... }, shipping: {...} }`
-- `POST /api/contact` — body: `{ name, email, message }`
+## Security included
 
-## Connecting the frontend to it
+- HTTP-only, signed 8-hour session cookies; credentials never go in localStorage.
+- `bcrypt` password hashing (work factor 12).
+- Role checks on every `/api/admin/*` endpoint and every admin asset.
+- Helmet headers, request size limits, strict CORS, origin checks on writes, validation, and rate limits.
+- Checkout re-prices products and locks inventory rows in a PostgreSQL transaction. A browser cannot choose prices or oversell stock.
+- Parameterized SQL and Zod input validation.
 
-Right now `frontend/assets/js/services/productService.js` (and the other
-services) read straight from the local `data/products.js` file, so the site
-works with zero setup. To point the site at this API instead, change the
-`fetch`/data calls in those service files to call e.g.
-`http://localhost:4000/api/products` — nothing else in the frontend needs to
-change, since the page code already goes through that service layer.
+## Production notes
 
-## What's not built yet
-
-Auth, the full admin panel (roles, discounts, inventory, analytics, audit
-log) and payments are not implemented — that's a much bigger project on its
-own. This starter covers the pieces the public storefront actually needs to
-go live (catalog + checkout + contact), so you have something real to build
-the rest on top of.
+Deploy HTTPS with `NODE_ENV=production`, unique long secrets, and exact production `STORE_ORIGIN`/`ADMIN_ORIGIN` values. For `www.example.com`, `admin.example.com`, and `api.example.com`, set `COOKIE_DOMAIN=.example.com` and set `window.NUVANTI_API_URL` in the admin login host to the API origin. Never expose `frontend/admin` through the public static host. Payments are not marked paid until a payment provider's signed webhook is implemented.

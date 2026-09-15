@@ -1,39 +1,18 @@
 import { Router } from 'express';
-import { readJSON } from '../lib/store.js';
+import { z } from 'zod';
+import { query } from '../lib/db.js';
 
 const router = Router();
+const listQuery = z.object({ category: z.string().max(80).optional(), collection: z.string().max(80).optional(), search: z.string().max(100).optional(), limit: z.coerce.number().int().min(1).max(100).default(24), offset: z.coerce.number().int().min(0).default(0) });
 
-// GET /api/products?category=polos&collection=mens&search=polo
 router.get('/', async (req, res) => {
-  const products = await readJSON('products');
-  const { category, collection, search } = req.query;
-
-  let list = products;
-  if (category) list = list.filter((p) => p.category === category);
-  if (collection) list = list.filter((p) => p.collection === collection);
-  if (search) {
-    const q = String(search).toLowerCase();
-    list = list.filter((p) => p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q));
-  }
-  res.json(list);
+  const { category, collection, search, limit, offset } = listQuery.parse(req.query);
+  const { rows } = await query(`SELECT id, slug, name, description, price_cents AS "priceCents", category, collection, images, colors, sizes, inventory FROM products WHERE is_active = true AND ($1::text IS NULL OR category = $1) AND ($2::text IS NULL OR collection = $2) AND ($3::text IS NULL OR name ILIKE $3 OR description ILIKE $3) ORDER BY created_at DESC LIMIT $4 OFFSET $5`, [category || null, collection || null, search ? `%${search}%` : null, limit, offset]);
+  res.json(rows);
 });
-
-// GET /api/products/:slug
 router.get('/:slug', async (req, res) => {
-  const products = await readJSON('products');
-  const product = products.find((p) => p.slug === req.params.slug);
-  if (!product) return res.status(404).json({ error: 'Product not found' });
-  res.json(product);
+  const { rows } = await query('SELECT id, slug, name, description, price_cents AS "priceCents", category, collection, images, colors, sizes, inventory FROM products WHERE slug = $1 AND is_active = true', [req.params.slug]);
+  if (!rows[0]) return res.status(404).json({ error: 'Product not found.' });
+  res.json(rows[0]);
 });
-
-// GET /api/products/:slug/related?limit=4
-router.get('/:slug/related', async (req, res) => {
-  const products = await readJSON('products');
-  const product = products.find((p) => p.slug === req.params.slug);
-  if (!product) return res.status(404).json({ error: 'Product not found' });
-  const limit = Number(req.query.limit) || 4;
-  const related = products.filter((p) => p.id !== product.id && p.category === product.category).slice(0, limit);
-  res.json(related);
-});
-
 export default router;

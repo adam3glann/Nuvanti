@@ -28,7 +28,7 @@ document.getElementById('demoAccounts').innerHTML = DEMO_ACCOUNTS.map((a) => `
   </button>
 `).join('');
 
-document.getElementById('demoAccounts').addEventListener('click', (e) => {
+document.getElementById('demoAccounts')?.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-email]');
   if (!btn) return;
   document.getElementById('email').value = btn.dataset.email;

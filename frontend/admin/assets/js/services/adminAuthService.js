@@ -1,56 +1,25 @@
-// adminAuthService — MOCK ONLY, frontend demonstration.
-// A real backend must independently perform authentication, session
-// issuance, and authorization on every request. Nothing here is a
-// security boundary; localStorage is trivially editable by the user.
-const STORAGE_KEY = 'nuvanti_admin_session_v1';
+// The server-side admin gateway is the security boundary. sessionStorage only
+// mirrors the safe display name/role for this UI; editing it grants nothing.
+const API = window.NUVANTI_API_URL || (location.protocol === 'file:' ? 'http://localhost:4000' : `${location.protocol}//${location.hostname}:4000`);
+const STORAGE_KEY = 'nuvanti_admin_display_session';
 
-// Development/demo accounts only — never real credentials.
-export const DEMO_ACCOUNTS = [
-  { email: 'superadmin@nuvanti.test', password: 'demo1234', role: 'super_admin', name: 'Laila Farouk' },
-  { email: 'admin@nuvanti.test', password: 'demo1234', role: 'admin', name: 'Omar Sabry' },
-  { email: 'manager@nuvanti.test', password: 'demo1234', role: 'manager', name: 'Yara Khaled' },
-  { email: 'staff@nuvanti.test', password: 'demo1234', role: 'staff', name: 'Karim Adel' },
-];
-
-export function getAdminSession() {
+export function getAdminSession() { try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY)); } catch { return null; } }
+export async function mockAdminLogin(email, password) {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY));
-  } catch {
-    return null;
-  }
+    const response = await fetch(`${API}/api/auth/login`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
+    const body = await response.json();
+    if (!response.ok) return { ok: false, error: body.error || 'Unable to sign in.' };
+    if (!['admin', 'super_admin'].includes(body.user.role)) { await fetch(`${API}/api/auth/logout`, { method: 'POST', credentials: 'include' }); return { ok: false, error: 'This account is not authorized for the admin area.' }; }
+    const session = { email: body.user.email, name: body.user.name, role: body.user.role };
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+    return { ok: true, session };
+  } catch { return { ok: false, error: 'Cannot reach the secure backend.' }; }
 }
-
-// Simulates a network round trip + credential check. Always resolves,
-// never throws — callers check `.ok`.
-export function mockAdminLogin(email, password, rememberDevice) {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      const account = DEMO_ACCOUNTS.find((a) => a.email.toLowerCase() === email.trim().toLowerCase());
-      if (!account || account.password !== password) {
-        resolve({ ok: false, error: 'Invalid email or password.' });
-        return;
-      }
-      const session = {
-        email: account.email, name: account.name, role: account.role,
-        loginAt: Date.now(), rememberDevice: !!rememberDevice,
-      };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
-      resolve({ ok: true, session });
-    }, 700);
-  });
-}
-
-export function adminLogout() {
-  localStorage.removeItem(STORAGE_KEY);
-}
-
-// Call at the top of every protected admin page.
+export async function adminLogout() { sessionStorage.removeItem(STORAGE_KEY); await fetch(`${API}/api/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => {}); location.href = 'login.html'; }
 export function requireAdminAuth() {
   const session = getAdminSession();
-  if (!session) {
-    const next = encodeURIComponent(location.pathname.split('/').pop());
-    location.href = `login.html?next=${next}`;
-    return null;
-  }
+  if (!session) { location.href = 'login.html'; return null; }
   return session;
 }
+// Demo credentials were intentionally removed. Create an admin through seed:admin.
+export const DEMO_ACCOUNTS = [];
