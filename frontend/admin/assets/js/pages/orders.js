@@ -1,5 +1,5 @@
 import { initAdminShell } from '../components/shell.js';
-import { formatPrice, formatDate, paginationHTML } from '../components/utils.js';
+import { formatPrice, formatDate, paginationHTML, escapeHtml } from '../components/utils.js';
 import { statusBadge } from '../components/statusBadge.js';
 import { fetchAdminOrders } from '../services/orderService.js';
 
@@ -23,12 +23,18 @@ function init() {
 async function load() {
   const tbody = document.getElementById('ordersBody');
   tbody.innerHTML = `<tr><td colspan="7"><div class="a-skeleton" style="height:36px"></div></td></tr>`;
-  const { items, total } = await fetchAdminOrders(state);
+  let items, total;
+  try {
+    ({ items, total } = await fetchAdminOrders(state));
+  } catch (error) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="admin-empty"><h3>Couldn't load orders</h3><p>${error.message}</p></div></td></tr>`;
+    return;
+  }
 
   tbody.innerHTML = items.length ? items.map((o) => `
     <tr>
       <td><a class="mono" href="order-detail.html?id=${o.id}" style="color:var(--a-primary);font-weight:600">${o.id}</a></td>
-      <td>${o.customer.name}<br /><span style="color:var(--a-muted);font-size:.76rem">${o.customer.email}</span></td>
+      <td>${escapeHtml(o.customer.name)}<br /><span style="color:var(--a-muted);font-size:.76rem">${escapeHtml(o.customer.email)}</span></td>
       <td>${formatDate(o.createdAt)}</td>
       <td>${o.items.reduce((s, i) => s + i.quantity, 0)} items</td>
       <td>${formatPrice(o.total)}</td>

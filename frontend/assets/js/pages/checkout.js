@@ -9,7 +9,6 @@ import { refreshCartDrawer } from '../components/cartDrawer.js';
 initShell({ currentPage: 'shop' });
 
 let delivery = 'standard';
-let payment = 'card';
 
 const lines = getCart();
 if (lines.length === 0) {
@@ -61,15 +60,11 @@ function render() {
 
     <section class="checkout-section" style="border-bottom:none">
       <h3 class="h3" style="margin-bottom:1.25rem">Payment</h3>
-      <label class="payment-option" data-active="true" data-value="card">
-        <input type="radio" name="payment" value="card" checked style="margin-top:.2rem" />
-        <div><strong>Credit / Debit Card</strong><p class="text-muted" style="font-size:var(--fs-small)">Visa, Mastercard, Meeza</p></div>
-      </label>
-      <label class="payment-option" data-value="cod">
-        <input type="radio" name="payment" value="cod" style="margin-top:.2rem" />
+      <label class="payment-option" data-active="true" data-value="cod">
+        <input type="radio" name="payment" value="cod" checked style="margin-top:.2rem" />
         <div><strong>Cash on Delivery</strong><p class="text-muted" style="font-size:var(--fs-small)">Pay when your order arrives</p></div>
       </label>
-      <div id="cardFields" style="margin-top:1rem"></div>
+      <p class="text-muted" style="font-size:var(--fs-small);margin-top:1rem">Online card payment will be available after a secure payment provider is connected.</p>
     </section>
 
     <button class="btn btn-primary btn-block" id="placeOrderBtn" type="submit">Place Order</button>
@@ -78,32 +73,14 @@ function render() {
     </p>
   `;
 
-  renderCardFields();
-
   document.querySelectorAll('input[name="delivery"]').forEach((r) => r.addEventListener('change', (e) => {
     delivery = e.target.value;
     document.querySelectorAll('.delivery-option').forEach((el) => (el.dataset.active = String(el.dataset.value === delivery)));
     renderSummary();
   }));
-  document.querySelectorAll('input[name="payment"]').forEach((r) => r.addEventListener('change', (e) => {
-    payment = e.target.value;
-    document.querySelectorAll('.payment-option').forEach((el) => (el.dataset.active = String(el.dataset.value === payment)));
-    renderCardFields();
-  }));
-
   renderSummary();
 
   document.getElementById('checkoutForm').addEventListener('submit', onSubmit);
-}
-
-function renderCardFields() {
-  const el = document.getElementById('cardFields');
-  if (payment !== 'card') { el.innerHTML = ''; return; }
-  el.innerHTML = `
-    <div class="card-placeholder">
-      Payment gateway UI placeholder — card fields will render here once connected to a real payment provider.
-    </div>
-  `;
 }
 
 function renderSummary() {

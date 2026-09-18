@@ -224,5 +224,5 @@ function renderVariants(product) {
 }
 
 function val(id) { return document.getElementById(id).value; }
-function imageSrc(url) { return /^https?:\/\//i.test(url) ? url : `../${url}`; }
+function imageSrc(url) { return /^https?:\/\//i.test(url) ? url : `/store-assets/${String(url).replace(/^assets\//, '')}`; }
 function esc(s) { return (s || '').replace(/"/g, '&quot;'); }

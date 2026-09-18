@@ -1,5 +1,5 @@
 import { initAdminShell } from '../components/shell.js';
-import { formatPrice, paginationHTML } from '../components/utils.js';
+import { formatPrice, paginationHTML, storeAssetSrc } from '../components/utils.js';
 import { statusBadge } from '../components/statusBadge.js';
 import { icon } from '../components/icons.js';
 import { showAdminToast } from '../components/toast.js';
@@ -43,7 +43,13 @@ async function init() {
 async function load() {
   const tbody = document.getElementById('productsBody');
   tbody.innerHTML = `<tr><td colspan="7"><div class="a-skeleton" style="height:40px"></div></td></tr>`.repeat(1);
-  const { items, total } = await fetchAdminProducts(state);
+  let items, total;
+  try {
+    ({ items, total } = await fetchAdminProducts(state));
+  } catch (error) {
+    document.getElementById('productsCard').innerHTML = `<div class="admin-empty"><h3>Couldn't load products</h3><p>${error.message}</p></div>`;
+    return;
+  }
 
   if (items.length === 0) {
     document.getElementById('productsCard').innerHTML = `
@@ -61,7 +67,7 @@ async function load() {
       <td class="row-checkbox-col"><input type="checkbox" class="row-check" data-id="${p.id}" ${selected.has(p.id) ? 'checked' : ''} /></td>
       <td>
         <div style="display:flex;align-items:center;gap:.6rem">
-          <img src="${/^https?:\/\//i.test(p.images[0]) ? p.images[0] : `../${p.images[0]}`}" alt="" width="36" height="45" style="object-fit:cover;border-radius:3px" />
+          <img src="${storeAssetSrc(p.images[0])}" alt="" width="36" height="45" style="object-fit:cover;border-radius:3px" />
           <div><a href="product-edit.html?id=${p.id}" style="font-weight:600;color:var(--a-text)">${p.name}</a><br /><span class="mono" style="color:var(--a-muted)">${p.sku}</span></div>
         </div>
       </td>
@@ -107,25 +113,31 @@ function bindRowEvents() {
   document.addEventListener('click', () => document.querySelectorAll('.popover').forEach((p) => (p.dataset.open = 'false')));
 
   document.querySelectorAll('[data-duplicate]').forEach((btn) => btn.addEventListener('click', async () => {
-    await duplicateAdminProduct(btn.dataset.duplicate);
-    showAdminToast('Product duplicated as draft.', 'success');
-    load();
+    try {
+      await duplicateAdminProduct(btn.dataset.duplicate);
+      showAdminToast('Product duplicated as draft.', 'success');
+      load();
+    } catch (error) { showAdminToast(error.message, 'error'); }
   }));
 
   document.querySelectorAll('[data-toggle-status]').forEach((btn) => btn.addEventListener('click', async () => {
-    const { items } = await fetchAdminProducts({ ...state, perPage: 999 });
-    const p = items.find((x) => x.id === btn.dataset.toggleStatus);
-    await updateAdminProduct(p.id, { status: p.status === 'active' ? 'draft' : 'active' });
-    showAdminToast(`Product ${p.status === 'active' ? 'unpublished' : 'published'}.`, 'success');
-    load();
+    try {
+      const { items } = await fetchAdminProducts({ ...state, perPage: 999 });
+      const p = items.find((x) => x.id === btn.dataset.toggleStatus);
+      await updateAdminProduct(p.id, { status: p.status === 'active' ? 'draft' : 'active' });
+      showAdminToast(`Product ${p.status === 'active' ? 'unpublished' : 'published'}.`, 'success');
+      load();
+    } catch (error) { showAdminToast(error.message, 'error'); }
   }));
 
   document.querySelectorAll('[data-delete]').forEach((btn) => btn.addEventListener('click', async () => {
     const ok = await confirmDialog({ title: 'Delete Product?', body: 'This will permanently remove the product from your catalog. This action cannot be easily reversed.', confirmLabel: 'Delete Product' });
     if (!ok) return;
-    await deleteAdminProduct(btn.dataset.delete);
-    showAdminToast('Product deleted.', 'success');
-    load();
+    try {
+      await deleteAdminProduct(btn.dataset.delete);
+      showAdminToast('Product deleted.', 'success');
+      load();
+    } catch (error) { showAdminToast(error.message, 'error'); }
   }));
 }
 
@@ -144,19 +156,23 @@ function updateBulkBar() {
 }
 
 async function bulkAction(status) {
-  for (const id of selected) await updateAdminProduct(id, { status });
-  showAdminToast(`${selected.size} product(s) updated.`, 'success');
-  selected.clear();
-  load();
+  try {
+    for (const id of selected) await updateAdminProduct(id, { status });
+    showAdminToast(`${selected.size} product(s) updated.`, 'success');
+    selected.clear();
+    load();
+  } catch (error) { showAdminToast(error.message, 'error'); }
 }
 
 async function bulkDelete() {
   const ok = await confirmDialog({ title: `Delete ${selected.size} Products?`, body: 'This will permanently remove the selected products. This action cannot be easily reversed.', confirmLabel: 'Delete Products' });
   if (!ok) return;
-  for (const id of selected) await deleteAdminProduct(id);
-  showAdminToast('Selected products deleted.', 'success');
-  selected.clear();
-  load();
+  try {
+    for (const id of selected) await deleteAdminProduct(id);
+    showAdminToast('Selected products deleted.', 'success');
+    selected.clear();
+    load();
+  } catch (error) { showAdminToast(error.message, 'error'); }
 }
 
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }

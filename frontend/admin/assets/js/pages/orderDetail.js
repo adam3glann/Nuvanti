@@ -1,5 +1,5 @@
 import { initAdminShell } from '../components/shell.js';
-import { formatPrice, formatDateTime } from '../components/utils.js';
+import { formatPrice, formatDateTime, storeAssetSrc, escapeHtml } from '../components/utils.js';
 import { statusBadge } from '../components/statusBadge.js';
 import { showAdminToast } from '../components/toast.js';
 import { confirmDialog } from '../components/confirmDialog.js';
@@ -17,7 +17,13 @@ const canCancel = session && hasPermission(session.role, 'orders.cancel');
 const canRefund = session && hasPermission(session.role, 'orders.refund');
 
 async function init() {
-  const order = await fetchAdminOrder(id);
+  let order;
+  try {
+    order = await fetchAdminOrder(id);
+  } catch (error) {
+    document.getElementById('orderRoot').innerHTML = `<div class="admin-empty"><h3>Couldn't load this order</h3><p>${error.message}</p></div>`;
+    return;
+  }
   if (!order) {
     document.getElementById('orderRoot').innerHTML = `<div class="admin-empty"><h3>Order not found</h3><a href="orders.html" class="btn btn-primary">Back to Orders</a></div>`;
     return;
@@ -40,8 +46,8 @@ function render(order) {
               <tbody>
                 ${order.items.map((it) => `
                   <tr>
-                    <td><div style="display:flex;align-items:center;gap:.6rem"><img src="../${it.image}" width="34" height="42" style="object-fit:cover;border-radius:3px" alt="" /><span>${it.name}</span></div></td>
-                    <td>${it.color} / ${it.size}</td><td>${it.quantity}</td>
+                    <td><div style="display:flex;align-items:center;gap:.6rem"><img src="${storeAssetSrc(it.image)}" width="34" height="42" style="object-fit:cover;border-radius:3px" alt="" /><span>${escapeHtml(it.name)}</span></div></td>
+                    <td>${[it.color, it.size].filter(Boolean).join(' / ') || '—'}</td><td>${it.quantity}</td>
                     <td>${formatPrice(it.price)}</td><td>${formatPrice(it.price * it.quantity)}</td>
                   </tr>`).join('')}
               </tbody>
@@ -66,7 +72,7 @@ function render(order) {
         <div class="card">
           <div class="card-head"><h2>Shipping</h2></div>
           <div class="card-pad" style="font-size:.85rem;display:flex;flex-direction:column;gap:.5rem">
-            <div style="display:flex;justify-content:space-between"><span style="color:var(--a-muted)">Address</span><span>${order.shippingAddress.city}, ${order.shippingAddress.country}</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:var(--a-muted)">Address</span><span>${escapeHtml(order.shippingAddress.city)}, ${escapeHtml(order.shippingAddress.country)}</span></div>
             <div style="display:flex;justify-content:space-between"><span style="color:var(--a-muted)">Method</span><span>${order.shippingAddress.method}</span></div>
             <div style="display:flex;justify-content:space-between"><span style="color:var(--a-muted)">Tracking</span><span class="mono">${order.trackingNumber || '—'}</span></div>
           </div>
@@ -77,9 +83,9 @@ function render(order) {
         <div class="card" style="margin-bottom:1.25rem">
           <div class="card-head"><h2>Customer</h2></div>
           <div class="card-pad" style="font-size:.85rem;display:flex;flex-direction:column;gap:.4rem">
-            <strong>${order.customer.name}</strong>
-            <span style="color:var(--a-muted)">${order.customer.email}</span>
-            <span style="color:var(--a-muted)">${order.customer.phone}</span>
+            <strong>${escapeHtml(order.customer.name)}</strong>
+            <span style="color:var(--a-muted)">${escapeHtml(order.customer.email)}</span>
+            <span style="color:var(--a-muted)">${escapeHtml(order.customer.phone)}</span>
           </div>
         </div>
 
@@ -131,33 +137,41 @@ function render(order) {
 
   document.getElementById('updateStatusBtn')?.addEventListener('click', async () => {
     const status = document.getElementById('statusSelect').value;
-    const updated = await updateOrderStatus(order.id, status);
-    showAdminToast('Order status updated.', 'success');
-    render(updated);
+    try {
+      const updated = await updateOrderStatus(order.id, status);
+      showAdminToast('Order status updated.', 'success');
+      render(updated);
+    } catch (error) { showAdminToast(error.message, 'error'); }
   });
 
   document.getElementById('cancelBtn')?.addEventListener('click', async () => {
     const ok = await confirmDialog({ title: 'Cancel Order?', body: 'This action cannot be easily reversed. The customer will be notified once this connects to a real notification system.', confirmLabel: 'Cancel Order' });
     if (!ok) return;
-    const updated = await cancelOrder(order.id);
-    showAdminToast('Order cancelled.', 'success');
-    render(updated);
+    try {
+      const updated = await cancelOrder(order.id);
+      showAdminToast('Order cancelled.', 'success');
+      render(updated);
+    } catch (error) { showAdminToast(error.message, 'error'); }
   });
 
   document.getElementById('refundBtn')?.addEventListener('click', async () => {
     const ok = await confirmDialog({ title: 'Refund Order?', body: `This will mark the order as refunded. Real refunds must be processed through the payment provider once connected.`, confirmLabel: 'Refund Order' });
     if (!ok) return;
-    const updated = await refundOrder(order.id);
-    showAdminToast('Order marked as refunded.', 'success');
-    render(updated);
+    try {
+      const updated = await refundOrder(order.id);
+      showAdminToast('Order marked as refunded.', 'success');
+      render(updated);
+    } catch (error) { showAdminToast(error.message, 'error'); }
   });
 
   document.getElementById('addNoteBtn').addEventListener('click', async () => {
     const text = document.getElementById('noteInput').value.trim();
     if (!text) return;
-    const updated = await addOrderNote(order.id, text);
-    showAdminToast('Note added.', 'success');
-    render(updated);
+    try {
+      const updated = await addOrderNote(order.id, text);
+      showAdminToast('Note added.', 'success');
+      render(updated);
+    } catch (error) { showAdminToast(error.message, 'error'); }
   });
 }
 

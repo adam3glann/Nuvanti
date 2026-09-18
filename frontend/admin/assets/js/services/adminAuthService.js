@@ -1,5 +1,9 @@
 // The server-side admin gateway is the security boundary. sessionStorage only
 // mirrors the safe display name/role for this UI; editing it grants nothing.
+// This file is served publicly (pre-login), so it deliberately does not
+// import other admin modules — keep this role list in sync with
+// components/permissions.js (ROLES) and backend/lib/permissions.js.
+const STAFF_TIER_ROLES = ['super_admin', 'admin', 'manager', 'staff'];
 const API = window.NUVANTI_API_URL || (location.protocol === 'file:' ? 'http://localhost:4000' : `${location.protocol}//${location.hostname}:4000`);
 const STORAGE_KEY = 'nuvanti_admin_display_session';
 
@@ -9,7 +13,7 @@ export async function mockAdminLogin(email, password) {
     const response = await fetch(`${API}/api/auth/login`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
     const body = await response.json();
     if (!response.ok) return { ok: false, error: body.error || 'Unable to sign in.' };
-    if (!['admin', 'super_admin'].includes(body.user.role)) { await fetch(`${API}/api/auth/logout`, { method: 'POST', credentials: 'include' }); return { ok: false, error: 'This account is not authorized for the admin area.' }; }
+    if (!STAFF_TIER_ROLES.includes(body.user.role)) { await fetch(`${API}/api/auth/logout`, { method: 'POST', credentials: 'include' }); return { ok: false, error: 'This account is not authorized for the admin area.' }; }
     const session = { email: body.user.email, name: body.user.name, role: body.user.role };
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(session));
     return { ok: true, session };
@@ -25,6 +29,11 @@ export async function confirmAdminPasswordReset(token, password) {
   const response = await fetch(`${API}/api/auth/password-reset/confirm`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, password }) });
   const body = response.status === 204 ? {} : await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body.error || 'Unable to reset your password.');
+}
+export async function changeAdminPassword(currentPassword, newPassword) {
+  const response = await fetch(`${API}/api/auth/change-password`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ currentPassword, newPassword }) });
+  const body = response.status === 204 ? {} : await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.error || 'Unable to change your password.');
 }
 export async function adminLogout() { sessionStorage.removeItem(STORAGE_KEY); await fetch(`${API}/api/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => {}); location.href = 'login.html'; }
 export function requireAdminAuth() {

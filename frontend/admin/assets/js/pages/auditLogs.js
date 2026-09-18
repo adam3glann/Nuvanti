@@ -1,5 +1,5 @@
 import { initAdminShell } from '../components/shell.js';
-import { formatDateTime, paginationHTML } from '../components/utils.js';
+import { formatDateTime, paginationHTML, escapeHtml } from '../components/utils.js';
 import { hasPermission } from '../components/permissions.js';
 import { fetchAuditLogs, uniqueUsers } from '../services/auditLogService.js';
 
@@ -13,22 +13,30 @@ if (session && !hasPermission(session.role, 'audit.view')) {
   init();
 }
 
-function init() {
-  document.getElementById('userFilter').innerHTML = `<option value="">All Admins</option>${uniqueUsers().map((u) => `<option value="${u}">${u}</option>`).join('')}`;
+async function init() {
+  try {
+    document.getElementById('userFilter').innerHTML = `<option value="">All Admins</option>${(await uniqueUsers()).map((u) => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('')}`;
+  } catch { /* filter list is a nicety; load() below will surface the real error */ }
   document.getElementById('searchInput').addEventListener('input', debounce((e) => { state.query = e.target.value; state.page = 1; load(); }, 250));
   document.getElementById('userFilter').addEventListener('change', (e) => { state.user = e.target.value; state.page = 1; load(); });
   load();
 }
 
 async function load() {
-  const { items, total } = await fetchAuditLogs(state);
+  let items, total;
+  try {
+    ({ items, total } = await fetchAuditLogs(state));
+  } catch (error) {
+    document.getElementById('auditBody').innerHTML = `<tr><td colspan="5"><div class="admin-empty"><h3>Couldn't load audit logs</h3><p>${error.message}</p></div></td></tr>`;
+    return;
+  }
   document.getElementById('auditBody').innerHTML = items.length ? items.map((l) => `
     <tr>
-      <td>${l.user}<br /><span style="color:var(--a-muted);font-size:.72rem;text-transform:capitalize">${l.role.replace('_', ' ')}</span></td>
-      <td>${l.action}</td>
-      <td>${l.resource}</td>
+      <td>${escapeHtml(l.user)}<br /><span style="color:var(--a-muted);font-size:.72rem;text-transform:capitalize">${escapeHtml(l.role.replace('_', ' '))}</span></td>
+      <td>${escapeHtml(l.action)}</td>
+      <td>${escapeHtml(l.resource)}</td>
       <td>${formatDateTime(l.timestamp)}</td>
-      <td class="mono" style="color:var(--a-muted)">${l.ip}</td>
+      <td class="mono" style="color:var(--a-muted)">${escapeHtml(l.ip)}</td>
     </tr>
   `).join('') : `<tr><td colspan="5"><div class="admin-empty"><h3>No matching audit entries</h3></div></td></tr>`;
 

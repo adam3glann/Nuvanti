@@ -1,6 +1,6 @@
 # Nuvanti secure backend
 
-This backend uses **PostgreSQL** and treats the admin area as a separate, protected application. It is not protected by a hidden URL or frontend localStorage: the admin server verifies a signed, HTTP-only session cookie and an `admin`/`super_admin` role before it sends any admin HTML, JavaScript, or CSS.
+This backend uses **PostgreSQL** and treats the admin area as a separate, protected application. It is not protected by a hidden URL or frontend localStorage: the admin server verifies a signed, HTTP-only session cookie and a staff-tier role (`staff`/`manager`/`admin`/`super_admin`) before it sends any admin HTML, JavaScript, or CSS. Within that, every `/api/admin/*` route independently checks a specific permission for the caller's role — see "Roles & permissions" below.
 
 ## Setup
 
@@ -35,9 +35,17 @@ CLOUDINARY_API_SECRET=your-api-secret
 
 Find them in Cloudinary's Dashboard → API Keys. Keep the API secret in `.env` only—never put it in frontend JavaScript or commit it to Git. Once configured, edit a product in Admin, select **Upload**, choose an image, then **Save Changes**. The returned HTTPS image URL is stored with that product in PostgreSQL and appears on the public store.
 
+## Roles & permissions
+
+There are five roles: `customer`, and four staff-tier roles — `staff`, `manager`, `admin`, `super_admin` — each with a fixed set of permissions enforced in `backend/lib/permissions.js` (mirrored in the admin UI's `components/permissions.js` for hiding controls, but the backend check is the real boundary). Only a `super_admin` can create, disable, or delete other administrator accounts, and the backend refuses to let the last active `super_admin` be disabled or deleted.
+
+## Adding administrators
+
+There is no "set a password for someone else" flow. From **Admin Users** (super_admin only), creating an account emails the person a setup link — the account starts with an unusable random password and can only be activated by setting a real one through that link (same delivery path as the password-reset email below; in development without SMTP configured, the link is printed to the backend terminal instead).
+
 ## Reset an admin password
 
-The admin login page has a complete **Forgot password** flow. It accepts an authorized admin email, sends a one-time link, then lets the user choose a new password. Links expire after 30 minutes and are invalidated after use.
+The admin login page has a complete **Forgot password** flow. It accepts an authorized admin email, sends a one-time link, then lets the user choose a new password. Links expire after 30 minutes and are invalidated after use. Signed-in users can also change their own password directly from **Security** without going through email.
 
 To deliver messages to Gmail (and therefore your Gmail app/phone), enable two-step verification on the sending Gmail account and create a Google **App Password**. Put these values in your private `.env` file—never in `.env.example` or Git:
 
@@ -57,10 +65,17 @@ The reset email is sent to the account's email address and will appear on the re
 
 - HTTP-only, signed 8-hour session cookies; credentials never go in localStorage.
 - `bcrypt` password hashing (work factor 12).
-- Role checks on every `/api/admin/*` endpoint and every admin asset.
+- Permission checks (not just a role check) on every `/api/admin/*` endpoint, backed by a real 4-tier role model — see "Roles & permissions" above.
+- Brute-force lockout: an account locks for 15 minutes after 5 consecutive failed logins.
+- Audit log of security-relevant events (logins, lockouts, password changes/resets, administrator account changes, and destructive catalog/order actions) — visible on the **Audit Logs** admin page to `admin`/`super_admin`.
 - Helmet headers, request size limits, strict CORS, origin checks on writes, validation, and rate limits.
 - Checkout re-prices products and locks inventory rows in a PostgreSQL transaction. A browser cannot choose prices or oversell stock.
-- Parameterized SQL and Zod input validation.
+- Parameterized SQL and Zod input validation everywhere, including admin mutations.
+- Customer-supplied strings (name, email, shipping address) are HTML-escaped before the admin UI renders them, to prevent stored XSS via order/checkout data.
+
+## Not yet implemented
+
+Two-factor authentication, per-device session tracking/"log out all devices" (sessions are currently a single stateless JWT cookie per browser — rotate `JWT_SECRET` to invalidate all of them at once), and email verification on customer registration are not built. The admin **Security** page is explicit about which of its controls are real. Discounts, Settings, Analytics detail, and Contact Messages also have no backend yet and remain mock/local-only in the admin UI.
 
 ## Production notes
 

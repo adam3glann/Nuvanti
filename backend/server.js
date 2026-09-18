@@ -17,6 +17,7 @@ import { requireAuth, requireRole } from './lib/auth.js';
 import { errorHandler, notFound, sameOrigin } from './middleware/security.js';
 
 const app = express();
+const STAFF_ROLES = ['staff', 'manager', 'admin', 'super_admin'];
 const PORT = Number(process.env.PORT || 4000);
 const ADMIN_PORT = Number(process.env.ADMIN_PORT || 4001);
 const storeOrigin = process.env.STORE_ORIGIN || 'http://localhost:8080';
@@ -37,8 +38,8 @@ app.use('/api/products', productsRouter);
 app.use('/api/categories', categoriesRouter);
 app.use('/api/orders', ordersRouter);
 app.use('/api/contact', contactRouter);
-app.use('/api/admin', requireAuth, requireRole('admin', 'super_admin'), adminRouter);
-app.use('/api/admin/uploads', requireAuth, requireRole('admin', 'super_admin'), uploadsRouter);
+app.use('/api/admin', requireAuth, requireRole(...STAFF_ROLES), adminRouter);
+app.use('/api/admin/uploads', requireAuth, requireRole(...STAFF_ROLES), uploadsRouter);
 
 app.use(notFound);
 app.use(errorHandler);
@@ -55,7 +56,8 @@ adminApp.use('/assets/css', express.static(path.join(__dirname, '../frontend/adm
 adminApp.use('/assets/js/services/adminAuthService.js', express.static(path.join(__dirname, '../frontend/admin/assets/js/services/adminAuthService.js')));
 adminApp.use('/assets/js/components/icons.js', express.static(path.join(__dirname, '../frontend/admin/assets/js/components/icons.js')));
 adminApp.use('/assets/js/pages/login.js', express.static(path.join(__dirname, '../frontend/admin/assets/js/pages/login.js')));
-adminApp.use(requireAuth, requireRole('admin', 'super_admin'));
+adminApp.use(requireAuth, requireRole(...STAFF_ROLES));
+adminApp.use('/store-assets', express.static(path.join(__dirname, '../frontend/assets')));
 adminApp.use(express.static(path.join(__dirname, '../frontend/admin'), { index: 'index.html', fallthrough: false }));
 adminApp.use((err, req, res, next) => res.status(err.status === 404 ? 404 : 500).send('Not found'));
 app.listen(PORT, () => console.log(`Nuvanti API listening on http://localhost:${PORT}`));

@@ -30,6 +30,6 @@ function render() {
       </div>
     </div>
   `).join('') + `
-    <p style="color:var(--a-muted);font-size:.8rem">This matrix is read-only in this preview — it mirrors what the backend will enforce. Editing role permissions will be enabled once role management is connected to the Node API, and every checkbox here is re-verified server-side regardless of what this screen shows.</p>
+    <p style="color:var(--a-muted);font-size:.8rem">This matrix is read-only in this preview — editing role permissions here isn't available yet. It does reflect what the backend actually enforces on every request: each checkbox above matches a real permission check in the API, independent of what this screen shows.</p>
   `;
 }

@@ -75,19 +75,11 @@ function renderAuthForm() {
   } else {
     wrap.innerHTML = `
       <form id="forgotForm" novalidate>
-        <p class="text-muted" style="margin-bottom:1rem;font-size:var(--fs-small)">Enter your email and we'll send a reset link.</p>
-        <div class="field"><label for="forgotEmail">Email</label><input type="email" id="forgotEmail" required /></div>
-        <button class="btn btn-primary btn-block" type="submit">Send Reset Link</button>
-        <p class="text-muted" id="forgotSuccess" style="margin-top:1rem;font-size:var(--fs-small)" hidden>Password-reset emails are not enabled yet. Contact the store administrator for help.</p>
+        <p class="text-muted" style="margin-bottom:1rem;font-size:var(--fs-small)">Customer password reset is not available yet. Please contact us and we will help you regain access.</p>
+        <a class="btn btn-primary btn-block" href="contact.html">Contact Support</a>
       </form>
     `;
     switchEl.innerHTML = `<button class="btn-text" id="toLogin">Back to sign in</button>`;
-    document.getElementById('forgotForm').addEventListener('submit', (e) => {
-      e.preventDefault();
-      if (!checkValid(e.target)) return;
-      document.getElementById('forgotSuccess').hidden = false;
-      e.target.querySelector('button[type="submit"]').disabled = true;
-    });
     document.getElementById('toLogin').addEventListener('click', () => { authView = 'login'; renderAuthForm(); });
   }
 }
