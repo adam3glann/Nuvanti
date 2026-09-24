@@ -16,7 +16,10 @@ function ensureRegion() {
 export function showToast(message, { icon: iconName = 'check' } = {}) {
   const el = document.createElement('div');
   el.className = 'toast';
-  el.innerHTML = `${icon(iconName)}<span>${message}</span>`;
+  el.innerHTML = icon(iconName);
+  const label = document.createElement('span');
+  label.textContent = String(message ?? '');
+  el.appendChild(label);
   ensureRegion().appendChild(el);
   setTimeout(() => {
     el.style.transition = 'opacity 200ms ease';

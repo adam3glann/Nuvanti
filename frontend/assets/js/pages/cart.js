@@ -2,16 +2,47 @@ import { initShell } from '../main.js';
 import { icon } from '../components/icons.js';
 import { formatPrice } from '../components/productCard.js';
 import { refreshCartDrawer } from '../components/cartDrawer.js';
-import { getCart, updateQuantity, removeFromCart, cartSubtotal, FREE_SHIPPING_THRESHOLD } from '../services/cartService.js';
+import { getCart, updateQuantity, removeFromCart, cartSubtotal, configureFreeShippingThreshold } from '../services/cartService.js';
+import { loadStoreSettings } from '../services/storeSettingsService.js';
+import { checkDiscount, getSavedDiscountCode, saveDiscountCode, clearDiscountCode } from '../services/discountService.js';
 
 initShell({ currentPage: 'shop' });
 
-let promoApplied = false;
-const PROMO_CODE = 'NUVANTI10';
-const PROMO_RATE = 0.1;
+// { code, discountCents } once a real code has been validated against the
+// backend, otherwise null.
+let discountInfo = null;
 let listenerBound = false;
+let storeSettings = null;
 
-render();
+initializeCart();
+
+async function initializeCart() {
+  try {
+    storeSettings = await loadStoreSettings();
+    configureFreeShippingThreshold(storeSettings.freeShippingThresholdCents / 100);
+    await restoreSavedDiscount();
+    render();
+  } catch {
+    document.getElementById('cartList').innerHTML = '<div class="state-block"><h3>Bag pricing is temporarily unavailable</h3><p>Your items are saved. Please try again shortly before checkout.</p></div>';
+    document.getElementById('cartSummary').innerHTML = '';
+  }
+}
+
+// If a code was applied earlier in this session, re-validate it against the
+// current subtotal (quantities may have changed, or the code may have
+// expired/hit its usage limit since) rather than trusting a stale amount.
+// Does not render itself — callers render once this settles.
+async function restoreSavedDiscount() {
+  const saved = getSavedDiscountCode();
+  if (!saved || getCart().length === 0) return;
+  try {
+    const result = await checkDiscount(saved, cartSubtotal());
+    discountInfo = { code: result.code, discountCents: result.discountCents };
+  } catch {
+    clearDiscountCode();
+    discountInfo = null;
+  }
+}
 
 function render() {
   const lines = getCart();
@@ -53,35 +84,51 @@ function render() {
   `).join('');
 
   const subtotal = cartSubtotal();
-  const shipping = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : (subtotal > 0 ? 75 : 0);
-  const discount = promoApplied ? subtotal * PROMO_RATE : 0;
-  const total = subtotal - discount + shipping;
+  const shipping = subtotal >= storeSettings.freeShippingThresholdCents / 100 ? 0 : (subtotal > 0 ? storeSettings.standardShippingCents / 100 : 0);
+  const discount = discountInfo ? discountInfo.discountCents / 100 : 0;
+  const total = Math.max(0, subtotal - discount) + shipping;
 
   summaryEl.innerHTML = `
     <h3 class="h3" style="margin-bottom:1.5rem">Order Summary</h3>
     <div class="promo-row">
       <label class="visually-hidden" for="promoInput">Discount code</label>
-      <input type="text" id="promoInput" placeholder="Discount code" value="${promoApplied ? PROMO_CODE : ''}" ${promoApplied ? 'disabled' : ''} />
-      <button class="btn btn-outline btn-sm" id="applyPromo" ${promoApplied ? 'disabled' : ''}>Apply</button>
+      <input type="text" id="promoInput" placeholder="Discount code" value="${discountInfo ? discountInfo.code : ''}" ${discountInfo ? 'disabled' : ''} />
+      <button class="btn btn-outline btn-sm" id="applyPromo" ${discountInfo ? 'disabled' : ''}>Apply</button>
     </div>
-    <div id="promoMsg" style="font-size:var(--fs-micro);margin-bottom:1rem;color:${promoApplied ? 'var(--color-success)' : 'var(--color-error)'}"></div>
+    ${discountInfo ? `<button type="button" class="btn btn-text" id="removePromo" style="display:block;margin:-.5rem 0 1rem;padding:0;font-size:var(--fs-micro)">Remove code</button>` : ''}
+    <div id="promoMsg" style="font-size:var(--fs-micro);margin-bottom:1rem;color:var(--color-error)"></div>
     <div class="summary-row"><span>Subtotal</span><span>${formatPrice(subtotal)}</span></div>
-    ${promoApplied ? `<div class="summary-row"><span>Discount (10%)</span><span>-${formatPrice(discount)}</span></div>` : ''}
+    ${discountInfo ? `<div class="summary-row"><span>Discount (${discountInfo.code})</span><span>-${formatPrice(discount)}</span></div>` : ''}
     <div class="summary-row"><span>Estimated Shipping</span><span>${shipping === 0 ? 'Free' : formatPrice(shipping)}</span></div>
     <div class="summary-row summary-row--total"><span>Estimated Total</span><span>${formatPrice(total)}</span></div>
     <a href="checkout.html" class="btn btn-primary btn-block" style="margin-top:1.5rem">Proceed to Checkout</a>
     <a href="shop.html" class="btn btn-text" style="display:block;text-align:center;margin-top:1rem">Continue Shopping</a>
   `;
 
-  document.getElementById('applyPromo').addEventListener('click', () => {
-    const val = document.getElementById('promoInput').value.trim().toUpperCase();
+  document.getElementById('applyPromo').addEventListener('click', async () => {
+    const input = document.getElementById('promoInput');
+    const btn = document.getElementById('applyPromo');
     const msg = document.getElementById('promoMsg');
-    if (val === PROMO_CODE) {
-      promoApplied = true;
+    const val = input.value.trim().toUpperCase();
+    if (!val) return;
+    btn.disabled = true; btn.textContent = 'Checking…'; msg.textContent = '';
+    try {
+      const result = await checkDiscount(val, cartSubtotal());
+      discountInfo = { code: result.code, discountCents: result.discountCents };
+      saveDiscountCode(result.code);
       render();
-    } else {
-      msg.textContent = 'That code is not valid.';
+    } catch (error) {
+      discountInfo = null;
+      msg.textContent = error.message;
+      btn.disabled = false; btn.textContent = 'Apply';
     }
+  });
+
+  const removeBtn = document.getElementById('removePromo');
+  if (removeBtn) removeBtn.addEventListener('click', () => {
+    discountInfo = null;
+    clearDiscountCode();
+    render();
   });
 
   if (!listenerBound) {
@@ -90,7 +137,7 @@ function render() {
   }
 }
 
-function onLineClick(e) {
+async function onLineClick(e) {
   const dec = e.target.closest('[data-dec]');
   const inc = e.target.closest('[data-inc]');
   const rem = e.target.closest('[data-remove]');
@@ -107,5 +154,9 @@ function onLineClick(e) {
     return;
   }
   refreshCartDrawer();
+  // Quantities changed, so a percentage discount's amount (and a
+  // minimum-order code's validity) may no longer be accurate — re-check
+  // against the backend rather than displaying a stale figure.
+  if (discountInfo) await restoreSavedDiscount();
   render();
 }

@@ -19,12 +19,15 @@ const NAV = [
   },
   {
     group: 'Customers',
-    items: [{ href: 'customers.html', label: 'All Customers', icon: 'users', page: 'customers', perm: 'customers.view' }],
+    items: [
+      { href: 'customers.html', label: 'All Customers', icon: 'users', page: 'customers', perm: 'customers.view' },
+      { href: 'messages.html', label: 'Contact Messages', icon: 'fileText', page: 'messages', perm: 'customers.view' },
+    ],
   },
   {
     group: 'Content & Marketing',
     items: [
-      { href: 'content.html', label: 'Homepage & CMS', icon: 'fileText', page: 'content', perm: 'content.manage' },
+      { href: 'newsletter.html', label: 'Newsletter', icon: 'fileText', page: 'newsletter', perm: 'content.manage' },
     ],
   },
   {

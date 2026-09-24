@@ -20,7 +20,7 @@ if (!order) {
     <div class="order-success">
       <div class="order-success__icon">${icon('check')}</div>
       <h1>Thank you for your order.</h1>
-      <p class="text-muted">A confirmation has been sent to ${order.customer.email}.</p>
+      <p class="text-muted">A confirmation has been sent to ${order.customer.email}${order.customer.phone ? ' and by WhatsApp' : ''}.</p>
 
       <div class="order-detail-card">
         <div class="order-detail-row"><span>Order Number</span><strong>${order.orderNumber}</strong></div>
@@ -32,13 +32,14 @@ if (!order) {
         `).join('')}
         <hr class="hr" style="margin-block:1rem" />
         <div class="order-detail-row"><span>Subtotal</span><span>${formatPrice(order.subtotal)}</span></div>
+        ${order.discountCode ? `<div class="order-detail-row"><span>Discount (${order.discountCode})</span><span>-${formatPrice(order.discountAmount)}</span></div>` : ''}
         <div class="order-detail-row"><span>Shipping</span><span>${order.shippingCost === 0 ? 'Free' : formatPrice(order.shippingCost)}</span></div>
         <div class="order-detail-row" style="font-weight:700;font-size:1.05rem"><span>Total</span><span>${formatPrice(order.total)}</span></div>
       </div>
 
       <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap">
         <a href="shop.html" class="btn btn-primary">Continue Shopping</a>
-        <a href="account.html?tab=orders" class="btn btn-outline">Track Order</a>
+        <a href="${order.trackingUrl || 'account.html?tab=orders'}" class="btn btn-outline">Track Order</a>
       </div>
     </div>
   `;

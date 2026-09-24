@@ -22,9 +22,6 @@ import {
   stockFor,
   isInStock,
 } from "../data/products.js";
-import { getPublishedProducts } from "../data/productStore.js";
-
-const allProducts = getPublishedProducts();
 
 import { addToCart } from "../services/cartService.js";
 
@@ -63,7 +60,13 @@ async function init() {
     return;
   }
 
-  product = await fetchProductBySlug(slug);
+  try { product = await fetchProductBySlug(slug); }
+  catch {
+    const root = document.getElementById("productRoot");
+    root.innerHTML = '<div class="state-block"><h3>Product details are temporarily unavailable</h3><p>Please try again in a moment.</p><button class="btn btn-outline" id="retryProduct">Try Again</button></div>';
+    root.querySelector('#retryProduct')?.addEventListener('click', () => location.reload());
+    return;
+  }
 
   if (!product) {
     renderNotFound();
@@ -89,7 +92,7 @@ async function init() {
 
   await loadRelated();
 
-  loadRecentlyViewed();
+  await loadRecentlyViewed();
 }
 
 /* =========================================================
@@ -1308,13 +1311,12 @@ function reattachAccordionOpen() {
    ========================================================= */
 
 async function loadRelated() {
-  const list = await fetchRelated(product, 4);
-
   const element = document.getElementById("relatedGrid");
-
   const section = document.getElementById("relatedSection");
-
   if (!element || !section) return;
+  let list;
+  try { list = await fetchRelated(product, 4); }
+  catch { section.hidden = true; return; }
 
   if (!list.length) {
     section.hidden = true;
@@ -1325,7 +1327,7 @@ async function loadRelated() {
   element.innerHTML = list.map(productCardHTML).join("");
 
   bindProductCardEvents(element, {
-    products: allProducts,
+    products: list,
     onCartChange: refreshCartDrawer,
   });
 }
@@ -1354,7 +1356,7 @@ function getRecent() {
   }
 }
 
-function loadRecentlyViewed() {
+async function loadRecentlyViewed() {
   const recent = getRecent().filter((item) => item !== product.slug);
 
   const section = document.getElementById("recentlyViewedSection");
@@ -1369,10 +1371,8 @@ function loadRecentlyViewed() {
     return;
   }
 
-  const list = recent
-    .map((slug) => allProducts.find((item) => item.slug === slug))
-    .filter(Boolean)
-    .slice(0, 4);
+  const list = (await Promise.all(recent.slice(0, 4).map((slug) => fetchProductBySlug(slug).catch(() => null))))
+    .filter(Boolean);
 
   if (!list.length) {
     section.hidden = true;
@@ -1383,7 +1383,7 @@ function loadRecentlyViewed() {
   grid.innerHTML = list.map(productCardHTML).join("");
 
   bindProductCardEvents(grid, {
-    products: allProducts,
+    products: list,
     onCartChange: refreshCartDrawer,
   });
 }

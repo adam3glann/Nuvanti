@@ -5,6 +5,8 @@ import { mountSearchOverlay } from './components/searchOverlay.js';
 import { initScrollReveal } from './components/scrollReveal.js';
 import { onCartChange } from './services/cartService.js';
 import { onWishlistChange } from './services/wishlistService.js';
+import { loadStoreSettings } from './services/storeSettingsService.js';
+import { configureFreeShippingThreshold } from './services/cartService.js';
 
 export function initShell({ transparentHeader = false, currentPage = '' } = {}) {
   renderHeader({ transparentOnHero: transparentHeader, currentPage });
@@ -14,6 +16,11 @@ export function initShell({ transparentHeader = false, currentPage = '' } = {}) 
 
   onCartChange(() => { refreshCartDrawer(); });
   onWishlistChange(() => { refreshHeaderCounts(); });
+
+  loadStoreSettings().then((settings) => {
+    configureFreeShippingThreshold(settings.freeShippingThresholdCents / 100);
+    refreshCartDrawer();
+  }).catch((error) => console.error('Store settings unavailable:', error));
 
   window.addEventListener('load', () => initScrollReveal());
   initScrollReveal();

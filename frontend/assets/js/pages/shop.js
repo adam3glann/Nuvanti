@@ -6,6 +6,7 @@ import { fetchProducts } from '../services/productService.js';
 import { categories } from '../data/categories.js';
 import { colorHex } from '../data/products.js';
 import { getPublishedProducts } from '../data/productStore.js';
+import { LOCAL_DEVELOPMENT } from '../config.js';
 
 const allProducts = getPublishedProducts();
 
@@ -188,10 +189,15 @@ async function runFilter(append = false) {
       sort: state.sort === 'featured' ? undefined : state.sort,
     });
   } catch (error) {
-    // The storefront is frontend-only: show the local catalog even if a mobile
-    // browser interrupts the small async mock-service delay.
-    console.warn('Catalog service unavailable; using local catalog.', error);
-    cache = [...allProducts];
+    if (LOCAL_DEVELOPMENT) cache = [...allProducts];
+    else {
+      if (requestId !== activeRequest) return;
+      resultsEl.innerHTML = `<div class="state-block" style="grid-column:1/-1"><h3>Shop is temporarily unavailable</h3><p>We couldn't load the live catalog. Please try again shortly.</p><button class="btn btn-outline" id="retryCatalog">Try Again</button></div>`;
+      document.getElementById('retryCatalog')?.addEventListener('click', () => runFilter());
+      document.getElementById('resultCount').textContent = '—';
+      document.getElementById('loadMoreWrap').hidden = true;
+      return;
+    }
   }
 
   // Ignore a delayed result if the shopper changed sort/filter while it loaded.
@@ -215,7 +221,7 @@ async function runFilter(append = false) {
   }
 
   resultsEl.innerHTML = visible.map(productCardHTML).join('');
-  bindProductCardEvents(resultsEl, { products: allProducts, onCartChange: refreshCartDrawer });
+  bindProductCardEvents(resultsEl, { products: cache, onCartChange: refreshCartDrawer });
   document.getElementById('loadMoreWrap').hidden = visible.length >= cache.length;
 }
 

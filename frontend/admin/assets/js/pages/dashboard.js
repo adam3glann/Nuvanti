@@ -14,7 +14,7 @@ if (session) render();
 async function render() {
   const rev = await revenueStats();
   const ord = await orderStats();
-  const cust = customerStats();
+  const cust = await customerStats();
   const { total: totalProducts, items: sampleProducts } = await fetchAdminProducts({ perPage: 999 });
   const outOfStock = sampleProducts.filter((p) => productStockStatus(p) === 'out').length;
   const lowStock = sampleProducts.filter((p) => productStockStatus(p) === 'low').length;
@@ -23,13 +23,12 @@ async function render() {
     <div class="stat-card"><p class="stat-card__label">Revenue Today</p><p class="stat-card__value">${formatPrice(rev.today)}</p></div>
     <div class="stat-card"><p class="stat-card__label">Revenue This Month</p><p class="stat-card__value">${formatPrice(rev.month)}</p></div>
     <div class="stat-card"><p class="stat-card__label">Total Orders</p><p class="stat-card__value">${ord.total}</p><p class="stat-card__delta up">${ord.pending} pending</p></div>
-    <div class="stat-card"><p class="stat-card__label">Total Customers</p><p class="stat-card__value">${cust.total}</p><p class="stat-card__delta up">${cust.returning} returning</p></div>
+    <div class="stat-card"><p class="stat-card__label">Total Customers</p><p class="stat-card__value">${cust.total}</p><p class="stat-card__delta">${cust.newThisMonth} joined this month</p></div>
   `;
 
   document.getElementById('orderStatusGrid').innerHTML = `
-    ${row('Pending', ord.pending, 'neutral')} ${row('Processing', ord.processing, 'info')}
-    ${row('Shipped', ord.shipped, 'info')} ${row('Delivered', ord.delivered, 'success')}
-    ${row('Cancelled', ord.cancelled, 'danger')} ${row('Returned', ord.returned, 'warning')}
+    ${row('Awaiting Fulfillment', ord.pending, 'neutral')} ${row('Fulfilled', ord.fulfilled, 'success')}
+    ${row('Cancelled', ord.cancelled, 'danger')}
   `;
   function row(label, val, tone) {
     return `<div class="stat-card"><p class="stat-card__label">${label}</p><p class="stat-card__value" style="font-size:1.25rem;color:var(--a-${tone === 'neutral' ? 'text' : tone})">${val}</p></div>`;

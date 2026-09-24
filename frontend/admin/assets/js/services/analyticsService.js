@@ -1,19 +1,29 @@
-import { revenueSeries, topProducts, topCategories } from '../data/analytics.js';
+import { API_ORIGIN } from '../config.js';
 
-function tick(ms = 150) { return new Promise((r) => setTimeout(r, ms)); }
+const cache = new Map();
 
-const RANGE_DAYS = { '7d': 7, '30d': 30, '90d': 90, '1y': 365 };
-
-export async function fetchRevenueSeries(range = '30d') {
-  await tick();
-  return revenueSeries(RANGE_DAYS[range] || 30);
+async function load(range) {
+  if (!cache.has(range)) {
+    cache.set(range, fetch(`${API_ORIGIN}/api/admin/analytics?range=${encodeURIComponent(range)}`, {
+      credentials: 'include',
+    }).then(async (response) => {
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || 'Unable to load analytics.');
+      return body;
+    }).catch((error) => {
+      cache.delete(range);
+      throw error;
+    }));
+  }
+  return cache.get(range);
 }
-export async function fetchTopProducts() { await tick(); return topProducts(); }
-export async function fetchTopCategories() { await tick(); return topCategories(); }
 
+export async function fetchRevenueSeries(range = '30d') { return (await load(range)).series; }
+export async function fetchTopProducts(range = '30d') { return (await load(range)).topProducts; }
+export async function fetchTopCategories(range = '30d') { return (await load(range)).topCategories; }
+export async function fetchPendingOrders(range = '30d') { return (await load(range)).pendingOrders; }
 export function summarize(series) {
-  const revenue = series.reduce((s, d) => s + d.revenue, 0);
-  const orders = series.reduce((s, d) => s + d.orders, 0);
-  const aov = orders ? Math.round(revenue / orders) : 0;
-  return { revenue, orders, aov };
+  const revenue = series.reduce((sum, day) => sum + day.revenue, 0);
+  const orders = series.reduce((sum, day) => sum + day.orders, 0);
+  return { revenue, orders, aov: orders ? Math.round(revenue / orders) : 0 };
 }

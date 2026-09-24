@@ -14,34 +14,61 @@ function init() {
   load();
 }
 
+function discountStatus(d) {
+  if (!d.isActive) return 'inactive';
+  if (d.expiresAt && new Date(d.expiresAt) < new Date()) return 'expired';
+  return 'active';
+}
+
 async function load() {
-  const discounts = await fetchDiscounts();
-  document.getElementById('discountsBody').innerHTML = discounts.length ? discounts.map((d) => `
+  const body = document.getElementById('discountsBody');
+  let discounts;
+  try {
+    discounts = await fetchDiscounts();
+  } catch (error) {
+    body.innerHTML = `<tr><td colspan="8"><div class="admin-empty"><h3>Couldn't load discounts</h3><p>${error.message}</p></div></td></tr>`;
+    return;
+  }
+
+  body.innerHTML = discounts.length ? discounts.map((d) => {
+    const status = discountStatus(d);
+    return `
     <tr>
       <td class="mono" style="font-weight:700">${d.code}</td>
-      <td style="text-transform:capitalize">${d.type.replace('_', ' ')}</td>
-      <td>${d.type === 'percentage' ? d.amount + '%' : d.type === 'fixed' ? formatPrice(d.amount) : '—'}</td>
-      <td>${d.minOrder ? formatPrice(d.minOrder) : '—'}</td>
-      <td>${d.used}${d.usageLimit ? ` / ${d.usageLimit}` : ''}</td>
-      <td>${d.endDate ? d.endDate : 'No expiry'}</td>
-      <td>${statusBadge(d.status === 'active' ? 'active' : d.status === 'expired' ? 'expired' : d.status === 'scheduled' ? 'scheduled' : 'inactive')}</td>
+      <td style="text-transform:capitalize">${d.type}</td>
+      <td>${d.type === 'percent' ? d.value + '%' : formatPrice(d.value)}</td>
+      <td>${d.minSubtotalCents ? formatPrice(d.minSubtotalCents / 100) : '—'}</td>
+      <td>${d.usedCount}${d.usageLimit ? ` / ${d.usageLimit}` : ''}</td>
+      <td>${d.expiresAt ? new Date(d.expiresAt).toLocaleDateString() : 'No expiry'}</td>
+      <td>${statusBadge(status)}</td>
       <td style="text-align:right">
-        <button class="btn btn-outline btn-sm" data-toggle="${d.id}">${d.status === 'active' ? 'Deactivate' : 'Activate'}</button>
+        <button class="btn btn-outline btn-sm" data-toggle="${d.id}" data-active="${d.isActive}" ${status === 'expired' ? 'disabled' : ''}>${d.isActive ? 'Deactivate' : 'Activate'}</button>
         <button class="icon-btn" data-delete="${d.id}" aria-label="Delete">✕</button>
       </td>
     </tr>
-  `).join('') : `<tr><td colspan="8"><div class="admin-empty"><h3>No discounts yet</h3><p>Create your first discount code.</p></div></td></tr>`;
+  `;
+  }).join('') : `<tr><td colspan="8"><div class="admin-empty"><h3>No discounts yet</h3><p>Create your first discount code.</p></div></td></tr>`;
 
   document.querySelectorAll('[data-toggle]').forEach((btn) => btn.addEventListener('click', async () => {
-    await toggleDiscountStatus(btn.dataset.toggle);
-    load();
+    btn.disabled = true;
+    try {
+      await toggleDiscountStatus(btn.dataset.toggle, btn.dataset.active !== 'true');
+      load();
+    } catch (error) {
+      showAdminToast(error.message, 'error');
+      btn.disabled = false;
+    }
   }));
   document.querySelectorAll('[data-delete]').forEach((btn) => btn.addEventListener('click', async () => {
     const ok = await confirmDialog({ title: 'Delete Discount?', body: 'This code will stop working immediately for any customer.', confirmLabel: 'Delete Discount' });
     if (!ok) return;
-    await deleteDiscount(btn.dataset.delete);
-    showAdminToast('Discount deleted.', 'success');
-    load();
+    try {
+      await deleteDiscount(btn.dataset.delete);
+      showAdminToast('Discount deleted.', 'success');
+      load();
+    } catch (error) {
+      showAdminToast(error.message, 'error');
+    }
   }));
 }
 
@@ -53,39 +80,46 @@ function openNewDiscount() {
       <div class="field-row">
         <div class="field"><label>Type</label>
           <select id="dType">
-            <option value="percentage">Percentage</option>
+            <option value="percent">Percentage</option>
             <option value="fixed">Fixed Amount</option>
-            <option value="free_shipping">Free Shipping</option>
           </select>
         </div>
-        <div class="field"><label>Amount</label><input type="number" id="dAmount" placeholder="e.g. 20" /></div>
+        <div class="field"><label>Amount</label><input type="number" id="dAmount" placeholder="e.g. 20" min="1" /></div>
       </div>
       <div class="field-row">
-        <div class="field"><label>Minimum Order (EGP)</label><input type="number" id="dMin" value="0" /></div>
-        <div class="field"><label>Usage Limit</label><input type="number" id="dLimit" placeholder="Leave blank for unlimited" /></div>
+        <div class="field"><label>Minimum Order (EGP)</label><input type="number" id="dMin" value="0" min="0" /></div>
+        <div class="field"><label>Usage Limit</label><input type="number" id="dLimit" placeholder="Leave blank for unlimited" min="1" /></div>
       </div>
-      <div class="field-row">
-        <div class="field"><label>Start Date</label><input type="date" id="dStart" /></div>
-        <div class="field"><label>End Date</label><input type="date" id="dEnd" /></div>
-      </div>
+      <div class="field"><label>Expires</label><input type="date" id="dEnd" /></div>
     `,
     footHTML: `<button class="btn btn-outline" id="mCancel">Cancel</button><button class="btn btn-primary" id="mSave">Create Discount</button>`,
   });
   modal.root.querySelector('#mCancel').addEventListener('click', modal.close);
   modal.root.querySelector('#mSave').addEventListener('click', async () => {
+    const saveBtn = modal.root.querySelector('#mSave');
     const code = modal.root.querySelector('#dCode').value.trim().toUpperCase();
-    if (!code) return;
-    await createDiscount({
-      code, type: modal.root.querySelector('#dType').value,
-      amount: Number(modal.root.querySelector('#dAmount').value) || 0,
-      minOrder: Number(modal.root.querySelector('#dMin').value) || 0,
-      usageLimit: modal.root.querySelector('#dLimit').value ? Number(modal.root.querySelector('#dLimit').value) : null,
-      startDate: modal.root.querySelector('#dStart').value || null,
-      endDate: modal.root.querySelector('#dEnd').value || null,
-    });
-    modal.close();
-    showAdminToast('Discount created.', 'success');
-    load();
+    const value = Number(modal.root.querySelector('#dAmount').value) || 0;
+    if (!code || value <= 0) {
+      showAdminToast('Enter a code and an amount greater than zero.', 'error');
+      return;
+    }
+    saveBtn.disabled = true;
+    try {
+      await createDiscount({
+        code,
+        type: modal.root.querySelector('#dType').value,
+        value,
+        minSubtotal: Number(modal.root.querySelector('#dMin').value) || 0,
+        usageLimit: modal.root.querySelector('#dLimit').value ? Number(modal.root.querySelector('#dLimit').value) : null,
+        expiresAt: modal.root.querySelector('#dEnd').value || null,
+      });
+      modal.close();
+      showAdminToast('Discount created.', 'success');
+      load();
+    } catch (error) {
+      showAdminToast(error.message, 'error');
+      saveBtn.disabled = false;
+    }
   });
   modal.open();
 }

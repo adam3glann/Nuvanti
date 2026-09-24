@@ -23,14 +23,12 @@
           <input type="search" id="searchInput" placeholder="Search order #, name, or email…" style="min-width:220px" />
           <select id="statusFilter">
             <option value="">All Statuses</option>
-            <option value="pending">Pending</option><option value="processing">Processing</option>
-            <option value="shipped">Shipped</option><option value="delivered">Delivered</option>
-            <option value="cancelled">Cancelled</option><option value="returned">Returned</option>
+            <option value="pending">Awaiting Fulfillment</option><option value="paid">Paid</option><option value="fulfilled">Fulfilled</option>
+            <option value="cancelled">Cancelled</option>
           </select>
           <select id="paymentFilter">
             <option value="">All Payments</option>
-            <option value="paid">Paid</option><option value="pending">Payment Pending</option>
-            <option value="refunded">Refunded</option><option value="failed">Failed</option>
+            <option value="paid">Paid</option><option value="pending">Cash on Delivery</option>
           </select>
           <select id="sortSelect" style="margin-left:auto">
             <option value="newest">Newest</option><option value="oldest">Oldest</option>

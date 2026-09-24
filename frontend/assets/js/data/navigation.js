@@ -16,6 +16,7 @@ export const footerNav = {
     { label: "Women's Collection", href: 'shop.html?collection=womens' },
   ],
   Help: [
+    { label: 'Track Order', href: 'track.html' },
     { label: 'Contact', href: 'contact.html' },
     { label: 'Shipping', href: 'shipping-policy.html' },
     { label: 'Returns', href: 'refund-policy.html' },

@@ -5,11 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Nuvanti — Considered Clothing</title>
 <meta name="description" content="Nuvanti is a modern clothing brand built on hand-worked embroidery and heavyweight knits. Shop the Knitted Embroidered Polo, Embroidered Tank Top, and Nuv Sweatpants." />
-<link rel="canonical" href="https://nuvanti.wuiltstore.com/en" />
 <meta property="og:title" content="Nuvanti — Considered Clothing" />
 <meta property="og:description" content="Heavyweight cottons, considered proportions, quiet detailing. Shop the new Nuvanti collection." />
 <meta property="og:type" content="website" />
-<meta property="og:url" content="https://nuvanti.wuiltstore.com/en" />
 <meta property="og:image" content="assets/img/lifestyle/campaign-tanktop.webp" />
 <meta name="twitter:card" content="summary_large_image" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -135,8 +133,9 @@
         <input type="email" id="newsletterEmail" required placeholder="Email address" style="background:transparent;border:1px solid var(--color-border-inverse);color:var(--color-text-inverse);padding:0.85rem 1rem;border-radius:10px" />
         <button class="btn btn-ink-outline" type="submit">Subscribe</button>
       </form>
-      <p class="newsletter__success" id="newsletterSuccess" hidden>You're on the list. Watch your inbox.</p>
-      <p style="color:var(--color-muted-inverse);font-size:var(--fs-micro);margin-top:1rem">By subscribing you agree to receive marketing emails. Unsubscribe anytime.</p>
+      <label class="newsletter__consent"><input type="checkbox" id="newsletterConsent" required /> I agree to receive Nuvanti marketing emails. I can unsubscribe at any time.</label>
+      <p id="newsletterMessage" class="newsletter__success" role="status" aria-live="polite" hidden></p>
+      <p style="color:var(--color-muted-inverse);font-size:var(--fs-micro);margin-top:1rem">We use your email only for Nuvanti updates. Please confirm your subscription from your inbox.</p>
     </div>
   </section>
 

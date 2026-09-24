@@ -1,5 +1,5 @@
 import { initAdminShell } from '../components/shell.js';
-import { paginationHTML } from '../components/utils.js';
+import { paginationHTML, storeAssetSrc } from '../components/utils.js';
 import { statusBadge } from '../components/statusBadge.js';
 import { showAdminToast } from '../components/toast.js';
 import { createAdminDrawer } from '../components/modal.js';
@@ -26,11 +26,17 @@ async function init() {
 }
 
 async function load() {
-  const { items, total } = await fetchInventory(state);
   const tbody = document.getElementById('invBody');
+  let items, total;
+  try {
+    ({ items, total } = await fetchInventory(state));
+  } catch (error) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="admin-empty"><h3>Couldn't load inventory</h3><p>${error.message}</p></div></td></tr>`;
+    return;
+  }
   tbody.innerHTML = items.map((r) => `
     <tr>
-      <td><div style="display:flex;align-items:center;gap:.6rem"><img src="${/^https?:\/\//i.test(r.image) ? r.image : `../${r.image}`}" width="32" height="40" style="object-fit:cover;border-radius:3px" alt="" /><span>${r.productName}</span></div></td>
+      <td><div style="display:flex;align-items:center;gap:.6rem"><img src="${storeAssetSrc(r.image)}" width="32" height="40" style="object-fit:cover;border-radius:3px" alt="" /><span>${r.productName}</span></div></td>
       <td>${r.size}</td>
       <td class="mono">${r.sku}</td>
       <td>${r.stock}</td>
@@ -65,10 +71,12 @@ function openAdjust(id, items) {
   drawer.root.querySelector('#adjSave').addEventListener('click', async () => {
     const amount = Number(drawer.root.querySelector('#adjAmount').value);
     if (!amount) return;
-    await adjustStock(id, amount, drawer.root.querySelector('#adjReason').value);
-    showAdminToast('Stock adjusted.', 'success');
-    drawer.close();
-    load();
+    try {
+      await adjustStock(id, amount, drawer.root.querySelector('#adjReason').value);
+      showAdminToast('Stock adjusted.', 'success');
+      drawer.close();
+      load();
+    } catch (error) { showAdminToast(error.message, 'error'); }
   });
   drawer.open();
 }

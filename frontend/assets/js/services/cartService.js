@@ -2,7 +2,11 @@
 // can later dispatch to a Node API (POST /cart, PATCH /cart/:lineId, etc.)
 // instead of writing to localStorage.
 const STORAGE_KEY = 'nuvanti_cart_v1';
-const FREE_SHIPPING_THRESHOLD = 3000; // EGP — mock business rule
+let FREE_SHIPPING_THRESHOLD = 3000;
+
+export function configureFreeShippingThreshold(value) {
+  if (Number.isFinite(value) && value >= 0) FREE_SHIPPING_THRESHOLD = value;
+}
 
 let listeners = [];
 

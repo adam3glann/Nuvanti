@@ -45,8 +45,18 @@ export function formatPrice(value) {
   return `${value.toLocaleString('en-US')} EGP`;
 }
 
-// Delegated listeners — attach once per container that renders product cards.
+// Delegated listeners — attach once per stable container and refresh the
+// current product map as async filters/search results replace its contents.
+const productCardBindings = new WeakMap();
 export function bindProductCardEvents(container, { products, onCartChange } = {}) {
+  const current = productCardBindings.get(container);
+  if (current) {
+    current.products = products || [];
+    current.onCartChange = onCartChange;
+    return;
+  }
+  const binding = { products: products || [], onCartChange };
+  productCardBindings.set(container, binding);
   container.addEventListener('click', (e) => {
     const wishBtn = e.target.closest('[data-wishlist-toggle]');
     if (wishBtn) {
@@ -63,12 +73,12 @@ export function bindProductCardEvents(container, { products, onCartChange } = {}
     if (quickAdd) {
       e.preventDefault();
       const id = quickAdd.dataset.quickAdd;
-      const product = (products || []).find((p) => p.id === id);
+      const product = binding.products.find((p) => String(p.id) === String(id));
       if (!product) return;
       const size = product.sizes.find((s) => (product.inventory[s] || 0) > 0) || product.sizes[0];
       addToCart({ product, size, color: product.colors[0], quantity: 1 });
       showToast(`${product.name} added to bag`, { icon: 'bag' });
-      onCartChange?.();
+      binding.onCartChange?.();
     }
   });
 }

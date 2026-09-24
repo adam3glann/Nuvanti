@@ -1,3 +1,18 @@
+// Product images are stored as paths relative to the storefront (e.g.
+// "assets/img/products/...") or as full Cloudinary URLs. The admin app only
+// exposes the storefront's assets under /store-assets, so map accordingly.
+export function storeAssetSrc(url) {
+  return /^https?:\/\//i.test(url || '') ? url : `/store-assets/${String(url || '').replace(/^assets\//, '')}`;
+}
+
+// Customer-supplied strings (name, email, shipping address, contact
+// messages, etc.) are rendered into innerHTML across the admin pages. Escape
+// them before interpolation so a customer can't stash markup/script in a
+// field that later runs in an admin's browser.
+export function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 export function formatPrice(v) {
   return `${Math.round(v).toLocaleString('en-US')} EGP`;
 }

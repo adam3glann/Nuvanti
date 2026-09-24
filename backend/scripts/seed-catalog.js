@@ -7,10 +7,10 @@ import { productPayload } from '../lib/catalog.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const products = JSON.parse(await readFile(path.join(__dirname, '../data/products.json'), 'utf8'));
+const categoryData = JSON.parse(await readFile(path.join(__dirname, '../data/categories.json'), 'utf8')).categories;
 try {
-  for (const slug of [...new Set(products.map((product) => product.category))]) {
-    const name = slug.split('-').map((part) => part[0].toUpperCase() + part.slice(1)).join(' ');
-    await pool.query('INSERT INTO categories (slug, name) VALUES ($1, $2) ON CONFLICT (slug) DO NOTHING', [slug, name]);
+  for (const category of categoryData) {
+    await pool.query('INSERT INTO categories (slug, name, image_url) VALUES ($1, $2, $3) ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name, image_url = EXCLUDED.image_url', [category.slug, category.name, category.image]);
   }
   for (const item of products) {
     const p = productPayload(item);

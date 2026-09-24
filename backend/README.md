@@ -1,6 +1,6 @@
 # Nuvanti secure backend
 
-This backend uses **PostgreSQL** and treats the admin area as a separate, protected application. It is not protected by a hidden URL or frontend localStorage: the admin server verifies a signed, HTTP-only session cookie and an `admin`/`super_admin` role before it sends any admin HTML, JavaScript, or CSS.
+This backend uses **PostgreSQL** and treats the admin area as a separate, protected application. It is not protected by a hidden URL or frontend localStorage: the admin server verifies a signed, HTTP-only session cookie and a staff-tier role (`staff`/`manager`/`admin`/`super_admin`) before it sends any admin HTML, JavaScript, or CSS. Within that, every `/api/admin/*` route independently checks a specific permission for the caller's role — see "Roles & permissions" below.
 
 ## Setup
 
@@ -35,9 +35,26 @@ CLOUDINARY_API_SECRET=your-api-secret
 
 Find them in Cloudinary's Dashboard → API Keys. Keep the API secret in `.env` only—never put it in frontend JavaScript or commit it to Git. Once configured, edit a product in Admin, select **Upload**, choose an image, then **Save Changes**. The returned HTTPS image URL is stored with that product in PostgreSQL and appears on the public store.
 
-## Reset an admin password
+## Roles & permissions
 
-The admin login page has a complete **Forgot password** flow. It accepts an authorized admin email, sends a one-time link, then lets the user choose a new password. Links expire after 30 minutes and are invalidated after use.
+There are five roles: `customer`, and four staff-tier roles — `staff`, `manager`, `admin`, `super_admin` — each with a fixed set of permissions enforced in `backend/lib/permissions.js` (mirrored in the admin UI's `components/permissions.js` for hiding controls, but the backend check is the real boundary). Only a `super_admin` can create, disable, or delete other administrator accounts, and the backend refuses to let the last active `super_admin` be disabled or deleted.
+
+## Adding administrators
+
+There is no "set a password for someone else" flow. From **Admin Users** (super_admin only), creating an account emails the person a setup link — the account starts with an unusable random password and can only be activated by setting a real one through that link (same delivery path as the password-reset email below; in development without SMTP configured, the link is printed to the backend terminal instead).
+
+## Reset a password (any account)
+
+Both the storefront (**My Account → Forgot password**) and the admin login page have a complete **Forgot password** flow. Either accepts an email, sends a one-time link (customers land back on the store, staff-tier accounts land on the admin login page), then lets the user choose a new password. Links expire after 30 minutes and are invalidated after use. Signed-in staff-tier users can also change their own password directly from **Security** without going through email.
+
+## Order confirmations & tracking
+
+Placing an order (`POST /api/orders`) fires two best-effort notifications after the order is saved — neither can fail the checkout itself:
+
+- **Email** via the same SMTP config as password resets (`sendOrderConfirmation` in `lib/mail.js`).
+- **WhatsApp** via Twilio's WhatsApp API (`lib/whatsapp.js`), only if `TWILIO_*` is configured and the shipping phone number is in a recognizable international format (a leading `+`). If not configured, or the number can't be normalized, it's skipped silently — checkout is unaffected either way.
+
+Both messages include a tracking link: `GET /api/orders/track/:id?token=...`, a public (no-login) endpoint guarded by a random per-order token (not the order's numeric id — that alone proves nothing). It returns order status, items, delivery method, and city/country only — no email, phone, or full address. The storefront's `track.html` page renders it, and also offers a manual order-number + tracking-code lookup for someone who lost the link. Signed-in customers see the same link for every past order under **My Account → Orders**, which now lists real order history instead of only the most recent order in that browser.
 
 To deliver messages to Gmail (and therefore your Gmail app/phone), enable two-step verification on the sending Gmail account and create a Google **App Password**. Put these values in your private `.env` file—never in `.env.example` or Git:
 
@@ -57,11 +74,20 @@ The reset email is sent to the account's email address and will appear on the re
 
 - HTTP-only, signed 8-hour session cookies; credentials never go in localStorage.
 - `bcrypt` password hashing (work factor 12).
-- Role checks on every `/api/admin/*` endpoint and every admin asset.
+- Permission checks (not just a role check) on every `/api/admin/*` endpoint, backed by a real 4-tier role model — see "Roles & permissions" above.
+- Brute-force lockout: an account locks for 15 minutes after 5 consecutive failed logins.
+- Audit log of security-relevant events (logins, lockouts, password changes/resets, administrator account changes, stock adjustments, and catalog/order actions) — visible on the **Audit Logs** admin page to `admin`/`super_admin`.
 - Helmet headers, request size limits, strict CORS, origin checks on writes, validation, and rate limits.
 - Checkout re-prices products and locks inventory rows in a PostgreSQL transaction. A browser cannot choose prices or oversell stock.
-- Parameterized SQL and Zod input validation.
+- Parameterized SQL and Zod input validation everywhere, including admin mutations.
+- Customer-supplied strings (name, email, shipping address) are HTML-escaped before the admin UI renders them, to prevent stored XSS via order/checkout data.
+
+## Current boundaries
+
+Two-factor authentication, per-device session tracking/"log out all devices" (sessions are currently a signed JWT cookie per browser — rotate `JWT_SECRET` to invalidate all of them at once), and enforced email verification on customer registration are not built. The admin **Security** page labels two-factor authentication unavailable. General/shipping settings, basic sales analytics, inventory adjustment history, contact inbox, and newsletter management are backend-connected. Homepage content editing is not available; page copy is maintained in the storefront source. Card payments and carrier integrations are not connected; do not treat an order status as carrier tracking or a card refund.
+
+Discounts now have a real backend: admin create/activate/deactivate/delete goes through `/api/admin/discounts`, and the storefront cart and checkout pages validate a code against `/api/orders/validate-discount` (a public, no-login preview) before it's applied at order time in `/api/orders`, where it's re-validated and its usage count incremented inside the same row-locked transaction as inventory. Codes support a percentage or fixed amount, an optional minimum order subtotal, an optional usage limit, and an optional expiry — there is no scheduled "starts on" date and no free-shipping discount type; both would need a schema change first.
 
 ## Production notes
 
-Deploy HTTPS with `NODE_ENV=production`, unique long secrets, and exact production `STORE_ORIGIN`/`ADMIN_ORIGIN` values. The chosen layout is `www.yourdomain.com` for the store, `admin.yourdomain.com` for the protected portal, and `api.yourdomain.com` for this backend. Set `COOKIE_DOMAIN=.yourdomain.com`, `ADMIN_APP_URL=https://admin.yourdomain.com`, and set `window.NUVANTI_API_URL` in the admin host to the API origin. Never expose `frontend/admin` through the public static host. Payments are not marked paid until a payment provider's signed webhook is implemented.
+Deploy HTTPS with `NODE_ENV=production`, unique long secrets, and exact production `STORE_ORIGIN`, `ADMIN_ORIGIN`, and `API_PUBLIC_URL` values. Use three hostnames under the same parent domain: `www.yourdomain.com` for the public store, `admin.yourdomain.com` for the protected portal, and `api.yourdomain.com` for this backend. Point the store host at the static `frontend` folder, the admin host at backend port `4001`, and the API host at backend port `4000`. Set `STORE_ORIGIN=https://www.yourdomain.com`, `ADMIN_ORIGIN=https://admin.yourdomain.com`, `ADMIN_APP_URL=https://admin.yourdomain.com`, and `API_PUBLIC_URL=https://api.yourdomain.com`. For unrelated host domains, set `window.NUVANTI_API_URL` or the API meta tag in both web apps before their page modules load. Do not set `COOKIE_DOMAIN`: the API session cookie should stay host-only. Never expose `frontend/admin` through the public static host. Only Egypt is accepted at checkout; configure actual rates and fulfillment with your courier before accepting orders. Payments are not marked paid until a provider's signed webhook is implemented.

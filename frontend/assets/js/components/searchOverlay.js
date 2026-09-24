@@ -5,7 +5,7 @@ import { refreshCartDrawer } from './cartDrawer.js';
 
 let mounted = false;
 const RECENT_KEY = 'nuvanti_recent_searches_v1';
-const POPULAR = ['Oversized Tee', 'Signature Hoodie', 'Cargo Pants', 'Denim Jacket', 'Accessories'];
+const POPULAR = ['Knitted Embroidered Polo', 'Embroidered Tank Top', 'Nuv Sweatpants', 'Men Tank Top'];
 
 export function mountSearchOverlay() {
   if (mounted) return;
@@ -56,7 +56,7 @@ export function mountSearchOverlay() {
     }
   });
 
-  bindProductCardEvents(resultsWrap, { products: null, onCartChange: refreshCartDrawer });
+  bindProductCardEvents(resultsWrap, { products: [], onCartChange: refreshCartDrawer });
 
   async function runSearch(term) {
     if (!term) {
@@ -68,13 +68,18 @@ export function mountSearchOverlay() {
     resultsWrap.hidden = false;
     resultsWrap.innerHTML = `<div class="product-grid">${'<div class="skeleton" style="aspect-ratio:4/5"></div>'.repeat(4)}</div>`;
 
-    const results = await searchProducts(term);
+    let results;
+    try {
+      results = await searchProducts(term);
+    } catch {
+      resultsWrap.innerHTML = `<div class="state-block"><h3>Search is unavailable right now</h3><p>Please try again in a moment.</p></div>`;
+      return;
+    }
     saveRecent(term);
     renderRecentChips();
 
-    // rebind product list reference for quick-add
-    const module = await import('../data/productStore.js');
-    bindProductCardEvents(resultsWrap, { products: module.getPublishedProducts(), onCartChange: refreshCartDrawer });
+    // Refresh the single delegated listener's live quick-add lookup.
+    bindProductCardEvents(resultsWrap, { products: results, onCartChange: refreshCartDrawer });
 
     if (results.length === 0) {
       resultsWrap.innerHTML = `

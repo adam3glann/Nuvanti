@@ -12,6 +12,16 @@ import {
 const params = new URLSearchParams(location.search);
 let tab = params.get('tab') === 'collections' ? 'collections' : 'categories';
 
+// Matches the backend's slug validation (^[a-z0-9-]+$): lowercase, strip
+// anything that isn't a letter/number, collapse separators to single dashes.
+function slugify(value) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 const session = initAdminShell({ page: 'categories', title: 'Categories & Collections' });
 if (session) init();
 
@@ -39,6 +49,14 @@ async function render() {
   const body = document.getElementById('tableBody');
   const headRow = document.getElementById('headRow');
 
+  try {
+    await renderTable(body, headRow);
+  } catch (error) {
+    body.innerHTML = `<tr><td colspan="5"><div class="admin-empty"><h3>Couldn't load this data</h3><p>${error.message}</p></div></td></tr>`;
+  }
+}
+
+async function renderTable(body, headRow) {
   if (tab === 'categories') {
     headRow.innerHTML = '<th>Name</th><th>Slug</th><th>Products</th><th>Status</th><th></th>';
     const cats = await fetchCategories();
@@ -74,15 +92,19 @@ async function render() {
 
 function bindRows(kind) {
   document.querySelectorAll('[data-toggle]').forEach((btn) => btn.addEventListener('click', async () => {
-    kind === 'category' ? await toggleCategoryStatus(btn.dataset.toggle) : await toggleCollectionStatus(btn.dataset.toggle);
-    render();
+    try {
+      kind === 'category' ? await toggleCategoryStatus(btn.dataset.toggle) : await toggleCollectionStatus(btn.dataset.toggle);
+      render();
+    } catch (error) { showAdminToast(error.message, 'error'); }
   }));
   document.querySelectorAll('[data-delete]').forEach((btn) => btn.addEventListener('click', async () => {
     const ok = await confirmDialog({ title: `Delete this ${kind}?`, body: 'Products will remain, but this grouping will be removed from the storefront.', confirmLabel: 'Delete' });
     if (!ok) return;
-    kind === 'category' ? await deleteCategory(btn.dataset.delete) : await deleteCollection(btn.dataset.delete);
-    showAdminToast(`${kind === 'category' ? 'Category' : 'Collection'} deleted.`, 'success');
-    render();
+    try {
+      kind === 'category' ? await deleteCategory(btn.dataset.delete) : await deleteCollection(btn.dataset.delete);
+      showAdminToast(`${kind === 'category' ? 'Category' : 'Collection'} deleted.`, 'success');
+      render();
+    } catch (error) { showAdminToast(error.message, 'error'); }
   }));
 }
 
@@ -100,10 +122,15 @@ function openNewCategory() {
   modal.root.querySelector('#mSave').addEventListener('click', async () => {
     const name = modal.root.querySelector('#mName').value.trim();
     if (!name) return;
-    await createCategory({ name, slug: modal.root.querySelector('#mSlug').value.trim() || name.toLowerCase().replace(/\s+/g, '-'), description: modal.root.querySelector('#mDesc').value });
-    modal.close();
-    showAdminToast('Category created.', 'success');
-    render();
+    const rawSlug = modal.root.querySelector('#mSlug').value.trim();
+    const slug = slugify(rawSlug || name);
+    if (!slug) return showAdminToast('Enter a name or slug using letters and numbers.', 'error');
+    try {
+      await createCategory({ name, slug, description: modal.root.querySelector('#mDesc').value });
+      modal.close();
+      showAdminToast('Category created.', 'success');
+      render();
+    } catch (error) { showAdminToast(error.message, 'error'); }
   });
   modal.open();
 }
@@ -121,10 +148,15 @@ function openNewCollection() {
   modal.root.querySelector('#mSave').addEventListener('click', async () => {
     const name = modal.root.querySelector('#mName').value.trim();
     if (!name) return;
-    await createCollection({ name, slug: modal.root.querySelector('#mSlug').value.trim() || name.toLowerCase().replace(/\s+/g, '-') });
-    modal.close();
-    showAdminToast('Collection created.', 'success');
-    render();
+    const rawSlug = modal.root.querySelector('#mSlug').value.trim();
+    const slug = slugify(rawSlug || name);
+    if (!slug) return showAdminToast('Enter a name or slug using letters and numbers.', 'error');
+    try {
+      await createCollection({ name, slug });
+      modal.close();
+      showAdminToast('Collection created.', 'success');
+      render();
+    } catch (error) { showAdminToast(error.message, 'error'); }
   });
   modal.open();
 }

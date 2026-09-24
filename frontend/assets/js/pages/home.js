@@ -2,12 +2,10 @@ import { initShell } from '../main.js';
 import { icon } from '../components/icons.js';
 import { productCardHTML, bindProductCardEvents } from '../components/productCard.js';
 import { refreshCartDrawer } from '../components/cartDrawer.js';
+import { subscribeToNewsletter, unsubscribeFromNewsletter } from '../services/newsletterService.js';
 import {
   fetchFeatured, fetchBestsellers, fetchNewArrivals, fetchCategories,
 } from '../services/productService.js';
-import { getPublishedProducts } from '../data/productStore.js';
-
-const products = getPublishedProducts();
 
 initShell({ transparentHeader: true, currentPage: 'index' });
 
@@ -120,13 +118,16 @@ function initHeroSlider() {
 
 async function loadFeatured() {
   const el = document.getElementById('featuredGrid');
-  const list = await fetchFeatured();
-  el.innerHTML = list.slice(0, 8).map(productCardHTML).join('');
-  bindProductCardEvents(el, { products, onCartChange: refreshCartDrawer });
+  try {
+    const list = await fetchFeatured();
+    el.innerHTML = list.slice(0, 8).map(productCardHTML).join('');
+    bindProductCardEvents(el, { products: list, onCartChange: refreshCartDrawer });
+  } catch { el.innerHTML = serviceUnavailable(); }
 }
 
 async function loadCategories() {
   const el = document.getElementById('categoryGrid');
+  try {
   const list = await fetchCategories();
   el.innerHTML = list.map((c) => `
     <a class="category-card" href="shop.html?category=${c.slug}">
@@ -137,24 +138,33 @@ async function loadCategories() {
       </span>
     </a>
   `).join('');
+  } catch { el.innerHTML = serviceUnavailable(); }
 }
 
 async function loadNewArrivals() {
   const el = document.getElementById('newArrivalsTrack');
+  try {
   const list = await fetchNewArrivals();
   el.innerHTML = list.map(productCardHTML).join('');
-  bindProductCardEvents(el, { products, onCartChange: refreshCartDrawer });
+  bindProductCardEvents(el, { products: list, onCartChange: refreshCartDrawer });
 
   const track = document.getElementById('newArrivalsTrack');
   document.getElementById('naPrev')?.addEventListener('click', () => track.scrollBy({ left: -320, behavior: 'smooth' }));
   document.getElementById('naNext')?.addEventListener('click', () => track.scrollBy({ left: 320, behavior: 'smooth' }));
+  } catch { el.innerHTML = serviceUnavailable(); }
 }
 
 async function loadBestsellers() {
   const el = document.getElementById('bestsellerGrid');
-  const list = await fetchBestsellers();
-  el.innerHTML = list.slice(0, 4).map(productCardHTML).join('');
-  bindProductCardEvents(el, { products, onCartChange: refreshCartDrawer });
+  try {
+    const list = await fetchBestsellers();
+    el.innerHTML = list.slice(0, 4).map(productCardHTML).join('');
+    bindProductCardEvents(el, { products: list, onCartChange: refreshCartDrawer });
+  } catch { el.innerHTML = serviceUnavailable(); }
+}
+
+function serviceUnavailable() {
+  return '<div class="state-block"><p>We could not load the live shop right now. Please refresh in a moment.</p></div>';
 }
 
 function initInstagramGrid() {
@@ -171,11 +181,56 @@ function initInstagramGrid() {
 function initNewsletter() {
   const form = document.getElementById('newsletterForm');
   if (!form) return;
-  form.addEventListener('submit', (e) => {
+  const message = document.getElementById('newsletterMessage');
+  const params = new URLSearchParams(location.search);
+  const state = params.get('newsletter');
+  if (state === 'confirmed') message.textContent = 'Your subscription is confirmed. Thank you for joining Nuvanti.';
+  if (state === 'invalid') message.textContent = 'That confirmation link has expired. Please subscribe again to receive a new link.';
+  if (state === 'confirmed' || state === 'invalid') {
+    message.hidden = false;
+    history.replaceState(null, '', location.pathname + location.hash);
+  }
+  if (state === 'unsubscribe') {
+    const token = params.get('token') || '';
+    form.hidden = true;
+    message.hidden = false;
+    message.textContent = 'Would you like to unsubscribe from Nuvanti marketing emails?';
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'btn btn-ink-outline';
+    button.textContent = 'Unsubscribe';
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      try {
+        await unsubscribeFromNewsletter(token);
+        message.textContent = 'You have been unsubscribed from Nuvanti marketing emails.';
+        history.replaceState(null, '', location.pathname + location.hash);
+      } catch (error) {
+        message.textContent = error.message;
+        button.disabled = false;
+      }
+    });
+    message.insertAdjacentElement('afterend', button);
+  }
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const input = form.querySelector('input');
-    if (!input.value || !input.checkValidity()) { input.reportValidity(); return; }
-    form.hidden = true;
-    document.getElementById('newsletterSuccess').hidden = false;
+    const consent = document.getElementById('newsletterConsent');
+    if (!input.value || !input.checkValidity() || !consent.checked) { form.reportValidity(); return; }
+    const button = form.querySelector('button[type="submit"]');
+    button.disabled = true;
+    button.textContent = 'Sending…';
+    message.hidden = true;
+    try {
+      const result = await subscribeToNewsletter(input.value);
+      form.hidden = true;
+      message.textContent = result.message || 'Check your inbox to confirm your subscription.';
+      message.hidden = false;
+    } catch (error) {
+      message.textContent = error.message;
+      message.hidden = false;
+      button.disabled = false;
+      button.textContent = 'Subscribe';
+    }
   });
 }

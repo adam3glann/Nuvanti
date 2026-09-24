@@ -4,12 +4,78 @@ function configured() {
   return ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS', 'MAIL_FROM'].every((key) => Boolean(process.env[key]) && !process.env[key].startsWith('PASTE_'));
 }
 
-export async function sendPasswordReset({ to, resetUrl }) {
+async function deliver({ to, subject, text, html, devLabel, devDetail }) {
   if (!configured()) {
     if (process.env.NODE_ENV === 'production') throw new Error('Email delivery is not configured.');
-    console.info(`Development password-reset URL for ${to}: ${resetUrl}`);
+    console.info(`${devLabel} for ${to}: ${devDetail}`);
     return;
   }
   const transporter = nodemailer.createTransport({ host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT || 587), secure: process.env.SMTP_SECURE === 'true', auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } });
-  await transporter.sendMail({ from: process.env.MAIL_FROM, to, subject: 'Reset your Nuvanti admin password', text: `We received a request to reset your Nuvanti admin password. Use this link within 30 minutes: ${resetUrl}\n\nIf you did not request this, you can ignore this email.`, html: `<p>We received a request to reset your Nuvanti admin password.</p><p><a href="${resetUrl}">Reset your password</a></p><p>This link expires in 30 minutes. If you did not request it, you can ignore this email.</p>` });
+  await transporter.sendMail({ from: process.env.MAIL_FROM, to, subject, text, html });
+}
+
+export async function sendPasswordReset({ to, resetUrl }) {
+  await deliver({
+    to,
+    subject: 'Reset your Nuvanti password',
+    text: `We received a request to reset your Nuvanti password. Use this link within 30 minutes: ${resetUrl}\n\nIf you did not request this, you can ignore this email.`,
+    html: `<p>We received a request to reset your Nuvanti password.</p><p><a href="${resetUrl}">Reset your password</a></p><p>This link expires in 30 minutes. If you did not request it, you can ignore this email.</p>`,
+    devLabel: 'Development password-reset URL',
+    devDetail: resetUrl,
+  });
+}
+
+export async function sendVerificationEmail({ to, name, verifyUrl }) {
+  await deliver({
+    to,
+    subject: 'Confirm your email for Nuvanti',
+    text: `Hi ${name}, please confirm your email address: ${verifyUrl}\n\nThis link expires in 24 hours.`,
+    html: `<p>Hi ${name}, please confirm your email address.</p><p><a href="${verifyUrl}">Confirm my email</a></p><p>This link expires in 24 hours.</p>`,
+    devLabel: 'Development email-verification URL',
+    devDetail: verifyUrl,
+  });
+}
+
+export async function sendNewsletterConfirmation({ to, confirmUrl, unsubscribeUrl }) {
+  await deliver({
+    to,
+    subject: 'Confirm your Nuvanti newsletter subscription',
+    text: `Please confirm that you want Nuvanti updates about new arrivals, restocks, and occasional offers: ${confirmUrl}\n\nIf you did not request this, ignore this email. You can unsubscribe at any time: ${unsubscribeUrl}`,
+    html: `<p>Please confirm that you want Nuvanti updates about new arrivals, restocks, and occasional offers.</p><p><a href="${confirmUrl}">Confirm subscription</a></p><p>If you did not request this, ignore this email. You can unsubscribe at any time from <a href="${unsubscribeUrl}">this page</a>.</p>`,
+    devLabel: 'Development newsletter confirmation URL',
+    devDetail: confirmUrl,
+  });
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// Sent right after checkout. Best-effort — a failure here must never fail
+// the order itself, so callers should wrap this in try/catch.
+export async function sendOrderConfirmation({ to, name, orderId, items, totalCents, trackingUrl }) {
+  const itemLines = items.map((i) => `- ${i.name} x${i.quantity}`).join('\n');
+  const itemRows = items.map((i) => `<li>${escapeHtml(i.name)} × ${i.quantity}</li>`).join('');
+  const total = (totalCents / 100).toLocaleString('en-US');
+  await deliver({
+    to,
+    subject: `Your Nuvanti order #${orderId} is confirmed`,
+    text: `Hi ${name}, thanks for your order!\n\nOrder #${orderId}\n${itemLines}\n\nTotal: ${total} EGP\n\nTrack your order any time: ${trackingUrl}`,
+    html: `<p>Hi ${escapeHtml(name)}, thanks for your order!</p><p><strong>Order #${orderId}</strong></p><ul>${itemRows}</ul><p>Total: ${total} EGP</p><p><a href="${trackingUrl}">Track your order</a></p>`,
+    devLabel: 'Development order-confirmation email',
+    devDetail: `order #${orderId}, ${trackingUrl}`,
+  });
+}
+// Sent when a super_admin creates a new staff/manager/admin account. The
+// account starts with an unusable random password — this link (via the same
+// reset-token flow) is the only way to set a real one.
+export async function sendAdminWelcome({ to, name, resetUrl }) {
+  await deliver({
+    to,
+    subject: 'Set up your Nuvanti admin account',
+    text: `Hi ${name}, an administrator account was created for you on Nuvanti. Set your password within 24 hours using this link: ${resetUrl}\n\nIf you weren't expecting this, contact your store administrator.`,
+    html: `<p>Hi ${name}, an administrator account was created for you on Nuvanti.</p><p><a href="${resetUrl}">Set your password</a> to finish setting up your account.</p><p>This link expires in 24 hours. If you weren't expecting this, contact your store administrator.</p>`,
+    devLabel: 'Development admin-setup URL',
+    devDetail: resetUrl,
+  });
 }

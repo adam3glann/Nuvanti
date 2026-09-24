@@ -1,7 +1,9 @@
-import { confirmAdminPasswordReset, getAdminSession, mockAdminLogin, requestAdminPasswordReset } from '../services/adminAuthService.js';
+import { confirmAdminPasswordReset, getAdminSession, refreshAdminSession, loginAdmin, requestAdminPasswordReset } from '../services/adminAuthService.js';
 
 const initialQuery = new URLSearchParams(location.search);
-if (getAdminSession() && !initialQuery.has('reset') && initialQuery.get('forgot') !== '1') location.href = 'index.html';
+if (getAdminSession() && !initialQuery.has('reset') && initialQuery.get('forgot') !== '1') {
+  refreshAdminSession().then((session) => { if (session) location.href = 'index.html'; }).catch(() => {});
+}
 const form = document.getElementById('loginForm');
 const errorBox = document.getElementById('loginError');
 const passwordInput = document.getElementById('password');
@@ -28,5 +30,5 @@ if (resetToken) {
   document.getElementById('forgotPassword').addEventListener('click', () => {
     location.href = 'login.html?forgot=1';
   });
-  form.addEventListener('submit', async (event) => { event.preventDefault(); const button = document.getElementById('loginSubmit'); errorBox.hidden = true; button.disabled = true; button.textContent = 'Signing in…'; const result = await mockAdminLogin(document.getElementById('email').value.trim(), passwordInput.value); if (!result.ok) { show(result.error, true); button.disabled = false; button.textContent = 'Sign In'; return; } location.href = 'index.html'; });
+  form.addEventListener('submit', async (event) => { event.preventDefault(); const button = document.getElementById('loginSubmit'); errorBox.hidden = true; button.disabled = true; button.textContent = 'Signing in…'; const result = await loginAdmin(document.getElementById('email').value.trim(), passwordInput.value); if (!result.ok) { show(result.error, true); button.disabled = false; button.textContent = 'Sign In'; return; } location.href = 'index.html'; });
 }

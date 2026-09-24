@@ -27,10 +27,7 @@ export function renderFooter() {
         <div class="footer-bottom">
           <span>© ${new Date().getFullYear()} Nuvanti. All rights reserved.</span>
           <div class="payment-row" aria-label="Accepted payment methods">
-            <span class="payment-chip">VISA</span>
-            <span class="payment-chip">MASTERCARD</span>
-            <span class="payment-chip">MEEZA</span>
-            <span class="payment-chip">COD</span>
+            <span class="payment-chip">CASH ON DELIVERY</span>
           </div>
           <span>Egypt (EGP ج.م)</span>
         </div>

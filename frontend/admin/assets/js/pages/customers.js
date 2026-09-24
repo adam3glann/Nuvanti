@@ -1,5 +1,5 @@
 import { initAdminShell } from '../components/shell.js';
-import { formatPrice, formatDate, paginationHTML } from '../components/utils.js';
+import { formatPrice, formatDate, paginationHTML, escapeHtml } from '../components/utils.js';
 import { statusBadge } from '../components/statusBadge.js';
 import { fetchAdminCustomers } from '../services/customerService.js';
 
@@ -16,12 +16,15 @@ function init() {
 }
 
 async function load() {
-  const { items, total } = await fetchAdminCustomers(state);
+  let result;
+  try { result = await fetchAdminCustomers(state); }
+  catch (error) { document.getElementById('custBody').innerHTML = `<tr><td colspan="7"><div class="admin-empty"><h3>Customers could not be loaded</h3><p>${escapeHtml(error.message)}</p></div></td></tr>`; return; }
+  const { items, total } = result;
   document.getElementById('custBody').innerHTML = items.length ? items.map((c) => `
     <tr>
-      <td><a href="customer-detail.html?id=${c.id}" style="font-weight:600;color:var(--a-text)">${c.name}</a></td>
-      <td>${c.email}</td>
-      <td>${c.phone}</td>
+      <td><a href="customer-detail.html?id=${encodeURIComponent(c.id)}" style="font-weight:600;color:var(--a-text)">${escapeHtml(c.name)}</a></td>
+      <td>${escapeHtml(c.email)}</td>
+      <td>—</td>
       <td>${c.orderCount}</td>
       <td>${formatPrice(c.totalSpent)}</td>
       <td>${c.lastOrder ? formatDate(c.lastOrder) : '—'}</td>

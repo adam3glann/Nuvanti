@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import { query } from './db.js';
 
 const cookieName = 'nuvanti_session';
 
@@ -9,7 +10,7 @@ function secret() {
 }
 
 export function signSession(user) {
-  return jwt.sign({ sub: user.id, role: user.role, email: user.email }, secret(), { expiresIn: '8h', issuer: 'nuvanti-api', audience: 'nuvanti-web' });
+  return jwt.sign({ sub: String(user.id), role: user.role, email: user.email, ver: user.sessionVersion ?? 0 }, secret(), { expiresIn: '8h', issuer: 'nuvanti-api', audience: 'nuvanti-web' });
 }
 
 export function readSession(req) {
@@ -27,11 +28,32 @@ export function clearSession(res) {
   res.clearCookie(cookieName, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}) });
 }
 
-export function requireAuth(req, res, next) {
-  const user = readSession(req);
-  if (!user) return res.status(401).json({ error: 'Authentication required.' });
-  req.user = user;
-  next();
+export async function requireAuth(req, res, next) {
+  const session = readSession(req);
+  if (!session) return res.status(401).json({ error: 'Authentication required.' });
+  try {
+    const { rows } = await query('SELECT id, email, role, session_version AS "sessionVersion" FROM users WHERE id = $1 AND is_active = true', [session.sub]);
+    const user = rows[0];
+    if (!user || Number(session.ver || 0) !== user.sessionVersion) return res.status(401).json({ error: 'Authentication required.' });
+    req.user = { ...session, sub: String(user.id), email: user.email, role: user.role };
+    next();
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function requireAdminPage(req, res, next) {
+  const session = readSession(req);
+  if (!session) return res.redirect('/login.html');
+  try {
+    const { rows } = await query('SELECT id, email, role, session_version AS "sessionVersion" FROM users WHERE id = $1 AND is_active = true', [session.sub]);
+    const user = rows[0];
+    if (!user || Number(session.ver || 0) !== user.sessionVersion) return res.redirect('/login.html');
+    req.user = { ...session, sub: String(user.id), email: user.email, role: user.role };
+    next();
+  } catch (error) {
+    next(error);
+  }
 }
 
 export function requireRole(...roles) {

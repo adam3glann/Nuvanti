@@ -1,6 +1,7 @@
 const MAP = {
   // order statuses
   pending: ['status-neutral', 'Pending'], processing: ['status-info', 'Processing'],
+  fulfilled: ['status-success', 'Fulfilled'],
   shipped: ['status-info', 'Shipped'], delivered: ['status-success', 'Delivered'],
   cancelled: ['status-danger', 'Cancelled'], returned: ['status-warning', 'Returned'],
   // payment

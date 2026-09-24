@@ -5,12 +5,12 @@ initShell({ currentPage: 'faq' });
 
 const FAQS = {
   orders: [
-    { q: 'How do I track my order?', a: 'Once your order ships, you\'ll receive a tracking link by email. You can also view order status from your account under Orders.' },
+    { q: 'How do I track my order?', a: 'Your order confirmation includes a private status link. You can also view order status from your account under Orders. Carrier scans are not currently connected.' },
     { q: 'Can I change or cancel my order?', a: 'Contact us within 2 hours of placing your order and we\'ll do our best to adjust it before it enters fulfillment.' },
   ],
   shipping: [
     { q: 'Where do you ship?', a: 'We currently ship inside Egypt only.' },
-    { q: 'How much does shipping cost?', a: 'Shipping fees are calculated based on your location and are displayed at checkout.' },
+    { q: 'How much does shipping cost?', a: 'Current standard and express delivery prices, including any free-shipping threshold, are shown in your bag and at checkout.' },
     { q: 'How long does delivery take?', a: 'Orders are processed within 1–3 business days. Delivery to Cairo &amp; Giza takes 2–6 business days.' },
   ],
   returns: [
@@ -18,8 +18,8 @@ const FAQS = {
     { q: 'Can I get a refund?', a: 'Refunds are not available. You can check your order while the courier is at your door — if it fits, keep it. If not, return it immediately to the courier, as returns aren\'t accepted afterward. In case of a manufacturing defect, report it within 48 hours with photos or video and you may receive a replacement or refund.' },
   ],
   payments: [
-    { q: 'What payment methods do you accept?', a: 'We accept Visa, Mastercard, Meeza, and Cash on Delivery within Egypt.' },
-    { q: 'Is my payment information secure?', a: 'Yes — all payments are processed by a certified third-party payment provider. We never store your full card details.' },
+    { q: 'What payment methods do you accept?', a: 'Cash on Delivery is currently available for orders shipped within Egypt. Online card payment is not yet available.' },
+    { q: 'Do you collect card details?', a: 'No. Online card payment is not connected, and the store does not collect card details.' },
   ],
   products: [
     { q: 'What are your products made from?', a: 'Each product page lists exact materials. We favor heavier-weight cottons and blends built to hold shape over time.' },
