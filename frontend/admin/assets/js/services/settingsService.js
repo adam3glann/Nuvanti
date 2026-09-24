@@ -30,6 +30,14 @@ export async function getSettings() {
   return fromApi(await request('/api/admin/settings'));
 }
 
+export async function getEmailStatus() {
+  return request('/api/admin/email/status');
+}
+
+export async function sendAdminTestEmail() {
+  return request('/api/admin/email/test', { method: 'POST', body: '{}' });
+}
+
 export async function saveSettingsSection(section, data) {
   const payload = section === 'general'
     ? { storeName: data.storeName, supportEmail: data.contactEmail }

@@ -7,9 +7,10 @@ function defaultApiOrigin() {
   if (location.protocol === 'file:' || ['localhost', '127.0.0.1'].includes(location.hostname)) {
     return 'http://localhost:4000';
   }
-  // The protected admin/API gateway has its own domain, separate from the
-  // public storefront. Cloudflare Pages previews use that same production API.
-  return 'https://admin.nuvanti.com';
+  // The protected admin/API gateway is hosted on Railway, separately from
+  // the Cloudflare Pages storefront. Keep this fallback in sync with the
+  // current Railway service domain.
+  return 'https://nuvanti-production.up.railway.app';
 }
 
 export const API_ORIGIN = (configuredApi || defaultApiOrigin()).replace(/\/$/, '');

@@ -1,23 +1,38 @@
 import nodemailer from 'nodemailer';
 
-function configured() {
-  const from = Boolean(process.env.MAIL_FROM) && !process.env.MAIL_FROM.startsWith('PASTE_');
-  const resend = Boolean(process.env.RESEND_API_KEY) && from;
-  const smtp = ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS'].every((key) => Boolean(process.env[key]) && !process.env[key].startsWith('PASTE_')) && from;
-  return resend || smtp;
+function hasValue(key) {
+  const value = String(process.env[key] || '').trim();
+  return Boolean(value) && !/(?:example\.com|^paste_|replace-with|your[-_])/i.test(value);
 }
 
-async function deliver({ to, subject, text, html, devLabel, devDetail }) {
-  if (!configured()) {
+export function emailDeliveryStatus() {
+  const senderReady = hasValue('MAIL_FROM');
+  const resendReady = hasValue('RESEND_API_KEY') && senderReady;
+  const smtpReady = ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS'].every(hasValue) && senderReady;
+  const provider = resendReady ? 'Resend' : smtpReady ? 'SMTP' : null;
+  const missing = [];
+  if (!senderReady) missing.push('MAIL_FROM');
+  if (!resendReady && !smtpReady) {
+    if (!hasValue('RESEND_API_KEY')) missing.push('RESEND_API_KEY');
+    if (!['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS'].every(hasValue)) {
+      missing.push(...['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS'].filter((key) => !hasValue(key)));
+    }
+  }
+  return { configured: Boolean(provider), provider, senderConfigured: senderReady, missing: [...new Set(missing)] };
+}
+
+async function deliver({ to, subject, text, html, replyTo, devLabel, devDetail }) {
+  const status = emailDeliveryStatus();
+  if (!status.configured) {
     if (process.env.NODE_ENV === 'production') throw new Error('Email delivery is not configured.');
     console.info(`${devLabel} for ${to}: ${devDetail}`);
     return;
   }
-  if (process.env.RESEND_API_KEY) {
+  if (status.provider === 'Resend') {
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: process.env.MAIL_FROM, to: [to], subject, text, html }),
+      body: JSON.stringify({ from: process.env.MAIL_FROM, to: [to], subject, text, html, ...(replyTo ? { reply_to: replyTo } : {}) }),
       signal: AbortSignal.timeout(10_000),
     });
     const result = await response.json().catch(() => ({}));
@@ -25,7 +40,33 @@ async function deliver({ to, subject, text, html, devLabel, devDetail }) {
     return;
   }
   const transporter = nodemailer.createTransport({ host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT || 587), secure: process.env.SMTP_SECURE === 'true', auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } });
-  await transporter.sendMail({ from: process.env.MAIL_FROM, to, subject, text, html });
+  await transporter.sendMail({ from: process.env.MAIL_FROM, to, subject, text, html, ...(replyTo ? { replyTo } : {}) });
+}
+
+export async function sendTestEmail({ to }) {
+  await deliver({
+    to,
+    subject: 'Nuvanti email delivery test',
+    text: 'This test confirms that Nuvanti can send email from its production service.',
+    html: '<p>This test confirms that Nuvanti can send email from its production service.</p>',
+    devLabel: 'Development email test',
+    devDetail: 'Nuvanti mail transport test',
+  });
+}
+
+export async function sendContactNotification({ to, name, email, message }) {
+  const safeName = escapeHtml(name);
+  const safeEmail = escapeHtml(email);
+  const safeMessage = escapeHtml(message);
+  await deliver({
+    to,
+    replyTo: email,
+    subject: `New Nuvanti contact message from ${name}`,
+    text: `Name: ${name}\nEmail: ${email}\n\n${message}`,
+    html: `<p><strong>Name:</strong> ${safeName}</p><p><strong>Email:</strong> ${safeEmail}</p><p>${safeMessage.replace(/\n/g, '<br>')}</p>`,
+    devLabel: 'Development contact notification',
+    devDetail: `message from ${email}`,
+  });
 }
 
 export async function sendPasswordReset({ to, resetUrl }) {

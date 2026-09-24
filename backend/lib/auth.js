@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import { query } from './db.js';
 
 const cookieName = 'nuvanti_session';
+const cookieSameSite = process.env.NODE_ENV === 'production' ? 'none' : 'lax';
 
 function secret() {
   const value = process.env.JWT_SECRET;
@@ -21,11 +22,11 @@ export function readSession(req) {
 }
 
 export function sessionCookie(res, token) {
-  res.cookie(cookieName, token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 8 * 60 * 60 * 1000, path: '/', ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}) });
+  res.cookie(cookieName, token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: cookieSameSite, maxAge: 8 * 60 * 60 * 1000, path: '/', ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}) });
 }
 
 export function clearSession(res) {
-  res.clearCookie(cookieName, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}) });
+  res.clearCookie(cookieName, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: cookieSameSite, path: '/', ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}) });
 }
 
 export async function requireAuth(req, res, next) {

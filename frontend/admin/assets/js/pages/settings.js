@@ -1,7 +1,7 @@
 import { initAdminShell } from '../components/shell.js';
 import { showAdminToast } from '../components/toast.js';
 import { hasPermission } from '../components/permissions.js';
-import { getSettings, saveSettingsSection } from '../services/settingsService.js';
+import { getEmailStatus, getSettings, saveSettingsSection, sendAdminTestEmail } from '../services/settingsService.js';
 import { escapeHtml } from '../components/utils.js';
 
 const session = initAdminShell({ page: 'settings', title: 'Settings' });
@@ -10,8 +10,9 @@ if (session) init();
 
 let tab = 'general';
 let settings;
-const TABS = ['general', 'shipping', 'payments'];
-const LABELS = { general: 'General', shipping: 'Shipping', payments: 'Payments' };
+let emailStatus;
+const TABS = ['general', 'shipping', 'payments', 'email'];
+const LABELS = { general: 'General', shipping: 'Shipping', payments: 'Payments', email: 'Email' };
 
 async function init() {
   if (!hasPermission(session.role, 'settings.view')) {
@@ -19,7 +20,10 @@ async function init() {
     return;
   }
   try {
-    settings = await getSettings();
+    [settings, emailStatus] = await Promise.all([
+      getSettings(),
+      getEmailStatus().catch((error) => ({ loadError: error.message })),
+    ]);
     render();
   } catch (error) {
     document.getElementById('settingsPanel').innerHTML = `<div class="admin-empty"><h3>Settings unavailable</h3><p>${escapeHtml(error.message)}</p><button class="btn btn-outline" id="retrySettings">Try Again</button></div>`;
@@ -50,12 +54,26 @@ function render() {
       </div>
       <p class="hint">These amounts update the checkout total immediately. The server recalculates the final amount when an order is placed.</p>
     `);
-  } else {
+  } else if (tab === 'payments') {
     root.innerHTML = `
       <div class="card"><div class="card-pad">
         <div class="settings-row"><div><p class="settings-row__label">Cash on Delivery</p><p class="settings-row__desc">Customers pay the courier when the order arrives.</p></div><span class="badge badge--success">Enabled</span></div>
         <div class="settings-row"><div><p class="settings-row__label">Online card payments</p><p class="settings-row__desc">Connect a payment provider and add signed webhooks before enabling cards.</p></div><span class="badge badge--neutral">Not connected</span></div>
       </div></div>`;
+  } else {
+    const ready = emailStatus?.configured;
+    const statusLabel = emailStatus?.loadError ? 'Status unavailable' : ready ? `Ready · ${emailStatus.provider}` : 'Not configured';
+    const details = emailStatus?.loadError
+      ? `<p class="hint">${escapeHtml(emailStatus.loadError)}</p>`
+      : ready
+        ? '<p class="hint">A test message will be sent to your signed-in administrator email. Check Inbox and Spam. Provider acceptance confirms the connection; it does not guarantee inbox placement.</p>'
+        : `<p class="hint">Add a mail provider in Railway → Nuvanti service → Variables, then redeploy. Missing variables: <span class="mono">${escapeHtml((emailStatus?.missing || []).join(', ') || 'unable to determine')}</span>.</p><p class="hint">Use either Resend with <span class="mono">RESEND_API_KEY</span> and <span class="mono">MAIL_FROM</span>, or SMTP with <span class="mono">SMTP_HOST</span>, <span class="mono">SMTP_PORT</span>, <span class="mono">SMTP_SECURE</span>, <span class="mono">SMTP_USER</span>, <span class="mono">SMTP_PASS</span>, and <span class="mono">MAIL_FROM</span>. Verify your sending domain/address with the provider first.</p>`;
+    root.innerHTML = `<div class="card"><div class="card-pad">
+      <div class="settings-row"><div><p class="settings-row__label">Transactional email</p><p class="settings-row__desc">Password resets, account verification, admin invitations, order confirmations, and newsletter confirmations.</p></div><span class="badge ${ready ? 'badge--success' : 'badge--neutral'}">${escapeHtml(statusLabel)}</span></div>
+      ${details}
+      ${canEdit ? `<button class="btn btn-primary" id="testEmailBtn" ${ready ? '' : 'disabled'}>Send test email to ${escapeHtml(session.email)}</button>` : '<p class="hint">Only a super administrator can send a test email.</p>'}
+      <p class="hint">Contact form inquiries also appear in Customers → Contact Messages. Email alerts go to the Customer Support Email set in the General tab.</p>
+    </div></div>`;
   }
 }
 
@@ -64,6 +82,20 @@ function section(body) {
 }
 
 document.getElementById('settingsRoot')?.addEventListener('click', async (event) => {
+  const testEmailButton = event.target.closest('#testEmailBtn');
+  if (testEmailButton && canEdit && emailStatus?.configured) {
+    testEmailButton.disabled = true;
+    testEmailButton.textContent = 'Sending…';
+    try {
+      const result = await sendAdminTestEmail();
+      showAdminToast(result.message || 'Test email accepted by the provider. Check Inbox and Spam.', 'success');
+    } catch (error) {
+      showAdminToast(error.message, 'error');
+      testEmailButton.disabled = false;
+      testEmailButton.textContent = `Send test email to ${session.email}`;
+    }
+    return;
+  }
   const button = event.target.closest('#saveSectionBtn');
   if (!button || !canEdit || !settings) return;
   const sectionName = tab;

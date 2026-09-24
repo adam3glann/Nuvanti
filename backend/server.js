@@ -19,6 +19,7 @@ import uploadsRouter from "./routes/uploads.js";
 import { requireAdminPage, requireAuth, requireRole } from "./lib/auth.js";
 import { errorHandler, notFound, sameOrigin } from "./middleware/security.js";
 import { query } from "./lib/db.js";
+import { emailDeliveryStatus } from "./lib/mail.js";
 
 const app = express();
 const STAFF_ROLES = ["staff", "manager", "admin", "super_admin"];
@@ -127,14 +128,7 @@ if (process.env.NODE_ENV === "production") {
     if (new URL(origin).protocol !== "https:")
       throw new Error(`${name} must use HTTPS in production.`);
   }
-  const mailFrom =
-    process.env.MAIL_FROM && !/example|paste_/i.test(process.env.MAIL_FROM);
-  const resendReady = process.env.RESEND_API_KEY && mailFrom;
-  const smtpReady =
-    ["SMTP_HOST", "SMTP_USER", "SMTP_PASS"].every(
-      (name) => process.env[name] && !/example|paste_/i.test(process.env[name]),
-    ) && mailFrom;
-  if (!resendReady && !smtpReady)
+  if (!emailDeliveryStatus().configured)
     console.warn(
       "Email is not configured; the website will run, but email actions will fail until SMTP or Resend is configured.",
     );

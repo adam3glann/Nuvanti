@@ -6,7 +6,7 @@ import { query, transaction } from '../lib/db.js';
 import { productPayload, toPublicProduct } from '../lib/catalog.js';
 import { requirePermission } from '../lib/permissions.js';
 import { logAudit } from '../lib/audit.js';
-import { sendAdminWelcome } from '../lib/mail.js';
+import { emailDeliveryStatus, sendAdminWelcome, sendTestEmail } from '../lib/mail.js';
 const router = Router();
 const MANAGEABLE_ROLES = ['staff', 'manager', 'admin', 'super_admin'];
 const productFields = z.object({ slug: z.string().regex(/^[a-z0-9-]+$/).max(160), name: z.string().min(2).max(160), description: z.string().max(5000).optional(), price: z.coerce.number().min(0).optional(), priceCents: z.coerce.number().int().min(0).optional(), category: z.string().min(1).max(80), collection: z.string().max(80).nullable().optional(), images: z.array(z.string()).max(12).optional(), colors: z.array(z.string().max(40)).max(20).optional(), sizes: z.array(z.string().max(20)).max(20).optional(), inventory: z.union([z.coerce.number().int().min(0), z.record(z.coerce.number().int().min(0))]).optional(), status: z.enum(['active', 'draft']).optional(), isActive: z.boolean().optional(), badges: z.array(z.string().max(30)).optional(), featured: z.boolean().optional(), bestseller: z.boolean().optional(), newArrival: z.boolean().optional(), sku: z.string().max(100).optional(), compareAtPrice: z.coerce.number().min(0).nullable().optional() });
@@ -14,6 +14,24 @@ const productInput = productFields.refine((value) => value.price !== undefined |
 const columns = 'id, slug, name, description, price_cents, category, collection, images, colors, sizes, inventory, is_active, metadata';
 const categoryInput = z.object({ name: z.string().min(2).max(80), slug: z.string().regex(/^[a-z0-9-]+$/).max(80), description: z.string().max(1000).optional() });
 const collectionInput = z.object({ name: z.string().min(2).max(80), slug: z.string().regex(/^[a-z0-9-]+$/).max(80) });
+router.get('/email/status', requirePermission('settings.view'), (req, res) => {
+  res.json(emailDeliveryStatus());
+});
+router.post('/email/test', requirePermission('settings.edit'), async (req, res) => {
+  const status = emailDeliveryStatus();
+  if (!status.configured) {
+    return res.status(503).json({ error: 'Email is not configured yet.', missing: status.missing });
+  }
+  try {
+    await sendTestEmail({ to: req.user.email });
+    await logAudit({ req, action: 'email.test_sent', targetType: 'email', targetId: 'self', metadata: { provider: status.provider } });
+    res.json({ ok: true, message: `Test email accepted by ${status.provider} for ${req.user.email}.` });
+  } catch (error) {
+    console.error('Admin email test failed:', error);
+    await logAudit({ req, action: 'email.test_failed', targetType: 'email', targetId: 'self', metadata: { provider: status.provider } });
+    res.status(502).json({ error: 'The email provider rejected or could not send the test email. Check the provider credentials, sender verification, and server logs.' });
+  }
+});
 router.get('/dashboard', requirePermission('analytics.view'), async (req, res) => { const { rows } = await query(`SELECT (SELECT count(*)::int FROM orders) AS "orders", (SELECT count(*)::int FROM products WHERE is_active) AS "products", (SELECT count(*)::int FROM users WHERE role = 'customer') AS "customers", (SELECT coalesce(sum(total_cents), 0)::bigint FROM orders WHERE status <> 'cancelled') AS "revenueCents"`); res.json(rows[0]); });
 router.get('/analytics', requirePermission('analytics.view'), async (req, res) => {
   const days = ({ '7d': 7, '30d': 30, '90d': 90, '1y': 365 })[req.query.range] || 30;

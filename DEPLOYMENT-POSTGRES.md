@@ -44,7 +44,8 @@ or paste them into chat.
 | `SMTP_PASS` | The Gmail App Password, not the normal Gmail password |
 | `MAIL_FROM` | `Nuvanti <your-sending-address@gmail.com>` |
 
-Keep the storefront's API origin pointed at the Railway domain.
+The storefront's production fallback API origin is `https://nuvanti-production.up.railway.app` in `frontend/assets/js/config.js`. If your Railway service domain changes, update that fallback (or inject `window.NUVANTI_API_URL` before the storefront modules load) and redeploy Cloudflare Pages.
+In Admin → Settings → Email, check the provider status and use **Send test email** after configuring the variables. The test goes to the signed-in super administrator. Set the Customer Support Email in Settings → General to receive contact-form alerts. Production session cookies are secure and allow cross-origin storefront API calls; keep the API origin and `STORE_ORIGIN` aligned.
 
 Railway trial credits and limits can change. Check current workspace usage and
 billing before adding a paid plan. Supabase remains a separate service with its
