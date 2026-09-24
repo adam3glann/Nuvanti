@@ -24,9 +24,38 @@ const app = express();
 const STAFF_ROLES = ['staff', 'manager', 'admin', 'super_admin'];
 const PORT = Number(process.env.PORT || 4000);
 const ADMIN_PORT = Number(process.env.ADMIN_PORT || 4001);
-const storeOrigin = process.env.STORE_ORIGIN || 'http://localhost:8080';
-const storePreviewOrigin = process.env.STORE_PREVIEW_ORIGIN || '';
-const adminOrigin = process.env.ADMIN_ORIGIN || `http://localhost:${ADMIN_PORT}`;
+const isProduction = process.env.NODE_ENV === 'production';
+const railwayOrigin = process.env.RAILWAY_PUBLIC_DOMAIN
+  ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+  : '';
+
+function publicOrigin(name, rawValue, fallback) {
+  const raw = String(rawValue || '').trim().replace(/^(?:"(.*)"|'(.*)')$/, '$1$2');
+  if (!raw) return fallback;
+  const value = isProduction && !/^[a-z][a-z\d+.-]*:\/\//i.test(raw) ? `https://${raw}` : raw;
+  let parsed;
+  try { parsed = new URL(value); }
+  catch { throw new Error(`${name} must be a valid URL origin.`); }
+  if (isProduction && ['localhost', '127.0.0.1'].includes(parsed.hostname)) return fallback;
+  if (isProduction && parsed.protocol === 'http:') parsed.protocol = 'https:';
+  if (isProduction && parsed.protocol !== 'https:') throw new Error(`${name} must use HTTPS in production.`);
+  return parsed.origin;
+}
+
+const storeOrigin = publicOrigin(
+  'STORE_ORIGIN', process.env.STORE_ORIGIN,
+  isProduction ? 'https://nuvanti-shop.pages.dev' : 'http://localhost:8080',
+);
+const storePreviewOrigin = process.env.STORE_PREVIEW_ORIGIN
+  ? publicOrigin('STORE_PREVIEW_ORIGIN', process.env.STORE_PREVIEW_ORIGIN, '')
+  : '';
+const notYetExposedOrigin = 'https://nuvanti-railway-pending.invalid';
+const adminOrigin = publicOrigin(
+  'ADMIN_ORIGIN', railwayOrigin || process.env.ADMIN_ORIGIN,
+  isProduction ? railwayOrigin || notYetExposedOrigin : `http://localhost:${ADMIN_PORT}`,
+);
+const adminAppUrl = publicOrigin('ADMIN_APP_URL', railwayOrigin || process.env.ADMIN_APP_URL, adminOrigin);
+const apiPublicUrl = publicOrigin('API_PUBLIC_URL', railwayOrigin || process.env.API_PUBLIC_URL, railwayOrigin || adminOrigin);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const frontendRoot = path.resolve(__dirname, '../frontend');
 const trustProxy = process.env.TRUST_PROXY ? Number(process.env.TRUST_PROXY) : 0;
@@ -35,24 +64,14 @@ if (process.env.NODE_ENV === 'production') {
   if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32 || /replace-with|example|paste_/i.test(process.env.JWT_SECRET)) {
     throw new Error('Set a unique production JWT_SECRET of at least 32 characters.');
   }
-  for (const [name, origin] of [['STORE_ORIGIN', storeOrigin], ['ADMIN_ORIGIN', adminOrigin], ['ADMIN_APP_URL', process.env.ADMIN_APP_URL || '']]) {
-    let parsed;
-    try { parsed = new URL(origin); } catch { throw new Error(`${name} must be an absolute HTTPS URL in production.`); }
-    if (parsed.protocol !== 'https:') throw new Error(`${name} must use HTTPS in production.`);
+  for (const [name, origin] of [['STORE_ORIGIN', storeOrigin], ['ADMIN_ORIGIN', adminOrigin], ['ADMIN_APP_URL', adminAppUrl], ['API_PUBLIC_URL', apiPublicUrl]]) {
+    if (new URL(origin).protocol !== 'https:') throw new Error(`${name} must use HTTPS in production.`);
   }
-  if (storePreviewOrigin) {
-    try { if (new URL(storePreviewOrigin).protocol !== 'https:') throw new Error(); }
-    catch { throw new Error('STORE_PREVIEW_ORIGIN must be an absolute HTTPS URL in production.'); }
-  }
-  try { if (new URL(process.env.API_PUBLIC_URL || '').protocol !== 'https:') throw new Error(); }
-  catch { throw new Error('API_PUBLIC_URL must be the public HTTPS origin of the API in production.'); }
   if (storeOrigin === adminOrigin) throw new Error('STORE_ORIGIN and ADMIN_ORIGIN must be separate production hosts.');
   const mailFrom = process.env.MAIL_FROM && !/example|paste_/i.test(process.env.MAIL_FROM);
   const resendReady = process.env.RESEND_API_KEY && mailFrom;
   const smtpReady = ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS'].every((name) => process.env[name] && !/example|paste_/i.test(process.env[name])) && mailFrom;
-  if (!resendReady && !smtpReady) {
-    throw new Error('Configure RESEND_API_KEY and MAIL_FROM, or SMTP_HOST, SMTP_USER, SMTP_PASS, and MAIL_FROM, before starting.');
-  }
+  if (!resendReady && !smtpReady) console.warn('Email is not configured; the website will run, but email actions will fail until SMTP or Resend is configured.');
 }
 
 app.disable('x-powered-by');

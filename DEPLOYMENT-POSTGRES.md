@@ -10,8 +10,12 @@ only application database; the unused Cloudflare D1 database is not connected.
   root (`/`). The admin files live in the sibling `frontend` directory.
 - `railway.json` configures the backend install, startup migrations, initial
   bootstrap, and `/api/health` deploy check.
-- Generate a public Railway domain. Use that same URL for `ADMIN_ORIGIN`,
-  `ADMIN_APP_URL`, and `API_PUBLIC_URL`.
+- Set `PORT=4000` before the first boot if Railway cannot detect the listening
+  port. The server uses `PORT` and otherwise falls back to `4000`.
+- Generate a public Railway domain targeting port `4000`. The server uses
+  Railway's `RAILWAY_PUBLIC_DOMAIN` as the admin and API origin when explicit
+  origin variables are not set. After generating the domain, redeploy so the
+  Railway-provided domain is available to the running process.
 
 ## Railway variables
 
@@ -25,11 +29,11 @@ or paste them into chat.
 | `NODE_ENV` | `production` |
 | `JWT_SECRET` | Unique random secret, at least 32 characters |
 | `TRUST_PROXY` | `1` |
-| `STORE_ORIGIN` | `https://nuvanti-shop.pages.dev` |
-| `STORE_PREVIEW_ORIGIN` | `https://nuvanti-shop.pages.dev` |
-| `ADMIN_ORIGIN` | The generated Railway domain, including `https://` |
-| `ADMIN_APP_URL` | The same generated Railway domain |
-| `API_PUBLIC_URL` | The same generated Railway domain |
+| `STORE_ORIGIN` | `https://nuvanti-shop.pages.dev` (the server defaults to this if omitted and upgrades `http://` to `https://` in production) |
+| `STORE_PREVIEW_ORIGIN` | Optional Cloudflare Pages preview origin, using `https://` |
+| `ADMIN_ORIGIN` | Optional; otherwise derived from Railway's public domain after it is generated |
+| `ADMIN_APP_URL` | Optional; defaults to `ADMIN_ORIGIN` |
+| `API_PUBLIC_URL` | Optional; defaults to Railway's public domain when available |
 | `NUVANTI_BOOTSTRAP_ADMIN_EMAIL` | Your administrator email |
 | `NUVANTI_BOOTSTRAP_ADMIN_PASSWORD` | A private password of at least 12 characters |
 | `NUVANTI_BOOTSTRAP_ADMIN_NAME` | Your administrator display name |
