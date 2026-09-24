@@ -1,7 +1,7 @@
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
-export function sameOrigin({ storeOrigin, adminOrigin }) {
-  const allowed = new Set([storeOrigin, adminOrigin].filter(Boolean));
+export function sameOrigin({ storeOrigin, storePreviewOrigin, adminOrigin }) {
+  const allowed = new Set([storeOrigin, storePreviewOrigin, adminOrigin].filter(Boolean));
   return (req, res, next) => {
     if (SAFE_METHODS.has(req.method)) return next();
     const origin = req.get('origin');

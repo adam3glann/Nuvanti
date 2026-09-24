@@ -25,6 +25,7 @@ const STAFF_ROLES = ['staff', 'manager', 'admin', 'super_admin'];
 const PORT = Number(process.env.PORT || 4000);
 const ADMIN_PORT = Number(process.env.ADMIN_PORT || 4001);
 const storeOrigin = process.env.STORE_ORIGIN || 'http://localhost:8080';
+const storePreviewOrigin = process.env.STORE_PREVIEW_ORIGIN || '';
 const adminOrigin = process.env.ADMIN_ORIGIN || `http://localhost:${ADMIN_PORT}`;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const trustProxy = process.env.TRUST_PROXY ? Number(process.env.TRUST_PROXY) : 0;
@@ -38,6 +39,10 @@ if (process.env.NODE_ENV === 'production') {
     try { parsed = new URL(origin); } catch { throw new Error(`${name} must be an absolute HTTPS URL in production.`); }
     if (parsed.protocol !== 'https:') throw new Error(`${name} must use HTTPS in production.`);
   }
+  if (storePreviewOrigin) {
+    try { if (new URL(storePreviewOrigin).protocol !== 'https:') throw new Error(); }
+    catch { throw new Error('STORE_PREVIEW_ORIGIN must be an absolute HTTPS URL in production.'); }
+  }
   try { if (new URL(process.env.API_PUBLIC_URL || '').protocol !== 'https:') throw new Error(); }
   catch { throw new Error('API_PUBLIC_URL must be the public HTTPS origin of the API in production.'); }
   if (storeOrigin === adminOrigin) throw new Error('STORE_ORIGIN and ADMIN_ORIGIN must be separate production hosts.');
@@ -49,11 +54,11 @@ if (process.env.NODE_ENV === 'production') {
 app.disable('x-powered-by');
 if (trustProxy) app.set('trust proxy', trustProxy);
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'same-site' } }));
-app.use(cors({ origin: [storeOrigin, adminOrigin], credentials: true, methods: ['GET', 'POST', 'PATCH', 'DELETE'] }));
+app.use(cors({ origin: [storeOrigin, storePreviewOrigin, adminOrigin].filter(Boolean), credentials: true, methods: ['GET', 'POST', 'PATCH', 'DELETE'] }));
 app.use(express.json({ limit: '100kb' }));
 app.use(cookieParser());
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, limit: 300, standardHeaders: 'draft-7', legacyHeaders: false }));
-app.use(sameOrigin({ storeOrigin, adminOrigin }));
+app.use(sameOrigin({ storeOrigin, storePreviewOrigin, adminOrigin }));
 app.use('/api/auth', rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: 'draft-7', legacyHeaders: false }), authRouter);
 
 app.get('/api/health', async (req, res, next) => {
@@ -93,5 +98,17 @@ adminApp.use((err, req, res, next) => res.status(err.status === 404 ? 404 : 500)
 if (trustProxy) adminApp.set('trust proxy', trustProxy);
 
 await query('SELECT 1');
-app.listen(PORT, () => console.log(`Nuvanti API listening on http://localhost:${PORT}`));
-adminApp.listen(ADMIN_PORT, () => console.log(`Protected admin listening on http://localhost:${ADMIN_PORT}`));
+if (process.env.NODE_ENV === 'production') {
+  // PaaS web services expose one port. Route the admin hostname to its
+  // protected gateway and all other hosts to the API on that same listener.
+  const adminHostname = new URL(adminOrigin).hostname.toLowerCase();
+  const publicApp = express();
+  publicApp.use((req, res, next) => {
+    if ((req.hostname || '').toLowerCase() === adminHostname) return adminApp(req, res, next);
+    return app(req, res, next);
+  });
+  publicApp.listen(PORT, '0.0.0.0', () => console.log(`Nuvanti public service listening on port ${PORT}`));
+} else {
+  app.listen(PORT, '0.0.0.0', () => console.log(`Nuvanti API listening on http://localhost:${PORT}`));
+  adminApp.listen(ADMIN_PORT, '0.0.0.0', () => console.log(`Protected admin listening on http://localhost:${ADMIN_PORT}`));
+}

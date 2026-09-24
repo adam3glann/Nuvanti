@@ -10,7 +10,8 @@
     "migrate": "node scripts/migrate.js",
     "seed:admin": "node scripts/seed-admin.js",
     "reset:admin": "node scripts/reset-admin.js",
-    "seed:catalog": "node scripts/seed-catalog.js"
+    "seed:catalog": "node scripts/seed-catalog.js",
+    "bootstrap:initial": "node scripts/bootstrap-initial.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
