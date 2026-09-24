@@ -106,8 +106,11 @@ adminApp.use(express.static(path.join(frontendRoot, 'admin'), { index: 'index.ht
 adminApp.use((err, req, res, next) => res.status(err.status === 404 ? 404 : 500).send('Not found'));
 if (trustProxy) adminApp.set('trust proxy', trustProxy);
 
-await query('SELECT 1');
 const isNetlify = process.env.NUVANTI_NETLIFY_FUNCTION === 'true';
+// Do not wait on PostgreSQL while a Netlify function is cold-starting. A
+// transient database connection delay must not prevent the function from
+// loading and serving the admin shell or returning an API error response.
+if (!isNetlify) await query('SELECT 1');
 if (process.env.NODE_ENV === 'production') {
   // PaaS web services expose one port. Route the admin hostname to its
   // protected gateway and all other hosts to the API on that same listener.
