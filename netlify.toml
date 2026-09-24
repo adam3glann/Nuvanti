@@ -8,7 +8,16 @@ NODE_VERSION = "22"
 
 [functions]
 node_bundler = "esbuild"
-included_files = ["frontend/admin/**/*", "frontend/assets/**/*"]
+included_files = [
+  "frontend/admin/**/*",
+  "frontend/assets/**/*",
+  "backend/server.js",
+  "backend/package.json",
+  "backend/lib/**/*",
+  "backend/middleware/**/*",
+  "backend/routes/**/*",
+  "backend/node_modules/**/*",
+]
 
 [[redirects]]
 from = "/"
