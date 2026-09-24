@@ -56,10 +56,9 @@ Placing an order (`POST /api/orders`) fires two best-effort notifications after 
 
 Both messages include a tracking link: `GET /api/orders/track/:id?token=...`, a public (no-login) endpoint guarded by a random per-order token (not the order's numeric id — that alone proves nothing). It returns order status, items, delivery method, and city/country only — no email, phone, or full address. The storefront's `track.html` page renders it, and also offers a manual order-number + tracking-code lookup for someone who lost the link. Signed-in customers see the same link for every past order under **My Account → Orders**, which now lists real order history instead of only the most recent order in that browser.
 
-For deployment on Netlify, use Resend's HTTPS API for mail. Verify `nuvanti.com` in Resend, add the DNS records Resend provides in Cloudflare, create an API key, and place it in Netlify as `RESEND_API_KEY`. Set `MAIL_FROM` to an address on that verified domain, for example `Nuvanti <orders@nuvanti.com>`. Never commit the API key. A persistent server can alternatively use SMTP; enable two-step verification on the sending Gmail account and use a Google **App Password**, never the normal Gmail password:
+For Railway deployment, configure mail through the service's environment variables. Gmail SMTP works without owning a custom domain: enable two-step verification and create a Google **App Password**, never use the normal Gmail password. Keep the app password private and never commit it:
 
 ```env
-ADMIN_APP_URL=https://admin.yourdomain.com
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=465
 SMTP_SECURE=true
@@ -90,6 +89,6 @@ Discounts now have a real backend: admin create/activate/deactivate/delete goes 
 
 ## Production notes
 
-For the Nuvanti Cloudflare Pages + Netlify layout, use `https://nuvanti.com` for the storefront and `https://admin.nuvanti.com` for both the protected admin portal and its `/api/*` endpoints. In local development the API and protected admin still use separate ports (`4000` and `4001`). Set production `STORE_ORIGIN`, `ADMIN_ORIGIN`, `ADMIN_APP_URL`, and `API_PUBLIC_URL` to those HTTPS origins, set `TRUST_PROXY=1`, and leave `COOKIE_DOMAIN` blank so the session cookie remains scoped to the admin host. The Cloudflare Pages preview is configured to call `admin.nuvanti.com` too. Never publish `frontend/admin` as an unprotected static site. Only Egypt is accepted at checkout; configure actual rates and fulfillment with your courier before accepting orders. Payments are not marked paid until a provider's signed webhook is implemented.
+For the current Railway layout, keep the repository root as the service root so the backend can serve the protected admin files from `frontend/admin`. Use the Cloudflare Pages storefront URL for `STORE_ORIGIN`; use the generated Railway HTTPS domain for `ADMIN_ORIGIN`, `ADMIN_APP_URL`, and `API_PUBLIC_URL`. Set `TRUST_PROXY=1`, leave `COOKIE_DOMAIN` blank so the session cookie remains scoped to the admin host, and set the Supabase CA in `DATABASE_SSL_CA`. Never publish `frontend/admin` as an unprotected static site. Only Egypt is accepted at checkout; configure actual rates and fulfillment with your courier before accepting orders. Payments are not marked paid until a provider's signed webhook is implemented.
 
-See the repository-level `DEPLOYMENT-POSTGRES.md` for the hosted PostgreSQL setup and production limitations. PostgreSQL remains the source of truth; the separate Cloudflare D1 database is not used by this backend.
+See the repository-level `DEPLOYMENT-POSTGRES.md` for Railway and Supabase configuration. PostgreSQL remains the source of truth; the separate Cloudflare D1 database is not used by this backend.

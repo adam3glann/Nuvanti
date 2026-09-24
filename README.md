@@ -12,11 +12,11 @@ Nuvanti is a static HTML/CSS/JavaScript storefront backed by a Node.js API and P
 
 ## Production host layout
 
-- `www.example.com` serves the contents of `frontend/` as the customer shop.
-- `admin.example.com` points to the backend's protected admin server on port `4001`.
-- `api.example.com` points to the API on port `4000`.
+- Cloudflare Pages serves the public storefront.
+- Railway serves the API and the protected admin portal from one public service domain.
+- Supabase PostgreSQL remains the application database.
 
-Set HTTPS `STORE_ORIGIN`, `ADMIN_ORIGIN`, `ADMIN_APP_URL`, and `API_PUBLIC_URL` in the backend environment. DNS, TLS certificates, reverse proxy routing, PostgreSQL, and SMTP must be configured by the deployment provider. Keep `COOKIE_DOMAIN` empty so the session cookie remains host-only on the API. Never serve `frontend/admin/` from the public shop host. For unrelated host domains, set `window.NUVANTI_API_URL` or a `meta[name="nuvanti-api-url"]` value in both web apps before their modules load.
+Configure the Railway service using [DEPLOYMENT-POSTGRES.md](DEPLOYMENT-POSTGRES.md). Set the storefront's API origin to the generated Railway URL before deploying the Pages site. Never publish `frontend/admin/` as an unprotected static site.
 
 Full database, mail, cloud image upload, and deployment details are in [backend/README.md](backend/README.md).
 

@@ -7,7 +7,8 @@ function defaultApiOrigin() {
   if (location.protocol === 'file:' || ['localhost', '127.0.0.1'].includes(location.hostname)) {
     return 'http://localhost:4000';
   }
-  return 'https://admin.nuvanti.com';
+  // In production the protected admin UI and API share one Railway host.
+  return location.origin;
 }
 
 export const API_ORIGIN = (configuredApi || defaultApiOrigin()).replace(/\/$/, '');

@@ -1,22 +1,47 @@
-# Nuvanti deployment with PostgreSQL
+# Nuvanti deployment: Railway + Supabase
 
-PostgreSQL stays the application's only database. The Cloudflare D1 database created earlier is not connected to the app and can be left unused. Use a managed PostgreSQL provider with a dashboard/table browser (for example Supabase) so orders, customers, products, and admin accounts remain visible to you.
+The Cloudflare Pages storefront stays at `nuvanti-shop.pages.dev`. Railway runs
+the Node backend and protected admin portal. Supabase PostgreSQL remains the
+only application database; the unused Cloudflare D1 database is not connected.
 
-## Prepare and deploy
+## Railway service
 
-The step-by-step deployment for the current no-card host is in
-[`NETLIFY-POSTGRES.md`](NETLIFY-POSTGRES.md). The shop stays on Cloudflare Pages,
-Netlify serves the API and protected admin portal at `admin.nuvanti.com`, and
-Supabase PostgreSQL remains the primary database. Do not paste database
-connection strings or secrets into chat or commit them to Git.
+- Connect the GitHub repository and keep the service root at the repository
+  root (`/`). The admin files live in the sibling `frontend` directory.
+- `railway.json` configures the backend install, startup migrations, initial
+  bootstrap, and `/api/health` deploy check.
+- Generate a public Railway domain. Use that same URL for `ADMIN_ORIGIN`,
+  `ADMIN_APP_URL`, and `API_PUBLIC_URL`.
 
-## Free-plan limitation
+## Railway variables
 
-The Netlify Free plan has a monthly usage limit and can pause projects when
-that limit is reached. Supabase's free plan is useful for preview and has a
-dashboard, but projects can pause after inactivity and downloadable backups
-are not available on that plan. Review the current provider limits and enable
-durable backups/always-on service before treating the deployment as a
-production store.
+Add these in the Railway service's **Variables** tab. Never commit credentials
+or paste them into chat.
 
-Cloudflare Pages can continue serving the static storefront at no charge. Card payments are not enabled by this setup; checkout is cash on delivery only until a payment provider and its verified webhook are configured.
+| Variable | Value |
+| --- | --- |
+| `DATABASE_URL` | Supabase PostgreSQL session-pooler URI, including the real database password |
+| `DATABASE_SSL_CA` | Full Supabase root CA PEM from Database Settings → SSL Configuration |
+| `NODE_ENV` | `production` |
+| `JWT_SECRET` | Unique random secret, at least 32 characters |
+| `TRUST_PROXY` | `1` |
+| `STORE_ORIGIN` | `https://nuvanti-shop.pages.dev` |
+| `STORE_PREVIEW_ORIGIN` | `https://nuvanti-shop.pages.dev` |
+| `ADMIN_ORIGIN` | The generated Railway domain, including `https://` |
+| `ADMIN_APP_URL` | The same generated Railway domain |
+| `API_PUBLIC_URL` | The same generated Railway domain |
+| `NUVANTI_BOOTSTRAP_ADMIN_EMAIL` | Your administrator email |
+| `NUVANTI_BOOTSTRAP_ADMIN_PASSWORD` | A private password of at least 12 characters |
+| `NUVANTI_BOOTSTRAP_ADMIN_NAME` | Your administrator display name |
+| `SMTP_HOST` | `smtp.gmail.com` |
+| `SMTP_PORT` | `465` |
+| `SMTP_SECURE` | `true` |
+| `SMTP_USER` | Your Gmail sending address |
+| `SMTP_PASS` | The Gmail App Password, not the normal Gmail password |
+| `MAIL_FROM` | `Nuvanti <your-sending-address@gmail.com>` |
+
+Keep the storefront's API origin pointed at the Railway domain.
+
+Railway trial credits and limits can change. Check current workspace usage and
+billing before adding a paid plan. Supabase remains a separate service with its
+own plan limits.

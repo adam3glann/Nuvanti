@@ -1,9 +1,7 @@
 import 'dotenv/config';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { existsSync } from 'fs';
 import express from 'express';
-import serverless from 'serverless-http';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -30,11 +28,8 @@ const storeOrigin = process.env.STORE_ORIGIN || 'http://localhost:8080';
 const storePreviewOrigin = process.env.STORE_PREVIEW_ORIGIN || '';
 const adminOrigin = process.env.ADMIN_ORIGIN || `http://localhost:${ADMIN_PORT}`;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const frontendRoot = process.env.NUVANTI_NETLIFY_FUNCTION === 'true'
-  ? [path.resolve(process.cwd(), 'frontend'), path.resolve(process.cwd(), '../frontend')].find((candidate) => existsSync(candidate)) || path.resolve(process.cwd(), 'frontend')
-  : path.resolve(__dirname, '../frontend');
+const frontendRoot = path.resolve(__dirname, '../frontend');
 const trustProxy = process.env.TRUST_PROXY ? Number(process.env.TRUST_PROXY) : 0;
-export let handler;
 if (!Number.isInteger(trustProxy) || trustProxy < 0) throw new Error('TRUST_PROXY must be a non-negative integer.');
 if (process.env.NODE_ENV === 'production') {
   if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32 || /replace-with|example|paste_/i.test(process.env.JWT_SECRET)) {
@@ -106,11 +101,7 @@ adminApp.use(express.static(path.join(frontendRoot, 'admin'), { index: 'index.ht
 adminApp.use((err, req, res, next) => res.status(err.status === 404 ? 404 : 500).send('Not found'));
 if (trustProxy) adminApp.set('trust proxy', trustProxy);
 
-const isNetlify = process.env.NUVANTI_NETLIFY_FUNCTION === 'true';
-// Do not wait on PostgreSQL while a Netlify function is cold-starting. A
-// transient database connection delay must not prevent the function from
-// loading and serving the admin shell or returning an API error response.
-if (!isNetlify) await query('SELECT 1');
+await query('SELECT 1');
 if (process.env.NODE_ENV === 'production') {
   // PaaS web services expose one port. Route the admin hostname to its
   // protected gateway and all other hosts to the API on that same listener.
@@ -121,13 +112,7 @@ if (process.env.NODE_ENV === 'production') {
     if (isAdminHost && !req.path.startsWith('/api/')) return adminApp(req, res, next);
     return app(req, res, next);
   });
-  if (isNetlify) {
-    // Netlify forwards both the API host and the separate admin host through
-    // one serverless function. Keep the admin hostname behind its own gate.
-    handler = serverless(publicApp);
-  } else {
-    publicApp.listen(PORT, '0.0.0.0', () => console.log(`Nuvanti public service listening on port ${PORT}`));
-  }
+  publicApp.listen(PORT, '0.0.0.0', () => console.log(`Nuvanti public service listening on port ${PORT}`));
 } else {
   app.listen(PORT, '0.0.0.0', () => console.log(`Nuvanti API listening on http://localhost:${PORT}`));
   adminApp.listen(ADMIN_PORT, '0.0.0.0', () => console.log(`Protected admin listening on http://localhost:${ADMIN_PORT}`));

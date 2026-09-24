@@ -3,7 +3,7 @@ import pg from 'pg';
 const { Pool } = pg;
 
 if (!process.env.DATABASE_URL) {
-  throw new Error('DATABASE_URL is required. Copy .env.example to .env and configure PostgreSQL.');
+  throw new Error('DATABASE_URL is missing. For Railway, add it under your service Variables; locally, set it in backend/.env.');
 }
 
 // Keep TLS certificate verification enabled in production. Supabase's
@@ -37,7 +37,7 @@ export const pool = new Pool({
     ? getProductionConnectionString(process.env.DATABASE_URL)
     : process.env.DATABASE_URL,
   ssl: getSslConfig(),
-  max: process.env.NUVANTI_NETLIFY_FUNCTION === 'true' ? 2 : 10,
+  max: 10,
 });
 
 export async function query(text, params) {
