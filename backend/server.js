@@ -42,20 +42,31 @@ function publicOrigin(name, rawValue, fallback) {
   return parsed.origin;
 }
 
-const storeOrigin = publicOrigin(
-  'STORE_ORIGIN', process.env.STORE_ORIGIN,
-  isProduction ? 'https://nuvanti-shop.pages.dev' : 'http://localhost:8080',
-);
+function safePublicOrigin(name, rawValue, fallback) {
+  try {
+    return publicOrigin(name, rawValue, fallback);
+  } catch (error) {
+    console.warn(`${error.message} Ignoring ${name} and using ${fallback}.`);
+    return fallback;
+  }
+}
+
+const defaultStoreOrigin = isProduction ? 'https://nuvanti-shop.pages.dev' : 'http://localhost:8080';
+const storeOrigin = safePublicOrigin('STORE_ORIGIN', process.env.STORE_ORIGIN, defaultStoreOrigin);
 const storePreviewOrigin = process.env.STORE_PREVIEW_ORIGIN
-  ? publicOrigin('STORE_PREVIEW_ORIGIN', process.env.STORE_PREVIEW_ORIGIN, '')
+  ? safePublicOrigin('STORE_PREVIEW_ORIGIN', process.env.STORE_PREVIEW_ORIGIN, '')
   : '';
 const notYetExposedOrigin = 'https://nuvanti-railway-pending.invalid';
-const adminOrigin = publicOrigin(
-  'ADMIN_ORIGIN', railwayOrigin || process.env.ADMIN_ORIGIN,
-  isProduction ? railwayOrigin || notYetExposedOrigin : `http://localhost:${ADMIN_PORT}`,
+const defaultAdminOrigin = isProduction ? railwayOrigin || notYetExposedOrigin : `http://localhost:${ADMIN_PORT}`;
+let adminOrigin = safePublicOrigin(
+  'ADMIN_ORIGIN', railwayOrigin || process.env.ADMIN_ORIGIN, defaultAdminOrigin,
 );
-const adminAppUrl = publicOrigin('ADMIN_APP_URL', railwayOrigin || process.env.ADMIN_APP_URL, adminOrigin);
-const apiPublicUrl = publicOrigin('API_PUBLIC_URL', railwayOrigin || process.env.API_PUBLIC_URL, railwayOrigin || adminOrigin);
+if (isProduction && adminOrigin === storeOrigin) {
+  console.warn('ADMIN_ORIGIN matches STORE_ORIGIN; using the Railway admin origin fallback.');
+  adminOrigin = defaultAdminOrigin;
+}
+const adminAppUrl = safePublicOrigin('ADMIN_APP_URL', railwayOrigin || process.env.ADMIN_APP_URL, adminOrigin);
+const apiPublicUrl = safePublicOrigin('API_PUBLIC_URL', railwayOrigin || process.env.API_PUBLIC_URL, railwayOrigin || adminOrigin);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const frontendRoot = path.resolve(__dirname, '../frontend');
 const trustProxy = process.env.TRUST_PROXY ? Number(process.env.TRUST_PROXY) : 0;
@@ -67,7 +78,6 @@ if (process.env.NODE_ENV === 'production') {
   for (const [name, origin] of [['STORE_ORIGIN', storeOrigin], ['ADMIN_ORIGIN', adminOrigin], ['ADMIN_APP_URL', adminAppUrl], ['API_PUBLIC_URL', apiPublicUrl]]) {
     if (new URL(origin).protocol !== 'https:') throw new Error(`${name} must use HTTPS in production.`);
   }
-  if (storeOrigin === adminOrigin) throw new Error('STORE_ORIGIN and ADMIN_ORIGIN must be separate production hosts.');
   const mailFrom = process.env.MAIL_FROM && !/example|paste_/i.test(process.env.MAIL_FROM);
   const resendReady = process.env.RESEND_API_KEY && mailFrom;
   const smtpReady = ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS'].every((name) => process.env[name] && !/example|paste_/i.test(process.env[name])) && mailFrom;
