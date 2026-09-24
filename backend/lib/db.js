@@ -9,7 +9,7 @@ if (!process.env.DATABASE_URL) {
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: true } : false,
-  max: 10,
+  max: process.env.NUVANTI_NETLIFY_FUNCTION === 'true' ? 2 : 10,
 });
 
 export async function query(text, params) {
