@@ -10,6 +10,12 @@ export async function logout() { localStorage.removeItem(STORAGE_KEY); await fet
 export async function requestPasswordReset(email) { return request('/api/auth/password-reset/request', { email }); }
 export async function confirmPasswordReset(token, password) { return request('/api/auth/password-reset/confirm', { token, password }); }
 export async function confirmEmailVerification(token) { return request('/api/auth/verify-email/confirm', { token }); }
+export async function requestEmailVerification() {
+  const response = await fetch(`${API}/api/auth/verify-email/request`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.error || 'Unable to send the verification email.');
+  return body;
+}
 export function isLoggedIn() { return !!getSession(); }
 export async function getCurrentUser() {
   const response = await fetch(`${API}/api/auth/me`, { credentials: 'include' });

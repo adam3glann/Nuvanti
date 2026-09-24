@@ -27,6 +27,7 @@ const NAV = [
   {
     group: 'Content & Marketing',
     items: [
+      { href: 'content.html', label: 'Homepage Slides', icon: 'megaphone', page: 'content', perm: 'content.manage' },
       { href: 'newsletter.html', label: 'Newsletter', icon: 'fileText', page: 'newsletter', perm: 'content.manage' },
     ],
   },

@@ -1,6 +1,6 @@
 import { initShell } from '../main.js';
 import { formatPrice } from '../components/productCard.js';
-import { getSession, getCurrentUser, updateProfile, login, register, logout, requestPasswordReset, confirmPasswordReset, confirmEmailVerification } from '../services/authService.js';
+import { getSession, getCurrentUser, updateProfile, login, register, logout, requestPasswordReset, confirmPasswordReset, confirmEmailVerification, requestEmailVerification } from '../services/authService.js';
 import { fetchMyOrders } from '../services/orderService.js';
 import { fetchAddresses, createAddress, deleteAddress } from '../services/addressService.js';
 import { showToast } from '../components/toast.js';
@@ -79,9 +79,10 @@ function renderAuthForm() {
   } else if (authView === 'register') {
     wrap.innerHTML = `
       <form id="registerForm" novalidate>
-        <div class="field"><label for="regName">Full Name</label><input type="text" id="regName" required /></div>
-        <div class="field"><label for="regEmail">Email</label><input type="email" id="regEmail" required /></div>
-        <div class="field"><label for="regPassword">Password</label><input type="password" id="regPassword" required minlength="8" /><span class="hint">At least 8 characters.</span></div>
+        <div class="field"><label for="regName">Full Name</label><input type="text" id="regName" autocomplete="name" minlength="2" maxlength="100" required /></div>
+        <div class="field"><label for="regEmail">Email</label><input type="email" id="regEmail" autocomplete="email" maxlength="254" required /></div>
+        <div class="field"><label for="regPassword">Password</label><input type="password" id="regPassword" autocomplete="new-password" required minlength="12" maxlength="128" /><span class="hint">At least 12 characters.</span></div>
+        <div class="field"><label for="regPasswordConfirm">Confirm Password</label><input type="password" id="regPasswordConfirm" autocomplete="new-password" required minlength="12" maxlength="128" /></div>
         <button class="btn btn-primary btn-block" type="submit">Create Account</button>
       </form>
     `;
@@ -89,8 +90,12 @@ function renderAuthForm() {
     document.getElementById('registerForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       if (!checkValid(e.target)) return;
-      try { await register(document.getElementById('regName').value, document.getElementById('regEmail').value, document.getElementById('regPassword').value); continueAfterAuth(); }
-      catch (error) { showAuthError(error.message); }
+      const password = document.getElementById('regPassword').value;
+      if (password !== document.getElementById('regPasswordConfirm').value) return showAuthError('Passwords do not match.');
+      const button = e.target.querySelector('button[type="submit"]');
+      button.disabled = true; button.textContent = 'Creating account…';
+      try { await register(document.getElementById('regName').value.trim(), document.getElementById('regEmail').value, password); continueAfterAuth(); }
+      catch (error) { showAuthError(error.message); button.disabled = false; button.textContent = 'Create Account'; }
     });
     document.getElementById('toLogin').addEventListener('click', () => { authView = 'login'; renderAuthForm(); });
   } else if (authView === 'forgot') {
@@ -151,6 +156,7 @@ const STATUS_LABELS = { pending: 'Order Received', paid: 'Payment Received', ful
 async function renderDashboard(session, tab) {
   root.innerHTML = `
     <div class="page-hero" style="border:none;padding-bottom:0"><h1>My Account</h1><p>Welcome back, ${escapeHtml(session.name)}.</p></div>
+    ${session.emailVerifiedAt ? '' : `<div class="state-block account-verify-banner" role="status"><h3>Verify your email</h3><p>A confirmation link should arrive at ${escapeHtml(session.email)}. Check your Spam folder too. If it hasn't arrived, resend it below.</p><button class="btn btn-outline" type="button" id="resendVerification">Resend confirmation email</button></div>`}
     <div class="account-layout">
       <nav class="account-nav" aria-label="Account">
         <a href="account.html?tab=profile" ${tab === 'profile' ? 'aria-current="page"' : ''}>Profile</a>
@@ -164,6 +170,20 @@ async function renderDashboard(session, tab) {
   `;
 
   const panel = document.getElementById('accountPanel');
+  document.getElementById('resendVerification')?.addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    button.textContent = 'Sending…';
+    try {
+      const result = await requestEmailVerification();
+      showToast(result.message || 'Verification email sent. Check your inbox and Spam.');
+    } catch (error) {
+      showToast(error.message, { icon: 'alertTriangle' });
+    } finally {
+      button.disabled = false;
+      button.textContent = 'Resend confirmation email';
+    }
+  });
   if (tab === 'orders') {
     panel.innerHTML = `<div class="a-skeleton" style="height:120px;border-radius:12px"></div>`;
     try {

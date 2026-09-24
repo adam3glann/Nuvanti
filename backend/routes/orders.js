@@ -6,6 +6,7 @@ import { requireAuth } from '../lib/auth.js';
 import { transaction, query } from '../lib/db.js';
 import { sendOrderConfirmation } from '../lib/mail.js';
 import { sendOrderWhatsApp } from '../lib/whatsapp.js';
+import { storePublicOrigin } from '../lib/publicOrigins.js';
 
 const router = Router();
 const checkout = z.object({
@@ -84,7 +85,7 @@ router.post('/', requireAuth, async (req, res) => {
     return { order: rows[0], itemSummaries: items.map((item) => ({ name: map.get(item.productId).name, quantity: item.quantity })) };
   });
 
-  const storeOrigin = process.env.STORE_ORIGIN || 'http://localhost:8080';
+  const storeOrigin = storePublicOrigin();
   const trackingUrl = `${storeOrigin}/track.html?order=${order.id}&token=${trackingToken}`;
   res.status(201).json({ order: { ...order, trackingUrl } });
 
@@ -100,7 +101,7 @@ router.post('/', requireAuth, async (req, res) => {
 });
 router.get('/mine', requireAuth, async (req, res) => {
   const { rows } = await query(`SELECT o.id, o.status, o.total_cents AS "totalCents", o.created_at AS "createdAt", o.tracking_token AS "trackingToken", coalesce(sum(i.quantity), 0)::int AS "itemCount" FROM orders o LEFT JOIN order_items i ON i.order_id = o.id WHERE o.user_id = $1 GROUP BY o.id ORDER BY o.created_at DESC`, [req.user.sub]);
-  const storeOrigin = process.env.STORE_ORIGIN || 'http://localhost:8080';
+  const storeOrigin = storePublicOrigin();
   res.json(rows.map(({ trackingToken, ...row }) => ({ ...row, trackingUrl: `${storeOrigin}/track.html?order=${row.id}&token=${trackingToken}` })));
 });
 

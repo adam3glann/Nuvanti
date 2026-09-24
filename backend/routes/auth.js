@@ -6,19 +6,21 @@ import { query, transaction } from '../lib/db.js';
 import { clearSession, readSession, requireAuth, sessionCookie, signSession } from '../lib/auth.js';
 import { sendPasswordReset, sendVerificationEmail } from '../lib/mail.js';
 import { logAudit } from '../lib/audit.js';
+import { adminPublicOrigin, storePublicOrigin } from '../lib/publicOrigins.js';
 
 const STAFF_ROLES = ['staff', 'manager', 'admin', 'super_admin'];
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_MINUTES = 15;
 
 const router = Router();
-const credentials = z.object({ email: z.string().email().max(254).transform((v) => v.toLowerCase().trim()), password: z.string().min(8).max(128) });
-const resetRequest = z.object({ email: z.string().email().max(254).transform((v) => v.toLowerCase().trim()) });
+const credentials = z.object({ email: z.string().trim().email().max(254).transform((v) => v.toLowerCase()), password: z.string().min(8).max(128) });
+const registrationCredentials = z.object({ email: z.string().trim().email().max(254).transform((v) => v.toLowerCase()), password: z.string().min(12).max(128) });
+const resetRequest = z.object({ email: z.string().trim().email().max(254).transform((v) => v.toLowerCase()) });
 const resetPassword = z.object({ token: z.string().regex(/^[a-f0-9]{64}$/), password: z.string().min(12).max(128) });
 
 router.post('/register', async (req, res) => {
-  const { email, password } = credentials.parse(req.body);
-  const name = z.string().min(2).max(100).parse(req.body.name).trim();
+  const { email, password } = registrationCredentials.parse(req.body);
+  const name = z.string().trim().min(2).max(100).parse(req.body.name);
   const passwordHash = await bcrypt.hash(password, 12);
   try {
     const { rows } = await query('INSERT INTO users (email, name, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id, email, name, role', [email, name, passwordHash, 'customer']);
@@ -37,7 +39,7 @@ async function sendVerificationLink(user) {
   const hash = crypto.createHash('sha256').update(token).digest('hex');
   await query('DELETE FROM email_verification_tokens WHERE user_id = $1 OR expires_at < NOW()', [user.id]);
   await query(`INSERT INTO email_verification_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, NOW() + INTERVAL '24 hours')`, [user.id, hash]);
-  const storeOrigin = process.env.STORE_ORIGIN || 'http://localhost:8080';
+  const storeOrigin = storePublicOrigin();
   await sendVerificationEmail({ to: user.email, name: user.name, verifyUrl: `${storeOrigin}/account.html?verify=${token}` });
 }
 
@@ -89,7 +91,7 @@ router.post('/password-reset/request', async (req, res) => {
     await query('DELETE FROM password_reset_tokens WHERE user_id = $1 OR expires_at < NOW()', [user.id]);
     await query(`INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, NOW() + INTERVAL '30 minutes')`, [user.id, hash]);
     const isStaff = STAFF_ROLES.includes(user.role);
-    const baseUrl = isStaff ? (process.env.ADMIN_APP_URL || process.env.ADMIN_ORIGIN || 'http://localhost:4001') : (process.env.STORE_ORIGIN || 'http://localhost:8080');
+    const baseUrl = isStaff ? adminPublicOrigin() : storePublicOrigin();
     const resetPage = isStaff ? 'login.html' : 'account.html';
     await sendPasswordReset({ to: user.email, resetUrl: `${baseUrl}/${resetPage}?reset=${token}` });
     await logAudit({ req, actor: user, action: 'auth.password_reset_requested', targetType: 'user', targetId: user.id });

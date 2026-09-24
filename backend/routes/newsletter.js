@@ -4,10 +4,11 @@ import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { query } from '../lib/db.js';
 import { sendNewsletterConfirmation } from '../lib/mail.js';
+import { apiPublicOrigin, storePublicOrigin } from '../lib/publicOrigins.js';
 
 const router = Router();
 const subscriptionLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 5, standardHeaders: 'draft-7', legacyHeaders: false });
-const emailSchema = z.object({ email: z.string().email().max(254).transform((value) => value.trim().toLowerCase()) });
+const emailSchema = z.object({ email: z.string().trim().email().max(254).transform((value) => value.toLowerCase()) });
 const digest = (value) => crypto.createHash('sha256').update(value).digest('hex');
 
 router.post('/', subscriptionLimiter, async (req, res) => {
@@ -26,8 +27,8 @@ router.post('/', subscriptionLimiter, async (req, res) => {
     ON CONFLICT (email) DO UPDATE SET consented_at = NOW(), confirmation_token_hash = EXCLUDED.confirmation_token_hash,
       confirmation_expires_at = EXCLUDED.confirmation_expires_at, unsubscribe_token_hash = EXCLUDED.unsubscribe_token_hash,
       confirmed_at = NULL, unsubscribed_at = NULL`, [email, digest(confirmationToken), digest(unsubscribeToken)]);
-  const storeOrigin = process.env.STORE_ORIGIN || 'http://localhost:8080';
-  const apiOrigin = process.env.API_PUBLIC_URL || 'http://localhost:4000';
+  const storeOrigin = storePublicOrigin();
+  const apiOrigin = apiPublicOrigin();
   try {
     await sendNewsletterConfirmation({
       to: email,
@@ -42,10 +43,10 @@ router.post('/', subscriptionLimiter, async (req, res) => {
 });
 
 router.get('/confirm/:token', async (req, res) => {
-  if (!/^[a-f0-9]{64}$/.test(req.params.token)) return res.redirect('/?newsletter=invalid');
+  const storeOrigin = storePublicOrigin();
+  if (!/^[a-f0-9]{64}$/.test(req.params.token)) return res.redirect(`${storeOrigin}/?newsletter=invalid`);
   const result = await query(`UPDATE newsletter_subscribers SET confirmed_at = NOW(), confirmation_token_hash = NULL, confirmation_expires_at = NULL
     WHERE confirmation_token_hash = $1 AND confirmation_expires_at > NOW() AND unsubscribed_at IS NULL`, [digest(req.params.token)]);
-  const storeOrigin = process.env.STORE_ORIGIN || 'http://localhost:8080';
   res.redirect(`${storeOrigin}/?newsletter=${result.rowCount ? 'confirmed' : 'invalid'}`);
 });
 

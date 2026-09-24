@@ -1,10 +1,147 @@
 import { initAdminShell } from '../components/shell.js';
 import { hasPermission } from '../components/permissions.js';
+import { showAdminToast } from '../components/toast.js';
+import {
+  createHomepageSlide, deleteHomepageSlide, fetchHomepageSlides,
+  updateHomepageSlide, uploadHomepageSlideImage,
+} from '../services/homepageSlideService.js';
+import { escapeHtml } from '../components/utils.js';
 
-const session = initAdminShell({ page: 'content', title: 'Content' });
+const session = initAdminShell({ page: 'content', title: 'Homepage Slides' });
+const root = document.getElementById('contentRoot');
+let slides = [];
 if (session) {
-  const root = document.getElementById('contentRoot');
-  root.innerHTML = hasPermission(session.role, 'content.manage')
-    ? '<div class="admin-empty"><h1>Homepage content editor unavailable</h1><p>Homepage campaigns and FAQs are currently managed in the storefront source. This page no longer saves misleading browser-only drafts.</p></div>'
-    : '<div class="admin-empty"><h1>Restricted</h1><p>You do not have permission to manage store content.</p></div>';
+  if (!hasPermission(session.role, 'content.manage')) {
+    root.innerHTML = '<div class="admin-empty"><h1>Restricted</h1><p>You do not have permission to manage homepage slides.</p></div>';
+  } else loadSlides();
+}
+
+async function loadSlides() {
+  root.innerHTML = '<div class="admin-empty"><p>Loading homepage slides…</p></div>';
+  try {
+    slides = await fetchHomepageSlides();
+    render();
+  } catch (error) {
+    root.innerHTML = `<div class="admin-empty"><h2>Slides unavailable</h2><p>${escapeHtml(error.message)}</p><button class="btn btn-outline" id="retrySlides">Try again</button></div>`;
+    root.querySelector('#retrySlides')?.addEventListener('click', loadSlides);
+  }
+}
+
+function render() {
+  root.innerHTML = `
+    <div class="slides-toolbar">
+      <div><p>These slides appear in the shop homepage carousel. Lower positions appear first; turn off “Show slide” to hide one without deleting it.</p><p class="hint">Upload requires Cloudinary. You can also use an existing path under <span class="mono">frontend/assets/</span> or paste a public HTTPS image URL.</p></div>
+      <button class="btn btn-primary" id="addSlideBtn" type="button">Add slide</button>
+    </div>
+    <div class="slides-list">${slides.length ? slides.map(renderSlide).join('') : '<div class="admin-empty"><h3>No slides</h3><p>Add a slide to show the homepage carousel.</p></div>'}</div>`;
+}
+
+function renderSlide(slide) {
+  const image = safePreviewUrl(slide.imageUrl) ? slide.imageUrl : '';
+  return `<form class="card slide-card" data-slide-id="${escapeHtml(slide.id)}">
+    <div class="slide-card__head">
+      <img class="slide-preview" src="${escapeHtml(image)}" alt="" data-preview />
+      <div class="slide-card__meta"><strong>Slide ${Number(slide.position) + 1}</strong><label class="slide-toggle"><input type="checkbox" name="isActive" ${slide.isActive ? 'checked' : ''} /> Show slide</label></div>
+      <div class="slide-card__actions"><button class="btn btn-outline btn-sm" type="button" data-delete>Delete</button></div>
+    </div>
+    <div class="card-pad">
+      <div class="field-row">
+        <div class="field"><label>Image path or HTTPS URL</label><input name="imageUrl" value="${escapeHtml(slide.imageUrl)}" maxlength="1000" required /><span class="hint">Example: assets/img/lifestyle/hero-polo-couple.webp</span></div>
+        <div class="field"><label>Eyebrow</label><input name="eyebrow" value="${escapeHtml(slide.eyebrow)}" maxlength="80" /></div>
+      </div>
+      <div class="field"><label>Headline</label><input name="title" value="${escapeHtml(slide.title)}" maxlength="160" minlength="3" required /></div>
+      <div class="field"><label>Description</label><textarea name="description" rows="3" maxlength="500">${escapeHtml(slide.description)}</textarea></div>
+      <div class="field-row">
+        <div class="field"><label>Primary button label</label><input name="ctaLabel" value="${escapeHtml(slide.ctaLabel)}" maxlength="50" required /></div>
+        <div class="field"><label>Primary button link</label><input name="ctaHref" value="${escapeHtml(slide.ctaHref)}" maxlength="500" required /></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Secondary button label (optional)</label><input name="secondaryLabel" value="${escapeHtml(slide.secondaryLabel)}" maxlength="50" /></div>
+        <div class="field"><label>Secondary button link (required if label is set)</label><input name="secondaryHref" value="${escapeHtml(slide.secondaryHref)}" maxlength="500" /></div>
+      </div>
+      <div class="slide-card__foot">
+        <div class="field slide-position"><label>Position (0 is first)</label><input name="position" type="number" min="0" max="1000" step="1" value="${Number(slide.position)}" required /></div>
+        <div class="slide-upload"><input type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-file hidden /><button class="btn btn-outline btn-sm" type="button" data-upload>Upload image</button><button class="btn btn-primary" type="submit">Save slide</button></div>
+      </div>
+    </div>
+  </form>`;
+}
+
+root?.addEventListener('click', async (event) => {
+  if (event.target.closest('#addSlideBtn')) {
+    const position = slides.length ? Math.max(...slides.map((slide) => Number(slide.position))) + 1 : 0;
+    try {
+      await createHomepageSlide({ imageUrl: 'assets/img/lifestyle/campaign-banner.webp', eyebrow: '', title: 'New featured story', description: '', ctaLabel: 'Shop now', ctaHref: 'shop.html', secondaryLabel: '', secondaryHref: '', position, isActive: true });
+      await loadSlides();
+      showAdminToast('Slide added. Edit it and save when ready.', 'success');
+    } catch (error) { showAdminToast(error.message, 'error'); }
+    return;
+  }
+  const uploadButton = event.target.closest('[data-upload]');
+  if (uploadButton) {
+    uploadButton.closest('.slide-card')?.querySelector('[data-file]')?.click();
+    return;
+  }
+  const deleteButton = event.target.closest('[data-delete]');
+  if (deleteButton) {
+    const card = deleteButton.closest('.slide-card');
+    if (!window.confirm('Delete this homepage slide?')) return;
+    deleteButton.disabled = true;
+    try {
+      await deleteHomepageSlide(card.dataset.slideId);
+      slides = slides.filter((slide) => String(slide.id) !== card.dataset.slideId);
+      render();
+      showAdminToast('Slide deleted.', 'success');
+    } catch (error) { showAdminToast(error.message, 'error'); deleteButton.disabled = false; }
+  }
+});
+
+root?.addEventListener('input', (event) => {
+  if (event.target.name !== 'imageUrl') return;
+  const preview = event.target.closest('.slide-card')?.querySelector('[data-preview]');
+  if (preview && safePreviewUrl(event.target.value.trim())) preview.src = event.target.value.trim();
+});
+
+root?.addEventListener('change', async (event) => {
+  if (!event.target.matches('[data-file]')) return;
+  const file = event.target.files?.[0];
+  const card = event.target.closest('.slide-card');
+  if (!file || !card) return;
+  const button = card.querySelector('[data-upload]');
+  button.disabled = true;
+  button.textContent = 'Uploading…';
+  try {
+    const result = await uploadHomepageSlideImage(file);
+    card.querySelector('[name="imageUrl"]').value = result.url;
+    card.querySelector('[data-preview]').src = result.url;
+    showAdminToast('Image uploaded. Save the slide to publish it.', 'success');
+  } catch (error) { showAdminToast(error.message, 'error'); }
+  finally { button.disabled = false; button.textContent = 'Upload image'; event.target.value = ''; }
+});
+
+root?.addEventListener('submit', async (event) => {
+  const form = event.target.closest('.slide-card');
+  if (!form) return;
+  event.preventDefault();
+  if (!form.reportValidity()) return;
+  const value = (name) => form.elements.namedItem(name).value.trim();
+  const payload = {
+    imageUrl: value('imageUrl'), eyebrow: value('eyebrow'), title: value('title'),
+    description: value('description'), ctaLabel: value('ctaLabel'), ctaHref: value('ctaHref'),
+    secondaryLabel: value('secondaryLabel'), secondaryHref: value('secondaryHref'),
+    position: Number(value('position')), isActive: form.elements.namedItem('isActive').checked,
+  };
+  const button = form.querySelector('[type="submit"]');
+  button.disabled = true;
+  button.textContent = 'Saving…';
+  try {
+    const saved = await updateHomepageSlide(form.dataset.slideId, payload);
+    slides = slides.map((slide) => String(slide.id) === String(saved.id) ? saved : slide).sort((a, b) => a.position - b.position || Number(a.id) - Number(b.id));
+    render();
+    showAdminToast('Homepage slide saved.', 'success');
+  } catch (error) { showAdminToast(error.message, 'error'); button.disabled = false; button.textContent = 'Save slide'; }
+});
+
+function safePreviewUrl(value) {
+  return /^https:\/\//i.test(value) || /^\/?assets\/[\w./-]+(?:\?[\w%=&.-]*)?$/.test(value) && !value.includes('..');
 }

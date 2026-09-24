@@ -3,6 +3,7 @@ import { icon } from '../components/icons.js';
 import { productCardHTML, bindProductCardEvents } from '../components/productCard.js';
 import { refreshCartDrawer } from '../components/cartDrawer.js';
 import { subscribeToNewsletter, unsubscribeFromNewsletter } from '../services/newsletterService.js';
+import { fetchHomepageSlides } from '../services/homepageService.js';
 import {
   fetchFeatured, fetchBestsellers, fetchNewArrivals, fetchCategories,
 } from '../services/productService.js';
@@ -34,8 +35,7 @@ const HERO_SLIDES = [
   },
 ];
 
-renderHero();
-initHeroSlider();
+loadHeroSlides();
 loadFeatured();
 loadCategories();
 loadNewArrivals();
@@ -43,20 +43,41 @@ loadBestsellers();
 initNewsletter();
 initInstagramGrid();
 
-function renderHero() {
+async function loadHeroSlides() {
+  let slides;
+  try {
+    slides = await fetchHomepageSlides();
+  } catch {
+    slides = HERO_SLIDES.map((slide) => ({
+      imageUrl: slide.image, eyebrow: slide.eyebrow,
+      title: slide.title.replace(/<[^>]*>/g, ''), description: slide.desc,
+      ctaLabel: slide.cta.label, ctaHref: slide.cta.href,
+      secondaryLabel: slide.secondary?.label || '', secondaryHref: slide.secondary?.href || '',
+    }));
+  }
+  renderHero(slides);
+  if (slides.length) initHeroSlider();
+}
+
+function renderHero(slides) {
   const el = document.getElementById('heroSlider');
+  if (!slides.length) {
+    el.hidden = true;
+    return;
+  }
+  el.hidden = false;
   el.innerHTML = `
-    ${HERO_SLIDES.map((s, i) => `
-      <div class="hero-slide" data-active="${i === 0}" data-index="${i}">
-        <img class="hero-slide__img" src="${s.image}" alt="" />
+    ${slides.map((s, i) => `
+      <div class="hero-slide" data-active="${i === 0}" data-index="${i}" aria-hidden="${i !== 0}">
+        <img class="hero-slide__img" src="${escapeHtml(s.imageUrl)}" alt="" ${i === 0 ? 'fetchpriority="high"' : 'loading="lazy"'} />
         <div class="hero-slide__scrim"></div>
         <div class="hero-slide__content">
-          <p class="label hero-slide__eyebrow">${s.eyebrow}</p>
-          <h1 class="hero-slide__title font-display">${s.title}</h1>
-          <p class="hero-slide__desc">${s.desc}</p>
+          ${s.eyebrow ? `<p class="label hero-slide__eyebrow">${escapeHtml(s.eyebrow)}</p>` : ''}
+          <h1 class="hero-slide__title font-display">${escapeHtml(s.title)}</h1>
+          ${s.description ? `<p class="hero-slide__desc">${escapeHtml(s.description)}</p>` : ''}
           <div class="hero-slide__ctas">
-            <a href="${s.cta.href}" class="btn btn-primary">${s.cta.label}</a>
-            ${s.secondary ? `<a href="${s.secondary.href}" class="btn btn-ink-outline">${s.secondary.label}</a>` : ''}
+            <a href="${escapeHtml(s.ctaHref)}" class="btn btn-primary">${escapeHtml(s.ctaLabel)}</a>
+            ${s.secondaryLabel ? `<a href="${escapeHtml(s.secondaryHref)}" class="btn btn-ink-outline">${escapeHtml(s.secondaryLabel)}</a>` : ''}
           </div>
         </div>
       </div>
@@ -64,7 +85,7 @@ function renderHero() {
     <div class="hero-controls">
       <button class="hero-arrow" id="heroPrev" aria-label="Previous slide">${icon('chevronLeft')}</button>
       <div class="hero-dots" id="heroDots">
-        ${HERO_SLIDES.map((_, i) => `<button class="hero-dot" data-active="${i === 0}" data-goto="${i}" aria-label="Go to slide ${i + 1}"></button>`).join('')}
+        ${slides.map((_, i) => `<button class="hero-dot" data-active="${i === 0}" data-goto="${i}" aria-label="Go to slide ${i + 1}" aria-pressed="${i === 0}"></button>`).join('')}
       </div>
       <button class="hero-arrow" id="heroNext" aria-label="Next slide">${icon('chevronRight')}</button>
     </div>
@@ -77,15 +98,16 @@ function initHeroSlider() {
   const dots = [...slider.querySelectorAll('.hero-dot')];
   let current = 0;
   let timer;
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   function goTo(index) {
     current = (index + slides.length) % slides.length;
-    slides.forEach((s, i) => { s.dataset.active = String(i === current); });
-    dots.forEach((d, i) => { d.dataset.active = String(i === current); });
+    slides.forEach((s, i) => { s.dataset.active = String(i === current); s.setAttribute('aria-hidden', String(i !== current)); });
+    dots.forEach((d, i) => { d.dataset.active = String(i === current); d.setAttribute('aria-pressed', String(i === current)); });
   }
   function next() { goTo(current + 1); }
   function prev() { goTo(current - 1); }
-  function startAutoplay() { timer = setInterval(next, 6000); }
+  function startAutoplay() { stopAutoplay(); if (!reducedMotion && slides.length > 1) timer = setInterval(next, 6000); }
   function stopAutoplay() { clearInterval(timer); }
 
   document.getElementById('heroNext').addEventListener('click', () => { next(); stopAutoplay(); startAutoplay(); });
@@ -113,7 +135,11 @@ function initHeroSlider() {
     startX = null;
   }, { passive: true });
 
-  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) startAutoplay();
+  startAutoplay();
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 }
 
 async function loadFeatured() {

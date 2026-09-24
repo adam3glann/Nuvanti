@@ -7,6 +7,7 @@ import { productPayload, toPublicProduct } from '../lib/catalog.js';
 import { requirePermission } from '../lib/permissions.js';
 import { logAudit } from '../lib/audit.js';
 import { emailDeliveryStatus, sendAdminWelcome, sendTestEmail } from '../lib/mail.js';
+import { adminPublicOrigin } from '../lib/publicOrigins.js';
 const router = Router();
 const MANAGEABLE_ROLES = ['staff', 'manager', 'admin', 'super_admin'];
 const productFields = z.object({ slug: z.string().regex(/^[a-z0-9-]+$/).max(160), name: z.string().min(2).max(160), description: z.string().max(5000).optional(), price: z.coerce.number().min(0).optional(), priceCents: z.coerce.number().int().min(0).optional(), category: z.string().min(1).max(80), collection: z.string().max(80).nullable().optional(), images: z.array(z.string()).max(12).optional(), colors: z.array(z.string().max(40)).max(20).optional(), sizes: z.array(z.string().max(20)).max(20).optional(), inventory: z.union([z.coerce.number().int().min(0), z.record(z.coerce.number().int().min(0))]).optional(), status: z.enum(['active', 'draft']).optional(), isActive: z.boolean().optional(), badges: z.array(z.string().max(30)).optional(), featured: z.boolean().optional(), bestseller: z.boolean().optional(), newArrival: z.boolean().optional(), sku: z.string().max(100).optional(), compareAtPrice: z.coerce.number().min(0).nullable().optional() });
@@ -14,6 +15,59 @@ const productInput = productFields.refine((value) => value.price !== undefined |
 const columns = 'id, slug, name, description, price_cents, category, collection, images, colors, sizes, inventory, is_active, metadata';
 const categoryInput = z.object({ name: z.string().min(2).max(80), slug: z.string().regex(/^[a-z0-9-]+$/).max(80), description: z.string().max(1000).optional() });
 const collectionInput = z.object({ name: z.string().min(2).max(80), slug: z.string().regex(/^[a-z0-9-]+$/).max(80) });
+const slideAsset = z.string().trim().min(1).max(1000).refine((value) => {
+  if (/^https:\/\//i.test(value)) {
+    try { return new URL(value).protocol === 'https:'; } catch { return false; }
+  }
+  return /^\/?assets\/[\w./-]+(?:\?[\w%=&.-]*)?$/.test(value) && !value.includes('..');
+}, 'Use an HTTPS image URL or an image path under assets/.');
+const slideLink = z.string().trim().min(1).max(500).refine((value) => {
+  if (/^https:\/\//i.test(value)) {
+    try { return new URL(value).protocol === 'https:'; } catch { return false; }
+  }
+  return /^(?!\/\/)[\w./?%&=+#-]+$/.test(value) && !value.toLowerCase().startsWith('javascript:');
+}, 'Use an internal page link or an HTTPS URL.');
+const homepageSlideInput = z.object({
+  imageUrl: slideAsset,
+  eyebrow: z.string().trim().max(80).default(''),
+  title: z.string().trim().min(3).max(160),
+  description: z.string().trim().max(500).default(''),
+  ctaLabel: z.string().trim().min(1).max(50),
+  ctaHref: slideLink,
+  secondaryLabel: z.string().trim().max(50).default(''),
+  secondaryHref: z.string().trim().max(500).default(''),
+  position: z.coerce.number().int().min(0).max(1000).default(0),
+  isActive: z.boolean().default(true),
+}).refine((slide) => !slide.secondaryLabel || slide.secondaryHref, { message: 'Add a link for the secondary button.' });
+const homepageSlideColumns = 'id::text, image_url AS "imageUrl", eyebrow, title, description, cta_label AS "ctaLabel", cta_href AS "ctaHref", secondary_label AS "secondaryLabel", secondary_href AS "secondaryHref", position, is_active AS "isActive"';
+router.get('/homepage-slides', requirePermission('content.manage'), async (req, res) => {
+  const { rows } = await query(`SELECT ${homepageSlideColumns} FROM homepage_slides ORDER BY position, id`);
+  res.json(rows);
+});
+router.post('/homepage-slides', requirePermission('content.manage'), async (req, res) => {
+  const slide = homepageSlideInput.parse(req.body);
+  const { rows } = await query(`INSERT INTO homepage_slides (image_url, eyebrow, title, description, cta_label, cta_href, secondary_label, secondary_href, position, is_active)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING ${homepageSlideColumns}`,
+  [slide.imageUrl, slide.eyebrow, slide.title, slide.description, slide.ctaLabel, slide.ctaHref, slide.secondaryLabel, slide.secondaryHref, slide.position, slide.isActive]);
+  await logAudit({ req, action: 'homepage_slide.created', targetType: 'homepage_slide', targetId: rows[0].id, metadata: { title: slide.title } });
+  res.status(201).json(rows[0]);
+});
+router.patch('/homepage-slides/:id', requirePermission('content.manage'), async (req, res) => {
+  const current = await query(`SELECT ${homepageSlideColumns} FROM homepage_slides WHERE id = $1`, [req.params.id]);
+  if (!current.rows[0]) return res.status(404).json({ error: 'Homepage slide not found.' });
+  const slide = homepageSlideInput.parse({ ...current.rows[0], ...req.body });
+  const { rows } = await query(`UPDATE homepage_slides SET image_url=$1, eyebrow=$2, title=$3, description=$4, cta_label=$5, cta_href=$6, secondary_label=$7, secondary_href=$8, position=$9, is_active=$10, updated_at=NOW()
+    WHERE id=$11 RETURNING ${homepageSlideColumns}`,
+  [slide.imageUrl, slide.eyebrow, slide.title, slide.description, slide.ctaLabel, slide.ctaHref, slide.secondaryLabel, slide.secondaryHref, slide.position, slide.isActive, req.params.id]);
+  await logAudit({ req, action: 'homepage_slide.updated', targetType: 'homepage_slide', targetId: rows[0].id, metadata: { title: slide.title } });
+  res.json(rows[0]);
+});
+router.delete('/homepage-slides/:id', requirePermission('content.manage'), async (req, res) => {
+  const result = await query('DELETE FROM homepage_slides WHERE id = $1', [req.params.id]);
+  if (!result.rowCount) return res.status(404).json({ error: 'Homepage slide not found.' });
+  await logAudit({ req, action: 'homepage_slide.deleted', targetType: 'homepage_slide', targetId: req.params.id });
+  res.status(204).end();
+});
 router.get('/email/status', requirePermission('settings.view'), (req, res) => {
   res.json(emailDeliveryStatus());
 });
@@ -142,7 +196,7 @@ router.post('/admin-users', requirePermission('admins.manage'), async (req, res)
     const token = crypto.randomBytes(32).toString('hex');
     const hash = crypto.createHash('sha256').update(token).digest('hex');
     await query(`INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, NOW() + INTERVAL '24 hours')`, [rows[0].id, hash]);
-    const baseUrl = process.env.ADMIN_APP_URL || process.env.ADMIN_ORIGIN || 'http://localhost:4001';
+    const baseUrl = adminPublicOrigin();
     await sendAdminWelcome({ to: rows[0].email, name: rows[0].name, resetUrl: `${baseUrl}/login.html?reset=${token}` });
     await logAudit({ req, action: 'admin_user.created', targetType: 'user', targetId: rows[0].id, metadata: { email: input.email, role: input.role } });
     res.status(201).json(rows[0]);
