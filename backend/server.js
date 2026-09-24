@@ -46,8 +46,11 @@ if (process.env.NODE_ENV === 'production') {
   try { if (new URL(process.env.API_PUBLIC_URL || '').protocol !== 'https:') throw new Error(); }
   catch { throw new Error('API_PUBLIC_URL must be the public HTTPS origin of the API in production.'); }
   if (storeOrigin === adminOrigin) throw new Error('STORE_ORIGIN and ADMIN_ORIGIN must be separate production hosts.');
-  if (!['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS', 'MAIL_FROM'].every((name) => process.env[name] && !/example|paste_/i.test(process.env[name]))) {
-    throw new Error('Configure production SMTP_HOST, SMTP_USER, SMTP_PASS, and MAIL_FROM before starting.');
+  const mailFrom = process.env.MAIL_FROM && !/example|paste_/i.test(process.env.MAIL_FROM);
+  const resendReady = process.env.RESEND_API_KEY && mailFrom;
+  const smtpReady = ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS'].every((name) => process.env[name] && !/example|paste_/i.test(process.env[name])) && mailFrom;
+  if (!resendReady && !smtpReady) {
+    throw new Error('Configure RESEND_API_KEY and MAIL_FROM, or SMTP_HOST, SMTP_USER, SMTP_PASS, and MAIL_FROM, before starting.');
   }
 }
 

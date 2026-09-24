@@ -34,15 +34,7 @@ services:
         value: https://admin.nuvanti.com
       - key: API_PUBLIC_URL
         value: https://api.nuvanti.com
-      - key: SMTP_HOST
-        sync: false
-      - key: SMTP_PORT
-        sync: false
-      - key: SMTP_SECURE
-        sync: false
-      - key: SMTP_USER
-        sync: false
-      - key: SMTP_PASS
+      - key: RESEND_API_KEY
         sync: false
       - key: MAIL_FROM
         sync: false

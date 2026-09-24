@@ -1,13 +1,27 @@
 import nodemailer from 'nodemailer';
 
 function configured() {
-  return ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS', 'MAIL_FROM'].every((key) => Boolean(process.env[key]) && !process.env[key].startsWith('PASTE_'));
+  const from = Boolean(process.env.MAIL_FROM) && !process.env.MAIL_FROM.startsWith('PASTE_');
+  const resend = Boolean(process.env.RESEND_API_KEY) && from;
+  const smtp = ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS'].every((key) => Boolean(process.env[key]) && !process.env[key].startsWith('PASTE_')) && from;
+  return resend || smtp;
 }
 
 async function deliver({ to, subject, text, html, devLabel, devDetail }) {
   if (!configured()) {
     if (process.env.NODE_ENV === 'production') throw new Error('Email delivery is not configured.');
     console.info(`${devLabel} for ${to}: ${devDetail}`);
+    return;
+  }
+  if (process.env.RESEND_API_KEY) {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: process.env.MAIL_FROM, to: [to], subject, text, html }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(`Resend email delivery failed (${response.status}): ${result.message || 'provider rejected the message'}`);
     return;
   }
   const transporter = nodemailer.createTransport({ host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT || 587), secure: process.env.SMTP_SECURE === 'true', auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } });

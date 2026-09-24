@@ -56,7 +56,7 @@ Placing an order (`POST /api/orders`) fires two best-effort notifications after 
 
 Both messages include a tracking link: `GET /api/orders/track/:id?token=...`, a public (no-login) endpoint guarded by a random per-order token (not the order's numeric id — that alone proves nothing). It returns order status, items, delivery method, and city/country only — no email, phone, or full address. The storefront's `track.html` page renders it, and also offers a manual order-number + tracking-code lookup for someone who lost the link. Signed-in customers see the same link for every past order under **My Account → Orders**, which now lists real order history instead of only the most recent order in that browser.
 
-To deliver messages to Gmail (and therefore your Gmail app/phone), enable two-step verification on the sending Gmail account and create a Google **App Password**. Put these values in your private `.env` file—never in `.env.example` or Git:
+For production, Resend's HTTPS API works on Render's free service (which blocks outbound SMTP). Verify `nuvanti.com` in Resend, add the DNS records Resend provides in Cloudflare, create an API key, and place it in Render as `RESEND_API_KEY`. Set `MAIL_FROM` to an address on that verified domain, for example `Nuvanti <orders@nuvanti.com>`. Never commit the API key. Alternatively, a paid server can use SMTP; enable two-step verification on the sending Gmail account and use a Google **App Password**, never the normal Gmail password:
 
 ```env
 ADMIN_APP_URL=https://admin.yourdomain.com
@@ -68,7 +68,7 @@ SMTP_PASS=your-16-character-google-app-password
 MAIL_FROM="Nuvanti Security <your-sending-email@gmail.com>"
 ```
 
-The reset email is sent to the account's email address and will appear on the recipient's phone through their email app. In development without SMTP values, the secure reset URL is printed in the backend terminal instead; production refuses to silently skip delivery.
+The reset email is sent to the account's email address and will appear on the recipient's phone through their email app. In development without mail credentials, the secure reset URL is printed in the backend terminal instead; production refuses to silently skip delivery.
 
 ## Security included
 
