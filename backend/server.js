@@ -1,5 +1,4 @@
 import 'dotenv/config';
-import { request as httpRequest } from 'node:http';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import express from 'express';
@@ -80,25 +79,6 @@ adminApp.disable('x-powered-by');
 adminApp.use(helmet({ contentSecurityPolicy: false }));
 adminApp.use(cookieParser());
 adminApp.get('/login.html', (req, res) => res.sendFile(path.join(__dirname, '../frontend/admin/login.html')));
-// Same-origin admin API proxy; the API server still enforces auth and origin checks.
-adminApp.use('/api', (req, res) => {
-  const upstream = httpRequest({
-    hostname: '127.0.0.1',
-    port: PORT,
-    path: req.originalUrl,
-    method: req.method,
-    headers: { ...req.headers, host: `localhost:${PORT}` },
-  }, (apiRes) => {
-    res.writeHead(apiRes.statusCode || 502, apiRes.headers);
-    apiRes.pipe(res);
-  });
-  upstream.on('error', (error) => {
-    console.error('Admin API proxy error:', error.message);
-    if (!res.headersSent) res.status(502).json({ error: 'Secure API is unavailable.' });
-    else res.destroy(error);
-  });
-  req.pipe(upstream);
-});
 // Login shell assets are public; admin documents and application assets below
 // remain server-authorized. Public JavaScript contains no credentials or data.
 adminApp.use('/assets/css', express.static(path.join(__dirname, '../frontend/admin/assets/css')));

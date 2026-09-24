@@ -5,9 +5,7 @@ const configuredApi = window.NUVANTI_API_URL
 
 function defaultApiOrigin() {
   if (location.protocol === 'file:' || ['localhost', '127.0.0.1'].includes(location.hostname)) {
-    // Route local admin requests through the admin origin to avoid browser
-    // restrictions on cross-port API calls.
-    return '';
+    return 'http://localhost:4000';
   }
   const labels = location.hostname.split('.');
   if (labels.length < 2) return `${location.protocol}//${location.hostname}:4000`;

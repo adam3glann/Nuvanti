@@ -43,7 +43,7 @@ async function sendVerificationLink(user) {
 
 router.post('/login', async (req, res) => {
   const { email, password } = credentials.parse(req.body);
-  const { rows } = await query('SELECT id, email, name, role, password_hash, failed_login_count, locked_until, session_version AS "sessionVersion" FROM users WHERE email = $1 AND is_active = true', [email]);
+  const { rows } = await query('SELECT id, email, name, role, password_hash, failed_login_count, locked_until FROM users WHERE email = $1 AND is_active = true', [email]);
   const user = rows[0];
 
   if (user?.locked_until && new Date(user.locked_until) > new Date()) {
@@ -71,7 +71,7 @@ router.post('/login', async (req, res) => {
     await query('UPDATE users SET failed_login_count = 0, locked_until = NULL WHERE id = $1', [user.id]);
   }
   const safeUser = { id: user.id, email: user.email, name: user.name, role: user.role };
-  sessionCookie(res, signSession({ ...safeUser, sessionVersion: user.sessionVersion }));
+  sessionCookie(res, signSession(safeUser));
   await logAudit({ req, actor: safeUser, action: 'auth.login_success', targetType: 'user', targetId: safeUser.id });
   res.json({ user: safeUser });
 });
