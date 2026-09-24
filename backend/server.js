@@ -250,14 +250,12 @@ if (trustProxy) adminApp.set("trust proxy", trustProxy);
 
 await query("SELECT 1");
 if (process.env.NODE_ENV === "production") {
-  // PaaS web services expose one port. Route the admin hostname to its
-  // protected gateway and all other hosts to the API on that same listener.
-  const adminHostname = new URL(adminOrigin).hostname.toLowerCase();
+  // Railway exposes one service port for both the API and protected admin.
+  // The storefront is hosted separately; every non-API request to this
+  // service should therefore go through the protected admin gateway.
   const publicApp = express();
   publicApp.use((req, res, next) => {
-    const isAdminHost = (req.hostname || "").toLowerCase() === adminHostname;
-    if (isAdminHost && !req.path.startsWith("/api/"))
-      return adminApp(req, res, next);
+    if (!req.path.startsWith("/api/")) return adminApp(req, res, next);
     return app(req, res, next);
   });
   publicApp.listen(PORT, "0.0.0.0", () =>
