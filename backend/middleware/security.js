@@ -5,7 +5,18 @@ export function sameOrigin({ storeOrigin, storePreviewOrigin, adminOrigin }) {
   return (req, res, next) => {
     if (SAFE_METHODS.has(req.method)) return next();
     const origin = req.get('origin');
-    if (!origin || !allowed.has(origin)) return res.status(403).json({ error: 'Invalid request origin.' });
+    let sameRequestHost = false;
+    if (origin) {
+      try {
+        const parsedOrigin = new URL(origin);
+        const requestHost = (req.get('host') || '').toLowerCase();
+        sameRequestHost = parsedOrigin.host.toLowerCase() === requestHost
+          && (process.env.NODE_ENV !== 'production' || parsedOrigin.protocol === 'https:');
+      } catch {}
+    }
+    if (!origin || (!allowed.has(origin) && !sameRequestHost)) {
+      return res.status(403).json({ error: 'Invalid request origin.' });
+    }
     next();
   };
 }
