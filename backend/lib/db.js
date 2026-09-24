@@ -22,7 +22,13 @@ function getProductionConnectionString(connectionString) {
 function getSslConfig() {
   if (process.env.NODE_ENV !== 'production') return false;
 
-  const ca = process.env.DATABASE_SSL_CA?.replace(/\\n/g, '\n').trim();
+  const rawCa = process.env.DATABASE_SSL_CA?.replace(/\\r?\\n/g, '\n').trim();
+  // Environment-variable forms may flatten pasted PEM newlines. Rebuild the
+  // standard PEM layout before passing it to Node's TLS implementation.
+  const caMatch = rawCa?.match(/-----BEGIN CERTIFICATE-----([\s\S]*?)-----END CERTIFICATE-----/);
+  const ca = caMatch
+    ? `-----BEGIN CERTIFICATE-----\n${caMatch[1].replace(/\s+/g, '').match(/.{1,64}/g).join('\n')}\n-----END CERTIFICATE-----`
+    : rawCa;
   return { rejectUnauthorized: true, ...(ca ? { ca } : {}) };
 }
 
