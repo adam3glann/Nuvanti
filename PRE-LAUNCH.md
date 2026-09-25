@@ -3,7 +3,7 @@
 The project now has working storefront and protected admin applications with a PostgreSQL API. Complete these brand and infrastructure items before taking real orders:
 
 - Deploy the backend and protected admin portal to Railway and keep the repository root as the service root. Set all Railway variables listed in [DEPLOYMENT-POSTGRES.md](DEPLOYMENT-POSTGRES.md), including `DATABASE_URL` and `DATABASE_SSL_CA`, before startup.
-- Set the storefront's API URL to the Railway public domain and redeploy Cloudflare Pages. Never publish `frontend/admin` from the shop host.
+- Set Cloudflare Pages project root to `frontend/` and deploy the `/api/*` Pages Function proxy. Set Railway `STORE_ORIGIN` to the exact storefront URL and leave `COOKIE_DOMAIN` blank. Never publish `frontend/admin` from the shop host.
 - Provision PostgreSQL, set a unique 32+ character production `JWT_SECRET`, apply migrations, and seed the starting catalog and first super-admin. Back up the database and test restoring it.
 - Configure and test SMTP or Resend delivery for account verification, account recovery, admin setup, order confirmations, and newsletter confirmation in Admin → Settings → Email. Contact messages remain saved in Admin → Customers → Contact Messages; email alerts use the support address in Settings. Optional WhatsApp and Cloudinary features need their own production credentials.
 - Confirm every product name, description, price, SKU, size/color variant, stock quantity, image, and brand asset. Test a real device-size storefront and the admin workflows with production-shaped catalog data.

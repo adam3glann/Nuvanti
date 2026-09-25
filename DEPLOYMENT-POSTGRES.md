@@ -1,7 +1,6 @@
 # Nuvanti deployment: Railway + Supabase
 
-The Cloudflare Pages storefront stays at `nuvanti-shop.pages.dev`. Railway runs
-the Node backend and protected admin portal. Supabase PostgreSQL remains the
+Cloudflare Pages serves the storefront from the `frontend/` project root. Its `functions/api/[[path]].js` proxy sends `/api/*` requests to Railway under the storefront's own origin, avoiding third-party-cookie blocking on mobile. Railway runs the Node backend and protected admin portal. Supabase PostgreSQL remains the
 only application database; the unused Cloudflare D1 database is not connected.
 
 ## Railway service
@@ -47,8 +46,9 @@ or paste them into chat.
 | `CLOUDINARY_API_KEY` | Cloudinary Dashboard → API Keys |
 | `CLOUDINARY_API_SECRET` | Cloudinary Dashboard → API Keys (keep private; backend service only) |
 
-The storefront's production fallback API origin is `https://nuvanti-production.up.railway.app` in `frontend/assets/js/config.js`. If your Railway service domain changes, update that fallback (or inject `window.NUVANTI_API_URL` before the storefront modules load) and redeploy Cloudflare Pages.
-In Admin → Settings → Email, check the provider status and use **Send test email** after configuring the variables. The test goes to the signed-in super administrator. Set the Customer Support Email in Settings → General to receive contact-form alerts. Production session cookies are secure and allow cross-origin storefront API calls; keep the API origin and `STORE_ORIGIN` aligned.
+In Cloudflare Pages, set the project root to `frontend/`. The proxy defaults to `https://nuvanti-production.up.railway.app`; if the Railway domain changes, set the Pages environment variable `NUVANTI_API_ORIGIN` to the new HTTPS origin and redeploy Pages. In Railway, set `STORE_ORIGIN` to the exact storefront origin and leave `COOKIE_DOMAIN` blank. The storefront uses same-origin API requests so session cookies remain first-party on phones.
+
+In Admin → Settings → Email, check the provider status and use **Send test email** after configuring the variables. The test goes to the signed-in super administrator. Set the Customer Support Email in Settings → General to receive contact-form alerts.
 
 Railway trial credits and limits can change. Check current workspace usage and
 billing before adding a paid plan. Supabase remains a separate service with its

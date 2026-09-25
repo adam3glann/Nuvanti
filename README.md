@@ -16,7 +16,7 @@ Nuvanti is a static HTML/CSS/JavaScript storefront backed by a Node.js API and P
 - Railway serves the API and the protected admin portal from one public service domain.
 - Supabase PostgreSQL remains the application database.
 
-Configure the Railway service using [DEPLOYMENT-POSTGRES.md](DEPLOYMENT-POSTGRES.md). Set the storefront's API origin to the generated Railway URL before deploying the Pages site. Never publish `frontend/admin/` as an unprotected static site.
+Configure Railway using [DEPLOYMENT-POSTGRES.md](DEPLOYMENT-POSTGRES.md). Cloudflare Pages should use `frontend/` as its project root; the Pages Function there proxies `/api/*` to Railway so mobile browsers can store the login cookie as a first-party cookie. Never publish `frontend/admin/` as an unprotected static site.
 
 Full database, mail, cloud image upload, and deployment details are in [backend/README.md](backend/README.md).
 
