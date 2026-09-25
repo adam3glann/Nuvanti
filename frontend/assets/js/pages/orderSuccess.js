@@ -20,7 +20,7 @@ if (!order) {
     <div class="order-success">
       <div class="order-success__icon">${icon('check')}</div>
       <h1>Thank you for your order.</h1>
-      <p class="text-muted">Your order is saved in My Account → Orders. A confirmation and shipping updates will be sent to ${escapeHtml(order.customer.email)} when store email delivery is configured.</p>
+      <p class="text-muted">Your order is saved in My Account → Orders. ${order.emailDelivery?.sent ? `Confirmation accepted by the email provider for ${escapeHtml(order.customer.email)}. Shipping updates will go to the same address.` : `Order placed, but the confirmation email could not be sent to ${escapeHtml(order.customer.email)}. Check Admin Settings → Email and Railway mail variables.`}</p>
 
       <div class="order-detail-card">
         <div class="order-detail-row"><span>Order Number</span><strong>${escapeHtml(order.orderNumber)}</strong></div>

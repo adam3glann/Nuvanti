@@ -114,17 +114,31 @@ function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-// Sent right after checkout. Best-effort — a failure here must never fail
+// Sent right after checkout. Best-effort â€” a failure here must never fail
 // the order itself, so callers should wrap this in try/catch.
-export async function sendOrderConfirmation({ to, name, orderId, items, totalCents, trackingUrl }) {
-  const itemLines = items.map((i) => `- ${i.name} x${i.quantity}`).join('\n');
-  const itemRows = items.map((i) => `<li>${escapeHtml(i.name)} × ${i.quantity}</li>`).join('');
-  const total = (totalCents / 100).toLocaleString('en-US');
+export async function sendOrderConfirmation({ to, name, orderId, items, totalCents, subtotalCents, discountCents, discountCode, shippingCents, delivery, shippingAddress, trackingUrl }) {
+  const itemLines = items.map((item) => {
+    const variant = [item.color, item.size].filter(Boolean).join(' / ');
+    const unitPrice = (Number(item.priceCents) / 100).toLocaleString('en-US');
+    return `- ${item.name}${variant ? ` (${variant})` : ''} x${item.quantity} — ${unitPrice} EGP each`;
+  }).join('\n');
+  const itemRows = items.map((item) => {
+    const variant = [item.color, item.size].filter(Boolean).join(' / ');
+    return `<li>${escapeHtml(item.name)}${variant ? ` (${escapeHtml(variant)})` : ''} × ${Number(item.quantity)} — ${(Number(item.priceCents) / 100).toLocaleString('en-US')} EGP each</li>`;
+  }).join('');
+  const total = (Number(totalCents) / 100).toLocaleString('en-US');
+  const subtotal = (Number(subtotalCents) / 100).toLocaleString('en-US');
+  const discount = (Number(discountCents || 0) / 100).toLocaleString('en-US');
+  const shippingCost = (Number(shippingCents) / 100).toLocaleString('en-US');
+  const address = [shippingAddress?.name || name, shippingAddress?.phone, shippingAddress?.address1, shippingAddress?.city, shippingAddress?.country, shippingAddress?.postalCode].filter(Boolean).join(', ');
+  const discountLine = Number(discountCents) > 0 ? `Discount${discountCode ? ` (${discountCode})` : ''}: -${discount} EGP\n` : '';
+  const discountHtml = Number(discountCents) > 0 ? `Discount${discountCode ? ` (${escapeHtml(discountCode)})` : ''}: -${discount} EGP<br>` : '';
+  const deliveryLabel = delivery === 'express' ? 'Express' : 'Standard';
   await deliver({
     to,
-    subject: `Your Nuvanti order #${orderId} is confirmed`,
-    text: `Hi ${name}, thanks for your order!\n\nOrder #${orderId}\n${itemLines}\n\nTotal: ${total} EGP\n\nTrack your order any time: ${trackingUrl}`,
-    html: `<p>Hi ${escapeHtml(name)}, thanks for your order!</p><p><strong>Order #${orderId}</strong></p><ul>${itemRows}</ul><p>Total: ${total} EGP</p><p><a href="${trackingUrl}">Track your order</a></p>`,
+    subject: `Your Nuvanti order NV-${orderId} is confirmed`,
+    text: `Hi ${name}, thanks for your order!\n\nOrder NV-${orderId}\nItems:\n${itemLines}\n\nSubtotal: ${subtotal} EGP\n${discountLine}Shipping (${deliveryLabel}): ${shippingCost} EGP\nTotal: ${total} EGP\n\nDelivering to: ${address}\n\nTrack your order: ${trackingUrl}`,
+    html: `<p>Hi ${escapeHtml(name)}, thanks for your order!</p><p><strong>Order NV-${orderId}</strong></p><ul>${itemRows}</ul><p>Subtotal: ${subtotal} EGP<br>${discountHtml}Shipping (${deliveryLabel}): ${shippingCost} EGP<br><strong>Total: ${total} EGP</strong></p><p>Delivering to: ${escapeHtml(address)}</p><p><a href="${escapeHtml(trackingUrl)}">Track your order</a></p>`,
     devLabel: 'Development order-confirmation email',
     devDetail: `order #${orderId}, ${trackingUrl}`,
   });
@@ -134,16 +148,16 @@ export async function sendOrderStatusUpdate({ to, name, orderId, status, trackin
   const label = labels[status] || 'Updated';
   await deliver({
     to,
-    subject: `Update on your Nuvanti order #${orderId}: ${label}`,
-    text: `Hi ${name}, your Nuvanti order #${orderId} is now: ${label}.\n\nView the latest status: ${trackingUrl}`,
-    html: `<p>Hi ${escapeHtml(name)}, your Nuvanti order <strong>#${orderId}</strong> is now: <strong>${escapeHtml(label)}</strong>.</p><p><a href="${trackingUrl}">View your order status</a></p>`,
+    subject: `Update on your Nuvanti order NV-${orderId}: ${label}`,
+    text: `Hi ${name}, your Nuvanti order NV-${orderId} is now: ${label}.\n\nView the latest status: ${trackingUrl}`,
+    html: `<p>Hi ${escapeHtml(name)}, your Nuvanti order <strong>NV-${orderId}</strong> is now: <strong>${escapeHtml(label)}</strong>.</p><p><a href="${trackingUrl}">View your order status</a></p>`,
     devLabel: 'Development order-status email',
     devDetail: `order #${orderId}: ${label}, ${trackingUrl}`,
   });
 }
 
 // Sent when a super_admin creates a new staff/manager/admin account. The
-// account starts with an unusable random password — this link (via the same
+// account starts with an unusable random password â€” this link (via the same
 // reset-token flow) is the only way to set a real one.
 export async function sendAdminWelcome({ to, name, resetUrl }) {
   await deliver({

@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import rateLimit from 'express-rate-limit';
 import { requireAuth } from '../lib/auth.js';
 import { transaction, query } from '../lib/db.js';
-import { sendOrderConfirmation } from '../lib/mail.js';
+import { emailDeliveryStatus, sendOrderConfirmation } from '../lib/mail.js';
 import { sendOrderWhatsApp } from '../lib/whatsapp.js';
 import { storePublicOrigin } from '../lib/publicOrigins.js';
 
@@ -25,7 +25,7 @@ const checkout = z.object({
 
 // Public discount preview: lets the storefront show the discount amount in
 // the cart/checkout summary before an order (and login) exist, without
-// consuming the code's usage count — only order creation above does that,
+// consuming the code's usage count â€” only order creation above does that,
 // inside its own row-locked transaction.
 const validateDiscountSchema = z.object({
   code: z.string().min(1).max(40),
@@ -127,13 +127,30 @@ router.post('/', requireAuth, asyncRoute(async (req, res) => {
 
   const storeOrigin = storePublicOrigin();
   const trackingUrl = `${storeOrigin}/track.html?order=${order.id}&token=${trackingToken}`;
-  res.status(201).json({ order: { ...order, trackingUrl }, items: itemSummaries });
+  // Keep checkout successful if email fails, but wait for the provider result so
+  // the customer can see whether the receipt was accepted for delivery.
+  let emailDelivery = { sent: false, configured: emailDeliveryStatus().configured };
+  try {
+    await sendOrderConfirmation({
+      to: req.user.email,
+      name: shipping.name,
+      orderId: order.id,
+      items: itemSummaries,
+      totalCents: order.totalCents,
+      subtotalCents: order.subtotalCents,
+      discountCents: order.discountCents,
+      discountCode: order.discountCode,
+      shippingCents: order.shippingCents,
+      delivery,
+      shippingAddress: shipping,
+      trackingUrl,
+    });
+    emailDelivery = { sent: emailDeliveryStatus().configured, configured: emailDeliveryStatus().configured };
+  } catch (error) {
+    console.error(`Order confirmation email failed for order #${order.id} to ${req.user.email}:`, error);
+  }
 
-  // Confirmation notifications are best-effort: they run after the response
-  // is already sent, and a failure here (bad SMTP config, WhatsApp down,
-  // etc.) must never affect the order that was already placed.
-  sendOrderConfirmation({ to: req.user.email, name: shipping.name, orderId: order.id, items: itemSummaries, totalCents: order.totalCents, trackingUrl })
-    .catch((error) => console.error('Order confirmation email failed:', error));
+  res.status(201).json({ order: { ...order, trackingUrl, emailDelivery }, items: itemSummaries });
   if (shipping.phone) {
     sendOrderWhatsApp({ phone: shipping.phone, message: `Hi ${shipping.name}, your Nuvanti order #${order.id} is confirmed! Track it here: ${trackingUrl}` })
       .catch((error) => console.error('Order confirmation WhatsApp failed:', error));
@@ -145,7 +162,7 @@ router.get('/mine', requireAuth, async (req, res) => {
   res.json(rows.map(({ trackingToken, ...row }) => ({ ...row, trackingUrl: `${storeOrigin}/track.html?order=${row.id}&token=${trackingToken}` })));
 });
 
-// Public, token-guarded order lookup — this is what the tracking link in the
+// Public, token-guarded order lookup â€” this is what the tracking link in the
 // confirmation email/WhatsApp message opens. No login required, and only
 // non-sensitive fields are returned (no email/phone/full address).
 const trackLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: 'draft-7', legacyHeaders: false });
