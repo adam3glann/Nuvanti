@@ -93,7 +93,11 @@ router.post('/password-reset/request', async (req, res) => {
     const isStaff = STAFF_ROLES.includes(user.role);
     const baseUrl = isStaff ? adminPublicOrigin() : storePublicOrigin();
     const resetPage = isStaff ? 'login.html' : 'account.html';
-    await sendPasswordReset({ to: user.email, resetUrl: `${baseUrl}/${resetPage}?reset=${token}` });
+    try {
+      await sendPasswordReset({ to: user.email, resetUrl: `${baseUrl}/${resetPage}?reset=${token}` });
+    } catch (error) {
+      console.error('Password reset email failed:', error);
+    }
     await logAudit({ req, actor: user, action: 'auth.password_reset_requested', targetType: 'user', targetId: user.id });
   }
   res.status(202).json({ message: 'If an account exists for that email, a reset link has been sent.' });
