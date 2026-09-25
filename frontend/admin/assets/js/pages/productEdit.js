@@ -59,9 +59,9 @@ function renderForm(product, cats, cols) {
           <div class="card-head"><h2>Pricing</h2></div>
           <div class="card-pad">
             <div class="field-row3">
-              <div class="field"><label for="fPrice">Price (EGP)</label><input type="number" id="fPrice" value="${product.price}" /></div>
-              <div class="field"><label for="fCompare">Compare-at Price</label><input type="number" id="fCompare" value="${product.compareAtPrice ?? ''}" /></div>
-              <div class="field"><label for="fCost">Cost Price</label><input type="number" id="fCost" value="${product.cost ?? ''}" /></div>
+              <div class="field"><label for="fPrice">Price (EGP)</label><input type="number" id="fPrice" min="0" max="99999.99" step="0.01" value="${product.price}" /></div>
+              <div class="field"><label for="fCompare">Compare-at Price</label><input type="number" id="fCompare" min="0" max="99999.99" step="0.01" value="${product.compareAtPrice ?? ''}" /></div>
+              <div class="field"><label for="fCost">Cost Price</label><input type="number" id="fCost" min="0" max="99999.99" step="0.01" value="${product.cost ?? ''}" /></div>
             </div>
           </div>
         </div>
@@ -158,13 +158,19 @@ function renderForm(product, cats, cols) {
     if (name.length < 2) return showAdminToast('Enter a product name with at least 2 characters.', 'error');
     if (!slug) return showAdminToast('Enter a product name so a product URL can be created.', 'error');
     if (!category) return showAdminToast('Create a category before adding products.', 'error');
+    const price = Number(val('fPrice'));
+    const compareAt = val('fCompare') ? Number(val('fCompare')) : null;
+    const cost = val('fCost') ? Number(val('fCost')) : null;
+    if (!Number.isFinite(price) || price < 0 || price > 99999.99) return showAdminToast('Price must be between 0 and 99,999.99 EGP.', 'error');
+    if (compareAt !== null && (!Number.isFinite(compareAt) || compareAt < 0 || compareAt > 99999.99)) return showAdminToast('Compare-at price must be between 0 and 99,999.99 EGP.', 'error');
+    if (cost !== null && (!Number.isFinite(cost) || cost < 0 || cost > 99999.99)) return showAdminToast('Cost price must be between 0 and 99,999.99 EGP.', 'error');
     const colors = splitList(val('fColors'));
     const sizes = splitList(val('fSizes'));
     const stockProduct = { ...product, colors, sizes };
     const patch = {
       name, slug, description: val('fDesc'),
-      price: Number(val('fPrice')) || 0, compareAtPrice: val('fCompare') ? Number(val('fCompare')) : null,
-      cost: Number(val('fCost')) || 0, sku: val('fSku').trim(), category, collection: val('fCollection'),
+      price, compareAtPrice: compareAt,
+      cost: cost ?? 0, sku: val('fSku').trim(), category, collection: val('fCollection'),
       material: val('fMaterial'), status: val('fStatus'),
       featured: document.getElementById('fFeatured').checked,
       bestseller: document.getElementById('fBestseller').checked,
