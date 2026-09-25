@@ -3,6 +3,7 @@ import { colorHex, isInStock } from '../data/products.js';
 import { toggleWishlist, isWishlisted } from '../services/wishlistService.js';
 import { addToCart } from '../services/cartService.js';
 import { showToast } from './toast.js';
+import { initScrollReveal } from './scrollReveal.js';
 
 export function productCardHTML(product, index = 0) {
   const images = Array.isArray(product.images) ? product.images.filter(Boolean) : [];
@@ -16,7 +17,7 @@ export function productCardHTML(product, index = 0) {
   const wished = isWishlisted(product.id);
   const inStock = isInStock(product) && sizes.length > 0;
   return `
-    <article class="product-card" data-product-id="${escapeHtml(product.id)}" style="--card-order:${Math.min(Number(index) || 0, 7)}">
+    <article class="product-card reveal" data-product-id="${escapeHtml(product.id)}" style="--card-order:${Math.min(Number(index) || 0, 7)}">
       <a href="product.html?slug=${slug}" class="product-card__media" aria-label="View ${name}">
         <img src="${escapeHtml(image)}" alt="${name}" loading="lazy" width="600" height="750" />
         <img src="${escapeHtml(alt)}" alt="" class="img-alt" loading="lazy" width="600" height="750" />
@@ -61,6 +62,7 @@ export function escapeHtml(value) {
 // current product map as async filters/search results replace its contents.
 const productCardBindings = new WeakMap();
 export function bindProductCardEvents(container, { products, onCartChange } = {}) {
+  initScrollReveal(container);
   const current = productCardBindings.get(container);
   if (current) {
     current.products = products || [];

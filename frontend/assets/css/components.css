@@ -2097,15 +2097,4 @@
   }
 }
 
-/* Keep product-entry motion on the compositor: opacity and transform only. */
-@keyframes product-card-arrive {
-  from { opacity: 0; transform: translate3d(0, 10px, 0); }
-  to { opacity: 1; transform: translate3d(0, 0, 0); }
-}
-.product-card {
-  animation: product-card-arrive 380ms var(--ease-editorial) both;
-  animation-delay: calc(var(--card-order, 0) * 35ms);
-}
-@media (prefers-reduced-motion: reduce) {
-  .product-card { animation: none; }
-}
+.product-card.reveal { transition-delay: calc(var(--card-order, 0) * 35ms); }

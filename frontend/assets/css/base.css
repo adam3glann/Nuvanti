@@ -6,6 +6,16 @@
 html { scroll-behavior: smooth; touch-action: manipulation; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 
+/* Progressive same-origin page transitions; unsupported browsers navigate normally. */
+@view-transition { navigation: auto; }
+::view-transition-old(root) { animation: 130ms ease-out both shop-page-out; }
+::view-transition-new(root) { animation: 190ms var(--ease-editorial) both shop-page-in; }
+@keyframes shop-page-out { to { opacity: 0; } }
+@keyframes shop-page-in { from { opacity: 0.88; transform: translateY(5px); } }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+}
+
 body {
   margin: 0;
   background: var(--color-paper);
