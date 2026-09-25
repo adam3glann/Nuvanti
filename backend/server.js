@@ -148,6 +148,14 @@ app.use(
 );
 app.use(express.json({ limit: "100kb" }));
 app.use(cookieParser());
+const markPrivateResponse = (req, res, next) => {
+  res.setHeader("Cache-Control", "no-store");
+  next();
+};
+app.use(
+  ["/api/auth", "/api/admin", "/api/addresses", "/api/orders/mine"],
+  markPrivateResponse,
+);
 app.use(
   rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -197,7 +205,30 @@ app.use(errorHandler);
 // A separate, server-protected admin origin: static files are never public.
 const adminApp = express();
 adminApp.disable("x-powered-by");
-adminApp.use(helmet({ contentSecurityPolicy: false }));
+adminApp.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        frameAncestors: ["'none'"],
+        objectSrc: ["'none'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+        imgSrc: ["'self'", "data:", "blob:", "https:"],
+        connectSrc: ["'self'"],
+        upgradeInsecureRequests: isProduction ? [] : null,
+      },
+    },
+  }),
+);
+adminApp.use((req, res, next) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  next();
+});
 adminApp.use(cookieParser());
 adminApp.get("/login.html", (req, res) =>
   res.sendFile(path.join(frontendRoot, "admin/login.html")),
