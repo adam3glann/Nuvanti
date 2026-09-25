@@ -20,6 +20,7 @@ import { requireAdminPage, requireAuth, requireRole } from "./lib/auth.js";
 import { errorHandler, notFound, sameOrigin } from "./middleware/security.js";
 import { query } from "./lib/db.js";
 import { emailDeliveryStatus } from "./lib/mail.js";
+import { hasPermission } from "./lib/permissions.js";
 
 const app = express();
 const STAFF_ROLES = ["staff", "manager", "admin", "super_admin"];
@@ -196,6 +197,14 @@ app.use(
   "/api/admin/uploads",
   requireAuth,
   requireRole(...STAFF_ROLES),
+  (req, res, next) => {
+    const canManageImages = ["products.create", "products.edit", "content.manage"]
+      .some((permission) => hasPermission(req.user.role, permission));
+    if (!canManageImages) {
+      return res.status(403).json({ error: "You do not have permission to upload images." });
+    }
+    next();
+  },
   uploadsRouter,
 );
 
