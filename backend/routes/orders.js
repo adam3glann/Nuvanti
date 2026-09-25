@@ -53,13 +53,30 @@ router.post('/', requireAuth, async (req, res) => {
   const trackingToken = crypto.randomBytes(24).toString('hex');
   const { order, itemSummaries } = await transaction(async (client) => {
     const ids = [...new Set(items.map((item) => item.productId))];
-    const { rows: products } = await client.query('SELECT id, name, price_cents, inventory FROM products WHERE id = ANY($1) AND is_active = true FOR UPDATE', [ids]);
+    const { rows: products } = await client.query(`SELECT id, name, price_cents, inventory, sizes, colors,
+      CASE WHEN metadata->'inventory' IS NULL OR metadata->'inventory' = '{}'::jsonb
+        THEN jsonb_build_object('One Size', inventory) ELSE metadata->'inventory' END AS "stockBySize"
+      FROM products WHERE id = ANY($1) AND is_active = true FOR UPDATE`, [ids]);
     if (products.length !== ids.length) { const error = new Error('One or more products are unavailable.'); error.status = 400; throw error; }
     const map = new Map(products.map((p) => [p.id, p]));
-    const quantities = new Map();
+    const variantQuantities = new Map();
+    const productQuantities = new Map();
     let subtotal = 0;
-    for (const item of items) { quantities.set(item.productId, (quantities.get(item.productId) || 0) + item.quantity); subtotal += map.get(item.productId).price_cents * item.quantity; }
-    for (const [productId, quantity] of quantities) { const product = map.get(productId); if (product.inventory < quantity) { const error = new Error(`${product.name} does not have enough stock.`); error.status = 409; throw error; } }
+    for (const item of items) {
+      const product = map.get(item.productId);
+      const size = item.size || 'One Size';
+      if (product.sizes?.length && !product.sizes.includes(size)) { const error = new Error(`${product.name} is no longer available in size ${size}.`); error.status = 409; throw error; }
+      if (item.color && product.colors?.length && !product.colors.includes(item.color)) { const error = new Error(`${product.name} is no longer available in ${item.color}.`); error.status = 409; throw error; }
+      const variantKey = `${item.productId}:${size}`;
+      variantQuantities.set(variantKey, { productId: item.productId, size, quantity: (variantQuantities.get(variantKey)?.quantity || 0) + item.quantity });
+      productQuantities.set(item.productId, (productQuantities.get(item.productId) || 0) + item.quantity);
+      subtotal += product.price_cents * item.quantity;
+    }
+    for (const variant of variantQuantities.values()) {
+      const product = map.get(variant.productId);
+      const available = Number(product.stockBySize?.[variant.size] || 0);
+      if (available < variant.quantity) { const error = new Error(`${product.name} does not have enough stock in size ${variant.size}.`); error.status = 409; throw error; }
+    }
 
     const { rows: settingsRows } = await client.query('SELECT standard_shipping_cents AS "standard", express_shipping_cents AS "express", free_shipping_threshold_cents AS "freeThreshold" FROM store_settings WHERE id = 1');
     const settings = settingsRows[0] || { standard: 7500, express: 15000, freeThreshold: 300000 };
@@ -79,15 +96,34 @@ router.post('/', requireAuth, async (req, res) => {
     }
 
     const totalCents = Math.max(0, subtotal - discountCents) + shippingCents;
-    const { rows } = await client.query('INSERT INTO orders (user_id, status, subtotal_cents, shipping_cents, total_cents, shipping_address, delivery, payment_method, tracking_token, discount_code, discount_cents) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id, status, total_cents AS "totalCents", created_at AS "createdAt", discount_code AS "discountCode", discount_cents AS "discountCents"', [req.user.sub, 'pending', subtotal, shippingCents, totalCents, shipping, delivery, 'cod', trackingToken, appliedCode, discountCents]);
+    const { rows } = await client.query('INSERT INTO orders (user_id, status, subtotal_cents, shipping_cents, total_cents, shipping_address, delivery, payment_method, tracking_token, discount_code, discount_cents) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id, status, subtotal_cents AS "subtotalCents", shipping_cents AS "shippingCents", total_cents AS "totalCents", created_at AS "createdAt", discount_code AS "discountCode", discount_cents AS "discountCents"', [req.user.sub, 'pending', subtotal, shippingCents, totalCents, shipping, delivery, 'cod', trackingToken, appliedCode, discountCents]);
     for (const item of items) { const p = map.get(item.productId); await client.query('INSERT INTO order_items (order_id, product_id, product_name, unit_price_cents, quantity, color, size, image_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)', [rows[0].id, p.id, p.name, p.price_cents, item.quantity, item.color || null, item.size || null, item.image || null]); }
-    for (const [productId, quantity] of quantities) await client.query('UPDATE products SET inventory = inventory - $1, updated_at = NOW() WHERE id = $2', [quantity, productId]);
-    return { order: rows[0], itemSummaries: items.map((item) => ({ name: map.get(item.productId).name, quantity: item.quantity })) };
+    for (const [productId, quantity] of productQuantities) {
+      const product = map.get(productId);
+      const nextStock = { ...product.stockBySize };
+      for (const variant of variantQuantities.values()) {
+        if (variant.productId === productId) nextStock[variant.size] -= variant.quantity;
+      }
+      const totalStock = Object.values(nextStock).reduce((sum, value) => sum + Math.max(0, Number(value) || 0), 0);
+      await client.query(`UPDATE products SET inventory = $2,
+        metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{inventory}', $3::jsonb, true), updated_at = NOW()
+        WHERE id = $1`, [productId, totalStock, JSON.stringify(nextStock)]);
+    }
+    return {
+      order: rows[0],
+      itemSummaries: items.map((item) => ({
+        name: map.get(item.productId).name,
+        priceCents: map.get(item.productId).price_cents,
+        quantity: item.quantity,
+        color: item.color || '',
+        size: item.size || '',
+      })),
+    };
   });
 
   const storeOrigin = storePublicOrigin();
   const trackingUrl = `${storeOrigin}/track.html?order=${order.id}&token=${trackingToken}`;
-  res.status(201).json({ order: { ...order, trackingUrl } });
+  res.status(201).json({ order: { ...order, trackingUrl }, items: itemSummaries });
 
   // Confirmation notifications are best-effort: they run after the response
   // is already sent, and a failure here (bad SMTP config, WhatsApp down,

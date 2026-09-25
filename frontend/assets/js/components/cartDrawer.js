@@ -1,5 +1,5 @@
 import { icon } from './icons.js';
-import { formatPrice } from './productCard.js';
+import { formatPrice, escapeHtml } from './productCard.js';
 import {
   getCart, updateQuantity, removeFromCart, cartSubtotal,
   amountToFreeShipping, freeShippingProgress, FREE_SHIPPING_THRESHOLD,
@@ -38,10 +38,12 @@ export function mountCartDrawer() {
     const lines = getCart();
     if (dec) {
       const line = lines.find((l) => l.lineId === dec.dataset.dec);
+      if (!line) return;
       updateQuantity(line.lineId, line.quantity - 1);
       render();
     } else if (inc) {
       const line = lines.find((l) => l.lineId === inc.dataset.inc);
+      if (!line) return;
       updateQuantity(line.lineId, line.quantity + 1);
       render();
     } else if (rem) {
@@ -82,20 +84,20 @@ function render() {
   }
 
   itemsEl.innerHTML = lines.map((l) => `
-    <div class="cart-line" data-line="${l.lineId}">
-      <img src="${l.image}" alt="${l.name}" width="80" height="100" />
+    <div class="cart-line" data-line="${escapeHtml(l.lineId)}">
+      <img src="${escapeHtml(l.image)}" alt="${escapeHtml(l.name)}" width="80" height="100" loading="lazy" />
       <div>
-        <p class="cart-line__name">${l.name}</p>
-        <p class="cart-line__meta">${l.color} · Size ${l.size}</p>
+        <p class="cart-line__name">${escapeHtml(l.name)}</p>
+        <p class="cart-line__meta">${escapeHtml(l.color)} · Size ${escapeHtml(l.size)}</p>
         <div class="cart-line__row">
           <div class="qty-stepper">
-            <button data-dec="${l.lineId}" aria-label="Decrease quantity">${icon('minus')}</button>
-            <span>${l.quantity}</span>
-            <button data-inc="${l.lineId}" aria-label="Increase quantity">${icon('plus')}</button>
+            <button data-dec="${escapeHtml(l.lineId)}" aria-label="Decrease quantity">${icon('minus')}</button>
+            <span>${Number(l.quantity)}</span>
+            <button data-inc="${escapeHtml(l.lineId)}" aria-label="Increase quantity" ${Number(l.quantity) >= 10 ? 'disabled' : ''}>${icon('plus')}</button>
           </div>
           <span>${formatPrice(l.price * l.quantity)}</span>
         </div>
-        <button class="btn-text btn-sm" data-remove="${l.lineId}" style="margin-top:.5rem;font-size:.75rem;color:var(--color-muted)">Remove</button>
+        <button class="btn-text btn-sm" data-remove="${escapeHtml(l.lineId)}" style="margin-top:.5rem;font-size:.75rem;color:var(--color-muted)">Remove</button>
       </div>
     </div>
   `).join('');

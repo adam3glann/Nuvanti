@@ -1,19 +1,20 @@
 import { initShell } from '../main.js';
 import { icon } from '../components/icons.js';
-import { productCardHTML, bindProductCardEvents } from '../components/productCard.js';
+import { productCardHTML, bindProductCardEvents, escapeHtml } from '../components/productCard.js';
 import { refreshCartDrawer } from '../components/cartDrawer.js';
-import { fetchProducts } from '../services/productService.js';
-import { categories } from '../data/categories.js';
+import { fetchCategories, fetchProducts } from '../services/productService.js';
+import { categories as localCategories } from '../data/categories.js';
 import { colorHex } from '../data/products.js';
 import { getPublishedProducts } from '../data/productStore.js';
 import { LOCAL_DEVELOPMENT } from '../config.js';
 
-const allProducts = getPublishedProducts();
+let allProducts = getPublishedProducts();
+let categories = [...localCategories];
 
 initShell({ currentPage: 'shop' });
 
-const ALL_SIZES = [...new Set(allProducts.flatMap((p) => p.sizes))];
-const ALL_COLORS = [...new Set(allProducts.flatMap((p) => p.colors))];
+let allSizes = [...new Set(allProducts.flatMap((p) => p.sizes || []))];
+let allColors = [...new Set(allProducts.flatMap((p) => p.colors || []))];
 
 const params = new URLSearchParams(location.search);
 const state = {
@@ -30,7 +31,14 @@ const state = {
   view: 'grid',
 };
 
-function initShop() {
+async function initShop() {
+  const [productsResult, categoriesResult] = await Promise.allSettled([fetchProducts(), fetchCategories()]);
+  if (productsResult.status === 'fulfilled') allProducts = productsResult.value;
+  else if (!LOCAL_DEVELOPMENT) allProducts = [];
+  if (categoriesResult.status === 'fulfilled') categories = categoriesResult.value;
+  else if (!LOCAL_DEVELOPMENT) categories = [];
+  allSizes = [...new Set(allProducts.flatMap((p) => p.sizes || []))];
+  allColors = [...new Set(allProducts.flatMap((p) => p.colors || []))];
   renderFilters();
   renderToolbar();
   initViewToggle();
@@ -48,8 +56,8 @@ function renderFilters() {
       <div class="filter-group__title">Category</div>
       ${categories.map((c) => `
         <label class="filter-option">
-          <input type="radio" name="category" value="${c.slug}" ${state.category === c.slug ? 'checked' : ''} />
-          ${c.name}
+          <input type="radio" name="category" value="${escapeHtml(c.slug)}" ${state.category === c.slug ? 'checked' : ''} />
+          ${escapeHtml(c.name)}
         </label>
       `).join('')}
       <label class="filter-option">
@@ -67,18 +75,18 @@ function renderFilters() {
     <div class="filter-group">
       <div class="filter-group__title">Size</div>
       <div class="size-filter-grid">
-        ${ALL_SIZES.map((s) => `<button type="button" class="size-filter" data-size="${s}" data-active="false">${s}</button>`).join('')}
+        ${allSizes.map((s) => `<button type="button" class="size-filter" data-size="${escapeHtml(s)}" data-active="false">${escapeHtml(s)}</button>`).join('')}
       </div>
     </div>
     <div class="filter-group">
       <div class="filter-group__title">Color</div>
       <div class="color-filter-grid">
-        ${ALL_COLORS.map((c) => `<button type="button" class="color-filter" data-color="${c}" data-active="false" style="background:${colorHex(c)}" aria-label="${c}" title="${c}"></button>`).join('')}
+        ${allColors.map((c) => `<button type="button" class="color-filter" data-color="${escapeHtml(c)}" data-active="false" style="background:${colorHex(c)}" aria-label="${escapeHtml(c)}" title="${escapeHtml(c)}"></button>`).join('')}
       </div>
     </div>
     <div class="filter-group" style="border-bottom:none">
       <div class="filter-group__title">Availability</div>
-      <label class="filter-option"><input type="checkbox" id="inStockOnly" /> In stock only</label>
+      <label class="filter-option"><input type="checkbox" data-in-stock-only ${state.availability === 'in-stock' ? 'checked' : ''} /> In stock only</label>
     </div>
   `;
   document.getElementById('filters').innerHTML = html;
@@ -96,8 +104,9 @@ function bindLayoutEvents() {
       if (e.target.name === 'price') {
         if (!e.target.value) { state.minPrice = undefined; state.maxPrice = undefined; }
         else { const [min, max] = e.target.value.split('-').map(Number); state.minPrice = min; state.maxPrice = max; }
+        syncFilterUI();
       }
-      if (e.target.id === 'inStockOnly') { state.availability = e.target.checked ? 'in-stock' : ''; }
+      if (e.target.matches('[data-in-stock-only]')) { state.availability = e.target.checked ? 'in-stock' : ''; syncFilterUI(); }
       state.page = 1;
       runFilter();
     });
@@ -141,9 +150,9 @@ function bindLayoutEvents() {
   document.getElementById('clearFilters').addEventListener('click', () => {
     state.category = ''; state.colors = []; state.sizes = []; state.availability = '';
     state.minPrice = undefined; state.maxPrice = undefined; state.page = 1;
-    document.querySelectorAll('input[name="price"]')[0].checked = true;
+    document.querySelectorAll('input[name="price"]').forEach((input) => { input.checked = input.value === ''; });
     document.querySelectorAll('input[name="category"]').forEach((r) => { r.checked = r.value === ''; });
-    document.getElementById('inStockOnly').checked = false;
+    document.querySelectorAll('[data-in-stock-only]').forEach((input) => { input.checked = false; });
     syncFilterUI();
     runFilter();
   });
@@ -153,6 +162,9 @@ function syncFilterUI() {
   document.querySelectorAll('[data-size]').forEach((btn) => { btn.dataset.active = String(state.sizes.includes(btn.dataset.size)); });
   document.querySelectorAll('[data-color]').forEach((btn) => { btn.dataset.active = String(state.colors.includes(btn.dataset.color)); });
   document.querySelectorAll('input[name="category"]').forEach((r) => { r.checked = r.value === state.category; });
+  document.querySelectorAll('[data-in-stock-only]').forEach((input) => { input.checked = state.availability === 'in-stock'; });
+  const selectedPrice = state.minPrice == null ? '' : `${state.minPrice}-${state.maxPrice}`;
+  document.querySelectorAll('input[name="price"]').forEach((input) => { input.checked = input.value === selectedPrice; });
 }
 
 function setView(view) {

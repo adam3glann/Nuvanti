@@ -1,12 +1,13 @@
 import { initShell } from '../main.js';
 import { formatPrice } from '../components/productCard.js';
-import { getCart, cartSubtotal, clearCart } from '../services/cartService.js';
+import { getCart, cartSubtotal, clearCart, syncCartWithProducts } from '../services/cartService.js';
 import { createOrder } from '../services/orderService.js';
 import { getCurrentUser } from '../services/authService.js';
 import { showToast } from '../components/toast.js';
 import { refreshCartDrawer } from '../components/cartDrawer.js';
 import { checkDiscount, getSavedDiscountCode, saveDiscountCode, clearDiscountCode } from '../services/discountService.js';
 import { loadStoreSettings } from '../services/storeSettingsService.js';
+import { fetchProductBySlug } from '../services/productService.js';
 import { fetchAddresses } from '../services/addressService.js';
 
 initShell({ currentPage: 'shop' });
@@ -20,7 +21,7 @@ let storeSettings = null;
 let currentUser = null;
 let savedAddress = null;
 
-const lines = getCart();
+let lines = getCart();
 if (lines.length === 0) {
   window.location.href = 'cart.html';
 } else {
@@ -32,6 +33,16 @@ async function initializeCheckout() {
   const summary = document.getElementById('checkoutSummary');
   form.innerHTML = '<div class="state-block"><h3>Preparing secure checkout</h3><p>Loading your account and current delivery rates.</p></div>';
   try {
+    const initialProducts = await Promise.all([...new Set(lines.map((line) => line.slug))].map(fetchProductBySlug));
+    const cartChanges = syncCartWithProducts(initialProducts);
+    lines = getCart();
+    if (!lines.length) { window.location.href = 'cart.html'; return; }
+    if (cartChanges.removed.length || cartChanges.adjusted.length) {
+      sessionStorage.setItem('nuvanti_cart_notice', 'Your bag was updated because some items or quantities are no longer available. Review it before checkout.');
+      window.location.href = 'cart.html';
+      return;
+    }
+    if (cartChanges.priceChanged) showToast('Bag prices were updated to today’s catalog.');
     [currentUser, storeSettings] = await Promise.all([getCurrentUser(), loadStoreSettings()]);
   } catch {
     form.innerHTML = '<div class="state-block"><h3>Checkout is temporarily unavailable</h3><p>We could not verify your account or current delivery prices. Your bag is saved—please try again shortly.</p></div>';
@@ -140,10 +151,10 @@ function renderSummary() {
     <h3 class="h3" style="margin-bottom:1.25rem">Order Summary</h3>
     ${lines.map((l) => `
       <div class="mini-line">
-        <img src="${l.image}" alt="${l.name}" />
+        <img src="${escapeAttr(l.image)}" alt="${escapeAttr(l.name)}" loading="lazy" />
         <div>
-          <p style="font-weight:600;font-size:var(--fs-small)">${l.name}</p>
-          <p class="mini-line__meta">${l.color} · ${l.size} · Qty ${l.quantity}</p>
+          <p style="font-weight:600;font-size:var(--fs-small)">${escapeAttr(l.name)}</p>
+          <p class="mini-line__meta">${escapeAttr(l.color)} · ${escapeAttr(l.size)} · Qty ${Number(l.quantity)}</p>
           <p style="font-size:var(--fs-small);margin-top:.25rem">${formatPrice(l.price * l.quantity)}</p>
         </div>
       </div>

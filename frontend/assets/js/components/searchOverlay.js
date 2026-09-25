@@ -25,7 +25,7 @@ export function mountSearchOverlay() {
           <div class="search-chip-group" id="recentChips"></div>
           <p class="label" style="margin-top:2rem">Popular Searches</p>
           <div class="search-chip-group" id="popularChips">
-            ${POPULAR.map((p) => `<button class="search-chip" data-term="${p}">${p}</button>`).join('')}
+            ${POPULAR.map((p) => `<button class="search-chip" data-term="${escapeHtml(p)}">${escapeHtml(p)}</button>`).join('')}
           </div>
         </div>
         <div class="search-results" id="searchResults" hidden></div>
@@ -84,7 +84,7 @@ export function mountSearchOverlay() {
     if (results.length === 0) {
       resultsWrap.innerHTML = `
         <div class="state-block">
-          <h3>No results for "${term}"</h3>
+          <h3>No results for "${escapeHtml(term)}"</h3>
           <p>Try a different term, or browse our best sellers below.</p>
           <a href="shop.html?filter=bestseller" class="btn btn-outline">Shop Best Sellers</a>
         </div>`;
@@ -113,8 +113,12 @@ function renderRecentChips() {
   if (!el) return;
   const recent = getRecent();
   el.innerHTML = recent.length
-    ? recent.map((t) => `<button class="search-chip" data-term="${t}">${t}</button>`).join('')
+    ? recent.map((t) => `<button class="search-chip" data-term="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join('')
     : `<span class="text-muted" style="font-size:.875rem">No recent searches yet.</span>`;
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 }
 
 export function openSearchOverlay() {

@@ -5,36 +5,43 @@ import { addToCart } from '../services/cartService.js';
 import { showToast } from './toast.js';
 
 export function productCardHTML(product) {
-  const alt = product.images[1] || product.images[0];
+  const images = Array.isArray(product.images) ? product.images.filter(Boolean) : [];
+  const colors = Array.isArray(product.colors) ? product.colors : [];
+  const badges = Array.isArray(product.badges) ? product.badges : [];
+  const sizes = Array.isArray(product.sizes) ? product.sizes : [];
+  const image = images[0] || 'assets/img/brand/nuvanti-logo.png';
+  const alt = images[1] || image;
+  const slug = encodeURIComponent(String(product.slug || ''));
+  const name = escapeHtml(product.name || 'Nuvanti item');
   const wished = isWishlisted(product.id);
-  const inStock = isInStock(product);
+  const inStock = isInStock(product) && sizes.length > 0;
   return `
-    <article class="product-card" data-product-id="${product.id}">
-      <a href="product.html?slug=${product.slug}" class="product-card__media" aria-label="View ${product.name}">
-        <img src="${product.images[0]}" alt="${product.name}" loading="lazy" width="600" height="750" />
-        <img src="${alt}" alt="" class="img-alt" loading="lazy" width="600" height="750" />
+    <article class="product-card" data-product-id="${escapeHtml(product.id)}">
+      <a href="product.html?slug=${slug}" class="product-card__media" aria-label="View ${name}">
+        <img src="${escapeHtml(image)}" alt="${name}" loading="lazy" width="600" height="750" />
+        <img src="${escapeHtml(alt)}" alt="" class="img-alt" loading="lazy" width="600" height="750" />
       </a>
       <div class="product-card__badges">
-        ${product.badges.map((b) => `<span class="badge ${b === 'SALE' ? 'badge--sale' : ''}">${b}</span>`).join('')}
+        ${badges.map((b) => `<span class="badge ${b === 'SALE' ? 'badge--sale' : ''}">${escapeHtml(b)}</span>`).join('')}
         ${!inStock ? '<span class="badge badge--outline">Sold out</span>' : ''}
       </div>
-      <button class="product-card__wishlist icon-btn" data-wishlist-toggle="${product.id}" data-active="${wished}"
+      <button class="product-card__wishlist icon-btn" data-wishlist-toggle="${escapeHtml(product.id)}" data-active="${wished}"
         aria-pressed="${wished}" aria-label="${wished ? 'Remove from wishlist' : 'Add to wishlist'}">
         ${icon('heart')}
       </button>
       <div class="product-card__quick">
-        <button class="btn btn-sm" data-quick-add="${product.id}" ${!inStock ? 'disabled' : ''}>
+        <button class="btn btn-sm" data-quick-add="${escapeHtml(product.id)}" ${!inStock ? 'disabled' : ''}>
           ${inStock ? 'Quick Add' : 'Sold Out'}
         </button>
       </div>
-      <a href="product.html?slug=${product.slug}">
-        <p class="product-card__name">${product.name}</p>
+      <a href="product.html?slug=${slug}">
+        <p class="product-card__name">${name}</p>
         <div class="product-card__meta">
           <span class="product-card__price">${formatPrice(product.price)}</span>
           ${product.compareAtPrice ? `<span class="product-card__compare">${formatPrice(product.compareAtPrice)}</span>` : ''}
         </div>
         <div class="product-card__swatches">
-          ${product.colors.map((c) => `<span class="swatch" style="background:${colorHex(c)}" title="${c}"></span>`).join('')}
+          ${colors.map((c) => `<span class="swatch" style="background:${colorHex(c)}" title="${escapeHtml(c)}" aria-label="${escapeHtml(c)}"></span>`).join('')}
         </div>
       </a>
     </article>
@@ -42,7 +49,12 @@ export function productCardHTML(product) {
 }
 
 export function formatPrice(value) {
-  return `${value.toLocaleString('en-US')} EGP`;
+  const amount = Number(value);
+  return Number.isFinite(amount) ? `${amount.toLocaleString('en-US', { maximumFractionDigits: 2 })} EGP` : 'Price unavailable';
+}
+
+export function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 }
 
 // Delegated listeners — attach once per stable container and refresh the

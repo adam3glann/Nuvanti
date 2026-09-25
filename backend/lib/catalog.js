@@ -1,11 +1,14 @@
 export function toPublicProduct(row) {
   const meta = row.metadata || {};
+  const variantInventory = meta.inventory && Object.keys(meta.inventory).length
+    ? meta.inventory
+    : { 'One Size': Number(row.inventory) };
   return {
     id: String(row.id), slug: row.slug, name: row.name, description: row.description,
     price: Number(row.price_cents) / 100, priceCents: Number(row.price_cents),
     category: row.category, collection: row.collection, images: row.images || [],
     colors: row.colors || [], sizes: row.sizes || [],
-    inventory: meta.inventory || { 'One Size': Number(row.inventory) },
+    inventory: variantInventory,
     badges: meta.badges || [], featured: Boolean(meta.featured), bestseller: Boolean(meta.bestseller),
     newArrival: Boolean(meta.newArrival), sku: meta.sku || `NV-${row.id}`,
     compareAtPrice: meta.compareAtPrice || null, status: row.is_active ? 'active' : 'draft',

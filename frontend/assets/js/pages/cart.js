@@ -1,9 +1,10 @@
 import { initShell } from '../main.js';
 import { icon } from '../components/icons.js';
-import { formatPrice } from '../components/productCard.js';
+import { formatPrice, escapeHtml } from '../components/productCard.js';
 import { refreshCartDrawer } from '../components/cartDrawer.js';
-import { getCart, updateQuantity, removeFromCart, cartSubtotal, configureFreeShippingThreshold } from '../services/cartService.js';
+import { getCart, updateQuantity, removeFromCart, cartSubtotal, configureFreeShippingThreshold, syncCartWithProducts } from '../services/cartService.js';
 import { loadStoreSettings } from '../services/storeSettingsService.js';
+import { fetchProductBySlug } from '../services/productService.js';
 import { checkDiscount, getSavedDiscountCode, saveDiscountCode, clearDiscountCode } from '../services/discountService.js';
 
 initShell({ currentPage: 'shop' });
@@ -13,11 +14,19 @@ initShell({ currentPage: 'shop' });
 let discountInfo = null;
 let listenerBound = false;
 let storeSettings = null;
+let catalogNotice = sessionStorage.getItem('nuvanti_cart_notice') || '';
+sessionStorage.removeItem('nuvanti_cart_notice');
 
 initializeCart();
 
 async function initializeCart() {
   try {
+    const initialLines = getCart();
+    const currentProducts = await Promise.all([...new Set(initialLines.map((line) => line.slug))].map(fetchProductBySlug));
+    const changes = syncCartWithProducts(currentProducts);
+    if (!catalogNotice && changes.removed.length) catalogNotice = 'Some bag items are no longer available and were removed. Please review your bag.';
+    else if (!catalogNotice && changes.adjusted.length) catalogNotice = 'Your bag quantities were adjusted to match current stock.';
+    else if (!catalogNotice && changes.priceChanged) catalogNotice = 'Prices were updated to the current catalog.';
     storeSettings = await loadStoreSettings();
     configureFreeShippingThreshold(storeSettings.freeShippingThresholdCents / 100);
     await restoreSavedDiscount();
@@ -54,6 +63,7 @@ function render() {
       <div class="state-block">
         ${icon('bag')}
         <h3 style="margin-top:1rem">Your bag is empty</h3>
+        ${catalogNotice ? `<p role="status">${escapeHtml(catalogNotice)}</p>` : ''}
         <p>Looks like you haven't added anything yet.</p>
         <a href="shop.html" class="btn btn-primary">Continue Shopping</a>
       </div>`;
@@ -61,23 +71,23 @@ function render() {
   }
 
   listEl.innerHTML = lines.map((l) => `
-    <div class="cart-page-line" data-line="${l.lineId}">
-      <img src="${l.image}" alt="${l.name}" />
+    <div class="cart-page-line" data-line="${escapeHtml(l.lineId)}">
+      <img src="${escapeHtml(l.image)}" alt="${escapeHtml(l.name)}" loading="lazy" />
       <div>
         <div style="display:flex;justify-content:space-between;gap:1rem">
           <div>
-            <p style="font-weight:600">${l.name}</p>
-            <p class="text-muted" style="font-size:var(--fs-small);margin-top:.25rem">${l.color} · Size ${l.size}</p>
+            <p style="font-weight:600">${escapeHtml(l.name)}</p>
+            <p class="text-muted" style="font-size:var(--fs-small);margin-top:.25rem">${escapeHtml(l.color)} · Size ${escapeHtml(l.size)}</p>
           </div>
           <p style="font-weight:600">${formatPrice(l.price * l.quantity)}</p>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:1rem">
           <div class="qty-stepper">
-            <button data-dec="${l.lineId}" aria-label="Decrease quantity">${icon('minus')}</button>
-            <span>${l.quantity}</span>
-            <button data-inc="${l.lineId}" aria-label="Increase quantity">${icon('plus')}</button>
+            <button data-dec="${escapeHtml(l.lineId)}" aria-label="Decrease quantity">${icon('minus')}</button>
+            <span>${Number(l.quantity)}</span>
+            <button data-inc="${escapeHtml(l.lineId)}" aria-label="Increase quantity">${icon('plus')}</button>
           </div>
-          <button class="icon-btn" data-remove="${l.lineId}" aria-label="Remove item">${icon('trash')}</button>
+          <button class="icon-btn" data-remove="${escapeHtml(l.lineId)}" aria-label="Remove item">${icon('trash')}</button>
         </div>
       </div>
     </div>
@@ -89,6 +99,7 @@ function render() {
   const total = Math.max(0, subtotal - discount) + shipping;
 
   summaryEl.innerHTML = `
+    ${catalogNotice ? `<p class="state-note" role="status">${escapeHtml(catalogNotice)}</p>` : ''}
     <h3 class="h3" style="margin-bottom:1.5rem">Order Summary</h3>
     <div class="promo-row">
       <label class="visually-hidden" for="promoInput">Discount code</label>

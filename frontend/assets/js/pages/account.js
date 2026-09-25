@@ -199,7 +199,7 @@ async function renderDashboard(session, tab) {
         </a>
       `).join('') : `<div class="state-block"><h3>No orders yet</h3><p>Your order history will appear here once you place your first order.</p><a href="shop.html" class="btn btn-primary">Shop Now</a></div>`;
     } catch (error) {
-      panel.innerHTML = `<div class="state-block"><h3>Couldn't load your orders</h3><p>${error.message}</p></div>`;
+      panel.innerHTML = `<div class="state-block"><h3>Couldn't load your orders</h3><p>${escapeHtml(error.message)}</p></div>`;
     }
   } else if (tab === 'addresses') {
     panel.innerHTML = '<div class="a-skeleton" style="height:120px;border-radius:12px"></div>';

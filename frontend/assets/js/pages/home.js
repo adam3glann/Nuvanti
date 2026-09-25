@@ -156,10 +156,10 @@ async function loadCategories() {
   try {
   const list = await fetchCategories();
   el.innerHTML = list.map((c) => `
-    <a class="category-card" href="shop.html?category=${c.slug}">
-      <img src="${c.image}" alt="${c.name}" loading="lazy" />
+    <a class="category-card" href="shop.html?category=${encodeURIComponent(c.slug)}">
+      <img src="${escapeHtml(c.image)}" alt="${escapeHtml(c.name)}" loading="lazy" />
       <span class="category-card__label">
-        <span>${c.name}</span>
+        <span>${escapeHtml(c.name)}</span>
         <span>${icon('chevronRight')}</span>
       </span>
     </a>

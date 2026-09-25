@@ -5,6 +5,7 @@ import {
   productCardHTML,
   bindProductCardEvents,
   formatPrice,
+  escapeHtml,
 } from "../components/productCard.js";
 
 import { refreshCartDrawer, openCartDrawer } from "../components/cartDrawer.js";
@@ -144,7 +145,7 @@ function renderBreadcrumb() {
     </span>
 
     <a href="shop.html?category=${encodeURIComponent(product.category)}">
-      ${capitalize(product.category)}
+      ${escapeHtml(capitalize(product.category))}
     </a>
 
     <span class="breadcrumb-sep">
@@ -152,7 +153,7 @@ function renderBreadcrumb() {
     </span>
 
     <span>
-      ${product.name}
+      ${escapeHtml(product.name)}
     </span>
 
   `;
@@ -600,15 +601,15 @@ function renderInfo() {
 
     <p class="label product-info__eyebrow">
 
-      ${capitalize(product.category)}
+      ${escapeHtml(capitalize(product.category))}
 
-      ${product.badges?.length ? " · " + product.badges.join(", ") : ""}
+      ${product.badges?.length ? " · " + product.badges.map(escapeHtml).join(", ") : ""}
 
     </p>
 
 
     <h1 class="product-info__name">
-      ${product.name}
+      ${escapeHtml(product.name)}
     </h1>
 
 
@@ -632,7 +633,7 @@ function renderInfo() {
 
 
     <p class="product-info__desc">
-      ${product.description}
+      ${escapeHtml(product.description)}
     </p>
 
 
@@ -643,7 +644,7 @@ function renderInfo() {
       <div class="option-group__head">
 
         <span class="label">
-          Color — ${selectedColor || "Select"}
+          Color — ${escapeHtml(selectedColor || "Select")}
         </span>
 
       </div>
@@ -717,7 +718,7 @@ function renderInfo() {
                 data-active="${size === selectedSize}"
                 ${stock === 0 ? "disabled" : ""}
               >
-                ${size}
+                ${escapeHtml(size)}
               </button>
 
             `;
@@ -853,7 +854,7 @@ function renderInfo() {
       </span>
 
       <span>
-        Material: ${product.material}
+        Material: ${escapeHtml(product.material || 'Cotton blend')}
       </span>
 
     </div>
@@ -1187,7 +1188,7 @@ function updateStockLine() {
     element.innerHTML = `
 
       <span class="stock-dot stock-dot--low"></span>
-      Only ${stock} left in size ${selectedSize}
+      Only ${stock} left in size ${escapeHtml(selectedSize)}
 
     `;
   } else {
@@ -1225,7 +1226,7 @@ function renderAccordion() {
     {
       title: "Product Details",
 
-      body: `${product.material}. Designed in-house. Model is 183cm and wears size M.`,
+      body: `${escapeHtml(product.material || 'Cotton blend')}. Designed in-house. Model is 183cm and wears size M.`,
     },
   ];
 

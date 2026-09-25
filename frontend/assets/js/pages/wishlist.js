@@ -1,22 +1,35 @@
 import { initShell } from '../main.js';
 import { icon } from '../components/icons.js';
-import { formatPrice } from '../components/productCard.js';
+import { formatPrice, escapeHtml } from '../components/productCard.js';
 import { refreshCartDrawer } from '../components/cartDrawer.js';
 import { getWishlist, removeFromWishlist } from '../services/wishlistService.js';
-import { getPublishedProducts } from '../data/productStore.js';
+import { fetchProducts } from '../services/productService.js';
+import { isInStock } from '../data/products.js';
 
-const products = getPublishedProducts();
 import { addToCart } from '../services/cartService.js';
 import { showToast } from '../components/toast.js';
 
 initShell({ currentPage: 'shop' });
 
 let bound = false;
-render();
+let products = [];
+loadProducts();
+
+async function loadProducts() {
+  const root = document.getElementById('wishlistRoot');
+  root.innerHTML = '<div class="state-block"><h2>Loading your wishlist…</h2></div>';
+  try {
+    products = await fetchProducts();
+    render();
+  } catch {
+    root.innerHTML = '<div class="state-block"><h2>Your wishlist is temporarily unavailable</h2><p>Please try again in a moment.</p><button class="btn btn-outline" id="retryWishlist" type="button">Try again</button></div>';
+    root.querySelector('#retryWishlist')?.addEventListener('click', loadProducts);
+  }
+}
 
 function render() {
   const ids = getWishlist();
-  const items = ids.map((id) => products.find((p) => p.id === id)).filter(Boolean);
+  const items = ids.map((id) => products.find((p) => String(p.id) === String(id))).filter(Boolean);
   const root = document.getElementById('wishlistRoot');
 
   if (items.length === 0) {
@@ -34,14 +47,14 @@ function render() {
     <div class="product-grid">
       ${items.map((p) => `
         <article class="product-card">
-          <a href="product.html?slug=${p.slug}" class="product-card__media">
-            <img src="${p.images[0]}" alt="${p.name}" loading="lazy" />
+          <a href="product.html?slug=${encodeURIComponent(p.slug)}" class="product-card__media">
+            <img src="${escapeHtml(p.images?.[0] || 'assets/img/brand/nuvanti-logo.png')}" alt="${escapeHtml(p.name)}" loading="lazy" />
           </a>
-          <a href="product.html?slug=${p.slug}"><p class="product-card__name">${p.name}</p></a>
+          <a href="product.html?slug=${encodeURIComponent(p.slug)}"><p class="product-card__name">${escapeHtml(p.name)}</p></a>
           <p class="product-card__price" style="margin-bottom:.75rem">${formatPrice(p.price)}</p>
           <div style="display:flex;gap:.5rem">
-            <button class="btn btn-primary btn-sm" style="flex:1" data-move="${p.id}">Move to Bag</button>
-            <button class="icon-btn" style="border:1px solid var(--color-border)" data-remove="${p.id}" aria-label="Remove">${icon('close')}</button>
+            <button class="btn btn-primary btn-sm" style="flex:1" data-move="${escapeHtml(p.id)}" ${isInStock(p) ? '' : 'disabled'}>${isInStock(p) ? 'Move to Bag' : 'Sold Out'}</button>
+            <button class="icon-btn" style="border:1px solid var(--color-border)" data-remove="${escapeHtml(p.id)}" aria-label="Remove ${escapeHtml(p.name)}">${icon('close')}</button>
           </div>
         </article>
       `).join('')}
@@ -58,11 +71,12 @@ function onClick(e) {
   const move = e.target.closest('[data-move]');
   const remove = e.target.closest('[data-remove]');
   if (move) {
-    const product = products.find((p) => p.id === move.dataset.move);
-    const size = product.sizes.find((s) => (product.inventory[s] || 0) > 0) || product.sizes[0];
-    addToCart({ product, size, color: product.colors[0], quantity: 1 });
+    const product = products.find((p) => String(p.id) === String(move.dataset.move));
+    if (!product || !isInStock(product)) return;
+    const size = product.sizes?.find((s) => (product.inventory[s] || 0) > 0) || product.sizes?.[0] || 'One Size';
+    addToCart({ product, size, color: product.colors?.[0] || 'Default', quantity: 1 });
     removeFromWishlist(product.id);
-    showToast(`${product.name} moved to bag`, { icon: 'bag' });
+    showToast('Moved to bag', { icon: 'bag' });
     refreshCartDrawer();
     render();
   } else if (remove) {

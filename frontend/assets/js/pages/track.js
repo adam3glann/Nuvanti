@@ -1,5 +1,5 @@
 import { initShell } from '../main.js';
-import { formatPrice } from '../components/productCard.js';
+import { formatPrice, escapeHtml } from '../components/productCard.js';
 
 initShell({ currentPage: '' });
 
@@ -21,7 +21,7 @@ if (orderId && token) {
 function renderLookupForm(error) {
   root.innerHTML = `
     <form id="lookupForm" novalidate style="max-width:420px;margin-inline:auto">
-      ${error ? `<p class="form-error" style="margin-bottom:1rem">${error}</p>` : ''}
+      ${error ? `<p class="form-error" style="margin-bottom:1rem">${escapeHtml(error)}</p>` : ''}
       <div class="field"><label for="lkOrder">Order Number</label><input id="lkOrder" placeholder="e.g. 1042" required /></div>
       <div class="field"><label for="lkToken">Tracking Code</label><input id="lkToken" required /><span class="hint">Both are in your confirmation email or WhatsApp message.</span></div>
       <button class="btn btn-primary btn-block" type="submit">Track Order</button>
@@ -57,7 +57,7 @@ function renderOrder(order) {
     <div class="order-detail-card">
       <div class="order-detail-row"><span>Order Number</span><strong>NV-${order.id}</strong></div>
       <div class="order-detail-row"><span>Placed</span><span>${new Date(order.createdAt).toLocaleDateString()}</span></div>
-      ${order.city ? `<div class="order-detail-row"><span>Shipping To</span><span>${order.city}, ${order.country}</span></div>` : ''}
+      ${order.city ? `<div class="order-detail-row"><span>Shipping To</span><span>${escapeHtml(order.city)}, ${escapeHtml(order.country)}</span></div>` : ''}
       <div class="order-detail-row"><span>Delivery</span><span>${order.delivery === 'express' ? 'Express (1–2 days)' : 'Standard (4–7 days)'}</span></div>
     </div>
 
@@ -74,7 +74,7 @@ function renderOrder(order) {
 
     <div class="order-detail-card">
       ${order.items.map((it) => `
-        <div class="order-detail-row"><span>${it.name}${it.color || it.size ? ` (${[it.color, it.size].filter(Boolean).join(', ')})` : ''} × ${it.quantity}</span></div>
+        <div class="order-detail-row"><span>${escapeHtml(it.name)}${it.color || it.size ? ` (${escapeHtml([it.color, it.size].filter(Boolean).join(', '))})` : ''} × ${Number(it.quantity)}</span></div>
       `).join('')}
       <hr class="hr" style="margin-block:1rem" />
       <div class="order-detail-row" style="font-weight:700;font-size:1.05rem"><span>Total</span><span>${formatPrice(order.total)}</span></div>

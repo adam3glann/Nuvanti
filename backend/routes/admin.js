@@ -135,7 +135,42 @@ router.get('/orders', requirePermission('orders.view'), async (req, res) => {
     items: row.items, notes: [],
   })));
 });
-router.patch('/orders/:id', requirePermission('orders.edit'), async (req, res) => { const status = z.enum(['pending', 'paid', 'fulfilled', 'cancelled']).parse(req.body?.status); const { rows } = await query('UPDATE orders SET status = $1 WHERE id = $2 RETURNING id, status', [status, req.params.id]); if (!rows[0]) return res.status(404).json({ error: 'Order not found.' }); await logAudit({ req, action: 'order.status_changed', targetType: 'order', targetId: rows[0].id, metadata: { status } }); res.json(rows[0]); });
+router.patch('/orders/:id', requirePermission('orders.edit'), async (req, res) => {
+  const status = z.enum(['pending', 'paid', 'fulfilled', 'cancelled']).parse(req.body?.status);
+  const result = await transaction(async (client) => {
+    const { rows } = await client.query('SELECT id, status FROM orders WHERE id = $1 FOR UPDATE', [req.params.id]);
+    const order = rows[0];
+    if (!order) return { notFound: true };
+    if (order.status === status) return order;
+    if (order.status === 'cancelled' || order.status === 'fulfilled' || (status === 'cancelled' && order.status !== 'pending')) {
+      return { conflict: 'This order status cannot be changed. Only pending orders can be cancelled; cancelled and fulfilled orders are final.' };
+    }
+    if (status === 'cancelled') {
+      const { rows: items } = await client.query(`SELECT product_id AS "productId", COALESCE(size, 'One Size') AS size, SUM(quantity)::int AS quantity
+        FROM order_items WHERE order_id = $1 GROUP BY product_id, COALESCE(size, 'One Size')`, [order.id]);
+      for (const item of items) {
+        const { rows: products } = await client.query(`SELECT inventory, CASE WHEN metadata->'inventory' IS NULL OR metadata->'inventory' = '{}'::jsonb
+          THEN jsonb_build_object('One Size', inventory) ELSE metadata->'inventory' END AS "stockBySize"
+          FROM products WHERE id = $1 FOR UPDATE`, [item.productId]);
+        if (!products[0]) continue;
+        const stockBySize = products[0].stockBySize || { 'One Size': products[0].inventory };
+        stockBySize[item.size] = Math.max(0, Number(stockBySize[item.size]) || 0) + item.quantity;
+        const totalStock = Object.values(stockBySize).reduce((sum, value) => sum + Math.max(0, Number(value) || 0), 0);
+        await client.query(`UPDATE products SET inventory = $2,
+          metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{inventory}', $3::jsonb, true), updated_at = NOW()
+          WHERE id = $1`, [item.productId, totalStock, JSON.stringify(stockBySize)]);
+        await client.query(`INSERT INTO inventory_adjustments (product_id, size, change, reason, actor_user_id)
+          VALUES ($1, $2, $3, $4, $5)`, [item.productId, item.size, item.quantity, `Cancelled order NV-${order.id}`, req.user.sub]);
+      }
+    }
+    const updated = await client.query('UPDATE orders SET status = $1 WHERE id = $2 RETURNING id, status', [status, order.id]);
+    return updated.rows[0];
+  });
+  if (result.notFound) return res.status(404).json({ error: 'Order not found.' });
+  if (result.conflict) return res.status(409).json({ error: result.conflict });
+  await logAudit({ req, action: 'order.status_changed', targetType: 'order', targetId: result.id, metadata: { status } });
+  res.json(result);
+});
 router.get('/categories', requirePermission('products.view'), async (req, res) => { const { rows } = await query(`SELECT c.id::text, c.name, c.slug, c.description, c.is_active AS "isActive", count(p.id)::int AS "productCount" FROM categories c LEFT JOIN products p ON p.category = c.slug GROUP BY c.id ORDER BY c.name`); res.json(rows.map((c) => ({ ...c, status: c.isActive ? 'active' : 'disabled' }))); });
 router.post('/categories', requirePermission('products.create'), async (req, res) => { const c = categoryInput.parse(req.body); const { rows } = await query('INSERT INTO categories (name, slug, description) VALUES ($1, $2, $3) RETURNING id::text, name, slug, description, is_active AS "isActive"', [c.name, c.slug, c.description || '']); await logAudit({ req, action: 'category.created', targetType: 'category', targetId: rows[0].id, metadata: { name: c.name, slug: c.slug } }); res.status(201).json({ ...rows[0], productCount: 0, status: 'active' }); });
 router.patch('/categories/:id', requirePermission('products.edit'), async (req, res) => { const isActive = z.boolean().parse(req.body?.isActive); const { rows } = await query('UPDATE categories SET is_active = $1 WHERE id = $2 RETURNING id::text, is_active AS "isActive"', [isActive, req.params.id]); if (!rows[0]) return res.status(404).json({ error: 'Category not found.' }); res.json(rows[0]); });
@@ -154,13 +189,21 @@ router.post('/inventory/:productId/:size/adjust', requirePermission('inventory.a
   const input = z.object({ change: z.number().int().min(-100000).max(100000).refine((value) => value !== 0), reason: z.string().trim().min(2).max(240) }).parse(req.body);
   const size = z.string().min(1).max(20).parse(req.params.size);
   const result = await transaction(async (client) => {
-    const existing = await client.query('SELECT inventory->>$2 AS stock FROM products WHERE id = $1 AND inventory ? $2 FOR UPDATE', [req.params.productId, size]);
+    const existing = await client.query(`SELECT CASE WHEN metadata->'inventory' IS NULL OR metadata->'inventory' = '{}'::jsonb
+      THEN jsonb_build_object('One Size', inventory) ELSE metadata->'inventory' END AS "stockBySize"
+      FROM products WHERE id = $1 FOR UPDATE`, [req.params.productId]);
     if (!existing.rows[0]) return null;
-    const currentStock = Number(existing.rows[0].stock) || 0;
+    const stockBySize = existing.rows[0].stockBySize || {};
+    if (!(size in stockBySize)) return { error: 'This size does not exist for the product.' };
+    const currentStock = Number(stockBySize[size]) || 0;
     const actualChange = input.change < 0 ? Math.max(input.change, -currentStock) : input.change;
     if (actualChange === 0) return { error: 'This size has no stock left to remove.' };
     const newStock = currentStock + actualChange;
-    await client.query(`UPDATE products SET inventory = jsonb_set(inventory, ARRAY[$2]::text[], to_jsonb($3::integer), true), updated_at = NOW() WHERE id = $1`, [req.params.productId, size, newStock]);
+    stockBySize[size] = newStock;
+    const totalStock = Object.values(stockBySize).reduce((sum, value) => sum + Math.max(0, Number(value) || 0), 0);
+    await client.query(`UPDATE products SET inventory = $2,
+      metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{inventory}', $3::jsonb, true), updated_at = NOW()
+      WHERE id = $1`, [req.params.productId, totalStock, JSON.stringify(stockBySize)]);
     await client.query('INSERT INTO inventory_adjustments (product_id, size, change, reason, actor_user_id) VALUES ($1, $2, $3, $4, $5)', [req.params.productId, size, actualChange, input.reason, req.user.sub]);
     return { stock: newStock, change: actualChange };
   });
