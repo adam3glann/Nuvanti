@@ -59,10 +59,11 @@ function renderForm(product, cats, cols) {
           <div class="card-head"><h2>Pricing</h2></div>
           <div class="card-pad">
             <div class="field-row3">
-              <div class="field"><label for="fPrice">Price (EGP)</label><input type="number" id="fPrice" min="0" max="99999.99" step="0.01" value="${product.price}" /></div>
-              <div class="field"><label for="fCompare">Compare-at Price</label><input type="number" id="fCompare" min="0" max="99999.99" step="0.01" value="${product.compareAtPrice ?? ''}" /></div>
-              <div class="field"><label for="fCost">Cost Price</label><input type="number" id="fCost" min="0" max="99999.99" step="0.01" value="${product.cost ?? ''}" /></div>
+              <div class="field"><label for="fPrice">Price (EGP)</label><input type="text" inputmode="decimal" id="fPrice" value="${formatMoney(product.price)}" placeholder="12,345" /></div>
+              <div class="field"><label for="fCompare">Compare-at Price</label><input type="text" inputmode="decimal" id="fCompare" value="${product.compareAtPrice == null ? '' : formatMoney(product.compareAtPrice)}" placeholder="12,345" /></div>
+              <div class="field"><label for="fCost">Cost Price</label><input type="text" inputmode="decimal" id="fCost" value="${product.cost == null ? '' : formatMoney(product.cost)}" placeholder="12,345" /></div>
             </div>
+            <small class="hint">Enter amounts up to 99,999.99 EGP. Thousands are grouped automatically, e.g. 12,345.</small>
           </div>
         </div>
 
@@ -124,6 +125,7 @@ function renderForm(product, cats, cols) {
             </div>
             <div class="field"><label for="fMaterial">Material</label><input id="fMaterial" value="${esc(product.material || '')}" /></div>
             <div class="field"><label for="fColors">Colors</label><input id="fColors" value="${esc((product.colors || []).join(', '))}" placeholder="Black, White" /><small class="hint">Separate colors with commas.</small></div>
+            <div id="colorPalette" class="field"></div>
             <div class="field"><label for="fSizes">Sizes</label><input id="fSizes" value="${esc((product.sizes || []).join(', '))}" placeholder="S, M, L, XL" /><small class="hint">Separate sizes with commas; stock is tracked per size.</small></div>
           </div>
         </div>
@@ -136,6 +138,19 @@ function renderForm(product, cats, cols) {
 
   renderImages(product.images || []);
   renderVariants(product);
+  const colorSwatches = { ...(product.colorSwatches || {}) };
+  renderColorPalette(splitList(val('fColors')), colorSwatches);
+
+  for (const field of ['fPrice', 'fCompare', 'fCost']) {
+    const input = document.getElementById(field);
+    input.addEventListener('focus', () => { input.value = input.value.replace(/,/g, ''); });
+    input.addEventListener('blur', () => { if (input.value.trim()) input.value = formatMoney(parseMoney(input.value)); });
+    input.addEventListener('input', () => {
+      const cleaned = input.value.replace(/[^\d.]/g, '');
+      const [whole, ...fraction] = cleaned.split('.');
+      input.value = whole + (fraction.length ? `.${fraction.join('').slice(0, 2)}` : '');
+    });
+  }
 
   let slugEdited = Boolean(product.slug);
   document.getElementById('fSlug').addEventListener('input', () => { slugEdited = true; });
@@ -146,7 +161,9 @@ function renderForm(product, cats, cols) {
     document.getElementById(field).addEventListener('input', () => {
       const stock = { ...(product.inventory || {}) };
       document.querySelectorAll('[data-stock-size]').forEach((input) => { stock[input.dataset.stockSize] = Math.max(0, Number(input.value) || 0); });
-      renderVariants({ ...product, colors: splitList(val('fColors')), sizes: splitList(val('fSizes')), inventory: stock });
+      const colors = splitList(val('fColors'));
+      renderVariants({ ...product, colors, sizes: splitList(val('fSizes')), inventory: stock });
+      renderColorPalette(colors, colorSwatches);
     });
   }
 
@@ -158,9 +175,9 @@ function renderForm(product, cats, cols) {
     if (name.length < 2) return showAdminToast('Enter a product name with at least 2 characters.', 'error');
     if (!slug) return showAdminToast('Enter a product name so a product URL can be created.', 'error');
     if (!category) return showAdminToast('Create a category before adding products.', 'error');
-    const price = Number(val('fPrice'));
-    const compareAt = val('fCompare') ? Number(val('fCompare')) : null;
-    const cost = val('fCost') ? Number(val('fCost')) : null;
+    const price = parseMoney(val('fPrice'));
+    const compareAt = val('fCompare') ? parseMoney(val('fCompare')) : null;
+    const cost = val('fCost') ? parseMoney(val('fCost')) : null;
     if (!Number.isFinite(price) || price < 0 || price > 99999.99) return showAdminToast('Price must be between 0 and 99,999.99 EGP.', 'error');
     if (compareAt !== null && (!Number.isFinite(compareAt) || compareAt < 0 || compareAt > 99999.99)) return showAdminToast('Compare-at price must be between 0 and 99,999.99 EGP.', 'error');
     if (cost !== null && (!Number.isFinite(cost) || cost < 0 || cost > 99999.99)) return showAdminToast('Cost price must be between 0 and 99,999.99 EGP.', 'error');
@@ -178,6 +195,7 @@ function renderForm(product, cats, cols) {
       seoTitle: val('fSeoTitle'), seoDescription: val('fSeoDesc'),
       images: product.images || [],
       colors,
+      colorSwatches: Object.fromEntries(colors.map((color) => [color, validHex(colorSwatches[color]) || defaultColorHex(color)])),
       sizes,
       inventory: readInventory(stockProduct),
     };
@@ -263,8 +281,33 @@ function renderVariants(product) {
   });
 }
 
+function renderColorPalette(colors, swatches) {
+  const root = document.getElementById('colorPalette');
+  if (!colors.length) {
+    root.innerHTML = '<small class="hint">Add color names above to choose their swatch colors.</small>';
+    return;
+  }
+  root.innerHTML = `<label>Color palette</label><div style="display:grid;gap:.5rem;margin-top:.35rem">${colors.map((color, index) => {
+    const hex = validHex(swatches[color]) || defaultColorHex(color);
+    return `<div style="display:flex;align-items:center;gap:.6rem"><input type="color" value="${hex}" data-palette-index="${index}" aria-label="Choose ${esc(color)} swatch color" style="width:42px;height:36px;padding:3px" /><span>${esc(color)}</span><code>${hex.toUpperCase()}</code></div>`;
+  }).join('')}</div><small class="hint">Pick the swatch color customers will see for each option.</small>`;
+  root.querySelectorAll('[data-palette-index]').forEach((input) => input.addEventListener('input', () => {
+    const color = colors[Number(input.dataset.paletteIndex)];
+    swatches[color] = input.value;
+    input.nextElementSibling.nextElementSibling.textContent = input.value.toUpperCase();
+  }));
+}
+
+function defaultColorHex(color) {
+  const known = { black: '#121114', grey: '#9A9690', gray: '#9A9690', olive: '#5B5A42', navy: '#232B3B', 'off-white': '#EFEBE2', white: '#FFFFFF', red: '#D62828', blue: '#246BCE', green: '#2D8A52', beige: '#D9C8A9', brown: '#795548', pink: '#E98AB8' };
+  return known[color.toLowerCase()] || '#808080';
+}
+function validHex(value) { return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value) ? value : null; }
+
 function val(id) { return document.getElementById(id).value; }
 function imageSrc(url) { return /^https?:\/\//i.test(url) ? url : `/store-assets/${String(url).replace(/^assets\//, '')}`; }
 function splitList(value) { return [...new Set(value.split(',').map((item) => item.trim()).filter(Boolean))]; }
 function makeSlug(value) { return String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 160); }
+function parseMoney(value) { const normalized = String(value ?? '').replace(/,/g, '').trim(); return normalized ? Number(normalized) : NaN; }
+function formatMoney(value) { const amount = Number(value); return Number.isFinite(amount) ? amount.toLocaleString('en-US', { maximumFractionDigits: 2 }) : ''; }
 function esc(s) { return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }

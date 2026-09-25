@@ -664,7 +664,7 @@ function renderInfo() {
               class="color-option"
               data-color="${escapeAttribute(color)}"
               data-active="${color === selectedColor}"
-              style="background:${colorHex(color)}"
+              style="background:${colorHex(color, product.colorSwatches)}"
               aria-label="${escapeAttribute(color)}"
               title="${escapeAttribute(color)}"
             ></button>

@@ -15,6 +15,7 @@ initShell({ currentPage: 'shop' });
 
 let allSizes = [...new Set(allProducts.flatMap((p) => p.sizes || []))];
 let allColors = [...new Set(allProducts.flatMap((p) => p.colors || []))];
+let allColorSwatches = Object.assign({}, ...allProducts.map((p) => p.colorSwatches || {}));
 
 const params = new URLSearchParams(location.search);
 const state = {
@@ -39,6 +40,7 @@ async function initShop() {
   else if (!LOCAL_DEVELOPMENT) categories = [];
   allSizes = [...new Set(allProducts.flatMap((p) => p.sizes || []))];
   allColors = [...new Set(allProducts.flatMap((p) => p.colors || []))];
+  allColorSwatches = Object.assign({}, ...allProducts.map((p) => p.colorSwatches || {}));
   renderFilters();
   renderToolbar();
   initViewToggle();
@@ -81,7 +83,7 @@ function renderFilters() {
     <div class="filter-group">
       <div class="filter-group__title">Color</div>
       <div class="color-filter-grid">
-        ${allColors.map((c) => `<button type="button" class="color-filter" data-color="${escapeHtml(c)}" data-active="false" style="background:${colorHex(c)}" aria-label="${escapeHtml(c)}" title="${escapeHtml(c)}"></button>`).join('')}
+        ${allColors.map((c) => `<button type="button" class="color-filter" data-color="${escapeHtml(c)}" data-active="false" style="background:${colorHex(c, allColorSwatches)}" aria-label="${escapeHtml(c)}" title="${escapeHtml(c)}"></button>`).join('')}
       </div>
     </div>
     <div class="filter-group" style="border-bottom:none">

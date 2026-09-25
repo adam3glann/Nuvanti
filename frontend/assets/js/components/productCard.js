@@ -41,7 +41,7 @@ export function productCardHTML(product) {
           ${product.compareAtPrice ? `<span class="product-card__compare">${formatPrice(product.compareAtPrice)}</span>` : ''}
         </div>
         <div class="product-card__swatches">
-          ${colors.map((c) => `<span class="swatch" style="background:${colorHex(c)}" title="${escapeHtml(c)}" aria-label="${escapeHtml(c)}"></span>`).join('')}
+          ${colors.map((c) => `<span class="swatch" style="background:${colorHex(c, product.colorSwatches)}" title="${escapeHtml(c)}" aria-label="${escapeHtml(c)}"></span>`).join('')}
         </div>
       </a>
     </article>

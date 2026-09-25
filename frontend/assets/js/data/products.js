@@ -66,7 +66,10 @@ export const products = [
   },
 ];
 
-export function colorHex(name) {
+export function colorHex(name, swatches = {}) {
+  const selected = swatches?.[name];
+  if (typeof selected === 'string' && /^#[0-9a-f]{6}$/i.test(selected)) return selected;
+  if (typeof name === 'string' && /^#[0-9a-f]{6}$/i.test(name)) return name;
   return COLOR_HEX[name] || '#999';
 }
 
