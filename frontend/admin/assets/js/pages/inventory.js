@@ -20,7 +20,7 @@ async function init() {
 
   document.getElementById('searchInput').addEventListener('input', debounce((e) => { state.query = e.target.value; state.page = 1; load(); }, 250));
   document.getElementById('statusFilter').addEventListener('change', (e) => { state.status = e.target.value; state.page = 1; load(); });
-  document.getElementById('exportBtn').addEventListener('click', () => showAdminToast('Export will generate a CSV once connected to the backend.', 'info'));
+  document.getElementById('exportBtn').addEventListener('click', exportInventory);
 
   load();
 }
@@ -99,3 +99,40 @@ function openHistory(id, items) {
 }
 
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
+
+async function exportInventory() {
+  const button = document.getElementById('exportBtn');
+  button.disabled = true;
+  button.textContent = 'Preparing CSV…';
+  try {
+    const { items } = await fetchInventory({ query: state.query, status: state.status, page: 1, perPage: 100000 });
+    const columns = ['Product', 'Size', 'SKU', 'Stock', 'Reserved', 'Available', 'Status'];
+    const rows = items.map((row) => [row.productName, row.size, row.sku, row.stock, row.reserved, row.stock - row.reserved, rowStatus(row)]);
+    const csv = [columns, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n');
+    downloadCsv(csv, 'nuvanti-inventory.csv');
+    showAdminToast(`Exported ${items.length} inventory row(s).`, 'success');
+  } catch (error) {
+    showAdminToast(`Inventory export failed: ${error.message}`, 'error');
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Export CSV';
+  }
+}
+
+function csvCell(value) {
+  let text = String(value ?? '');
+  // Prevent spreadsheet formula execution for untrusted text columns.
+  if (/^[\u0000-\u0020]*[=+\-@]/.test(text)) text = `'${text}`;
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function downloadCsv(csv, filename) {
+  const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}

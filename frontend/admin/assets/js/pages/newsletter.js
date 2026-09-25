@@ -24,13 +24,19 @@ async function load() {
 }
 
 function exportCsv(rows) {
-  const quote = (value) => '"' + String(value ?? '').replace(/"/g, '""') + '"';
-  const csv = ['Email,Confirmed,Consent Recorded', ...rows.map((item) => [item.email, item.confirmedAt, item.consentedAt].map(quote).join(','))].join(String.fromCharCode(13, 10));
-  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  const quote = (value) => {
+    let text = String(value ?? '');
+    if (/^[\u0000-\u0020]*[=+\-@]/.test(text)) text = `'${text}`;
+    return '"' + text.replace(/"/g, '""') + '"';
+  };
+  const csv = ['Email,Confirmed,Consent Recorded', ...rows.map((item) => [item.email, item.confirmedAt, item.consentedAt].map(quote).join(','))].join('\r\n');
+  const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }));
   const link = document.createElement('a');
   link.href = url;
   link.download = 'nuvanti-newsletter-subscribers.csv';
+  document.body.append(link);
   link.click();
-  URL.revokeObjectURL(url);
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
   showAdminToast('Subscriber list exported.', 'success');
 }

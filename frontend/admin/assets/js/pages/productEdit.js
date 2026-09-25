@@ -12,9 +12,14 @@ const id = params.get('id');
 const isNew = !id;
 
 async function init() {
-  const cats = await fetchCategories();
-  const cols = await fetchCollections();
-  const product = isNew ? blankProduct() : await fetchAdminProduct(id);
+  let cats, cols, product;
+  try {
+    [cats, cols] = await Promise.all([fetchCategories(), fetchCollections()]);
+    product = isNew ? blankProduct() : await fetchAdminProduct(id);
+  } catch (error) {
+    document.getElementById('editRoot').innerHTML = `<div class="admin-empty"><h3>Couldn't load the product form</h3><p>${esc(error.message)}</p><a href="products.html" class="btn btn-outline">Back to Products</a></div>`;
+    return;
+  }
 
   if (!product) {
     document.getElementById('editRoot').innerHTML = `<div class="admin-empty"><h3>Product not found</h3><a href="products.html" class="btn btn-primary">Back to Products</a></div>`;
@@ -96,7 +101,6 @@ function renderForm(product, cats, cols) {
               <select id="fStatus">
                 <option value="draft" ${product.status === 'draft' ? 'selected' : ''}>Draft</option>
                 <option value="active" ${product.status === 'active' ? 'selected' : ''}>Published</option>
-                <option value="archived" ${product.status === 'archived' ? 'selected' : ''}>Archived</option>
               </select>
             </div>
             <label class="checkbox-row" style="margin-bottom:.6rem"><input type="checkbox" id="fFeatured" ${product.featured ? 'checked' : ''}/> Featured</label><br/>
@@ -119,6 +123,8 @@ function renderForm(product, cats, cols) {
               </select>
             </div>
             <div class="field"><label for="fMaterial">Material</label><input id="fMaterial" value="${esc(product.material || '')}" /></div>
+            <div class="field"><label for="fColors">Colors</label><input id="fColors" value="${esc((product.colors || []).join(', '))}" placeholder="Black, White" /><small class="hint">Separate colors with commas.</small></div>
+            <div class="field"><label for="fSizes">Sizes</label><input id="fSizes" value="${esc((product.sizes || []).join(', '))}" placeholder="S, M, L, XL" /><small class="hint">Separate sizes with commas; stock is tracked per size.</small></div>
           </div>
         </div>
 
@@ -131,28 +137,56 @@ function renderForm(product, cats, cols) {
   renderImages(product.images || []);
   renderVariants(product);
 
+  let slugEdited = Boolean(product.slug);
+  document.getElementById('fSlug').addEventListener('input', () => { slugEdited = true; });
+  document.getElementById('fName').addEventListener('input', (event) => {
+    if (!slugEdited) document.getElementById('fSlug').value = makeSlug(event.target.value);
+  });
+  for (const field of ['fColors', 'fSizes']) {
+    document.getElementById(field).addEventListener('input', () => {
+      const stock = { ...(product.inventory || {}) };
+      document.querySelectorAll('[data-stock-size]').forEach((input) => { stock[input.dataset.stockSize] = Math.max(0, Number(input.value) || 0); });
+      renderVariants({ ...product, colors: splitList(val('fColors')), sizes: splitList(val('fSizes')), inventory: stock });
+    });
+  }
+
   document.getElementById('saveBtn').addEventListener('click', async () => {
+    const button = document.getElementById('saveBtn');
+    const name = val('fName').trim();
+    const slug = makeSlug(val('fSlug') || name);
+    const category = val('fCategory');
+    if (name.length < 2) return showAdminToast('Enter a product name with at least 2 characters.', 'error');
+    if (!slug) return showAdminToast('Enter a product name so a product URL can be created.', 'error');
+    if (!category) return showAdminToast('Create a category before adding products.', 'error');
+    const colors = splitList(val('fColors'));
+    const sizes = splitList(val('fSizes'));
+    const stockProduct = { ...product, colors, sizes };
     const patch = {
-      name: val('fName'), slug: val('fSlug'), description: val('fDesc'),
+      name, slug, description: val('fDesc'),
       price: Number(val('fPrice')) || 0, compareAtPrice: val('fCompare') ? Number(val('fCompare')) : null,
-      cost: Number(val('fCost')) || 0, sku: val('fSku'), category: val('fCategory'), collection: val('fCollection'),
+      cost: Number(val('fCost')) || 0, sku: val('fSku').trim(), category, collection: val('fCollection'),
       material: val('fMaterial'), status: val('fStatus'),
       featured: document.getElementById('fFeatured').checked,
       bestseller: document.getElementById('fBestseller').checked,
       newArrival: document.getElementById('fNewArrival').checked,
       seoTitle: val('fSeoTitle'), seoDescription: val('fSeoDesc'),
       images: product.images || [],
-      colors: product.colors || [],
-      sizes: product.sizes || [],
-      inventory: readInventory(product),
+      colors,
+      sizes,
+      inventory: readInventory(stockProduct),
     };
-    if (isNew) {
-      await createAdminProduct(patch);
-    } else {
-      await updateAdminProduct(product.id, patch);
+    button.disabled = true;
+    button.textContent = isNew ? 'Creating…' : 'Saving…';
+    try {
+      if (isNew) await createAdminProduct(patch);
+      else await updateAdminProduct(product.id, patch);
+      showAdminToast(isNew ? 'Product created.' : 'Product saved — live in the store now.', 'success');
+      setTimeout(() => { location.href = 'products.html'; }, 500);
+    } catch (error) {
+      showAdminToast(error.message || 'Could not save this product.', 'error');
+      button.disabled = false;
+      button.textContent = isNew ? 'Create Product' : 'Save Changes';
     }
-    showAdminToast(isNew ? 'Product created.' : 'Product saved — live in the store now.', 'success');
-    setTimeout(() => { location.href = 'products.html'; }, 500);
   });
 }
 
@@ -225,4 +259,6 @@ function renderVariants(product) {
 
 function val(id) { return document.getElementById(id).value; }
 function imageSrc(url) { return /^https?:\/\//i.test(url) ? url : `/store-assets/${String(url).replace(/^assets\//, '')}`; }
-function esc(s) { return (s || '').replace(/"/g, '&quot;'); }
+function splitList(value) { return [...new Set(value.split(',').map((item) => item.trim()).filter(Boolean))]; }
+function makeSlug(value) { return String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 160); }
+function esc(s) { return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
