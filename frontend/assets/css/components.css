@@ -362,10 +362,7 @@
     transform var(--dur-med) var(--ease-editorial);
 }
 .product-card:hover .product-card__media {
-  box-shadow:
-    0 20px 40px var(--shadow-glow-color),
-    var(--shadow-hover);
-  transform: translateY(-6px);
+  transform: translateY(-4px);
 }
 .product-card__media img {
   position: absolute;
@@ -379,7 +376,7 @@
     transform var(--dur-slow) var(--ease-editorial);
 }
 .product-card:hover .product-card__media img:not(.img-alt) {
-  transform: scale(1.09);
+  transform: scale(1.035);
 }
 .product-card__media img.img-alt {
   opacity: 0;
@@ -2098,4 +2095,17 @@
   .hero-arrow:hover {
     transform: none;
   }
+}
+
+/* Keep product-entry motion on the compositor: opacity and transform only. */
+@keyframes product-card-arrive {
+  from { opacity: 0; transform: translate3d(0, 10px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+.product-card {
+  animation: product-card-arrive 380ms var(--ease-editorial) both;
+  animation-delay: calc(var(--card-order, 0) * 35ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .product-card { animation: none; }
 }

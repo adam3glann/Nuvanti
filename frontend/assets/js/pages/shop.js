@@ -219,6 +219,7 @@ async function runFilter(append = false) {
 
   const visibleCount = state.page * state.perPage;
   const visible = cache.slice(0, visibleCount);
+  const previousVisibleCount = append ? (state.page - 1) * state.perPage : 0;
 
   document.getElementById('resultCount').textContent = `${cache.length} Product${cache.length === 1 ? '' : 's'}`;
 
@@ -234,7 +235,9 @@ async function runFilter(append = false) {
     return;
   }
 
-  resultsEl.innerHTML = visible.map(productCardHTML).join('');
+  const cardsToRender = append ? visible.slice(previousVisibleCount) : visible;
+  if (append) resultsEl.insertAdjacentHTML('beforeend', cardsToRender.map((product, index) => productCardHTML(product, previousVisibleCount + index)).join(''));
+  else resultsEl.innerHTML = visible.map(productCardHTML).join('');
   bindProductCardEvents(resultsEl, { products: cache, onCartChange: refreshCartDrawer });
   document.getElementById('loadMoreWrap').hidden = visible.length >= cache.length;
 }

@@ -4,7 +4,7 @@ import { toggleWishlist, isWishlisted } from '../services/wishlistService.js';
 import { addToCart } from '../services/cartService.js';
 import { showToast } from './toast.js';
 
-export function productCardHTML(product) {
+export function productCardHTML(product, index = 0) {
   const images = Array.isArray(product.images) ? product.images.filter(Boolean) : [];
   const colors = Array.isArray(product.colors) ? product.colors : [];
   const badges = Array.isArray(product.badges) ? product.badges : [];
@@ -16,7 +16,7 @@ export function productCardHTML(product) {
   const wished = isWishlisted(product.id);
   const inStock = isInStock(product) && sizes.length > 0;
   return `
-    <article class="product-card" data-product-id="${escapeHtml(product.id)}">
+    <article class="product-card" data-product-id="${escapeHtml(product.id)}" style="--card-order:${Math.min(Number(index) || 0, 7)}">
       <a href="product.html?slug=${slug}" class="product-card__media" aria-label="View ${name}">
         <img src="${escapeHtml(image)}" alt="${name}" loading="lazy" width="600" height="750" />
         <img src="${escapeHtml(alt)}" alt="" class="img-alt" loading="lazy" width="600" height="750" />
