@@ -137,7 +137,12 @@ router.post('/verify-email/request', requireAuth, async (req, res) => {
   const { rows } = await query('SELECT id, email, name, email_verified_at AS "emailVerifiedAt" FROM users WHERE id = $1', [req.user.sub]);
   if (!rows[0]) return res.status(404).json({ error: 'Account not found.' });
   if (rows[0].emailVerifiedAt) return res.status(400).json({ error: 'Your email is already verified.' });
-  await sendVerificationLink(rows[0]);
+  try {
+    await sendVerificationLink(rows[0]);
+  } catch (error) {
+    console.error('Verification email resend failed:', error);
+    return res.status(502).json({ error: 'The verification email could not be sent. Check the mail provider settings in Railway and try again.' });
+  }
   res.status(202).json({ message: 'Verification email sent.' });
 });
 

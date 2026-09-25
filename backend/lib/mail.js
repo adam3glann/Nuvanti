@@ -39,7 +39,15 @@ async function deliver({ to, subject, text, html, replyTo, devLabel, devDetail }
     if (!response.ok) throw new Error(`Resend email delivery failed (${response.status}): ${result.message || 'provider rejected the message'}`);
     return;
   }
-  const transporter = nodemailer.createTransport({ host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT || 587), secure: process.env.SMTP_SECURE === 'true', auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } });
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: process.env.SMTP_SECURE === 'true',
+    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
+  });
   await transporter.sendMail({ from: process.env.MAIL_FROM, to, subject, text, html, ...(replyTo ? { replyTo } : {}) });
 }
 
