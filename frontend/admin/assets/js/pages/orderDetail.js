@@ -6,13 +6,12 @@ import { confirmDialog } from '../components/confirmDialog.js';
 import { hasPermission } from '../components/permissions.js';
 import { fetchAdminOrder, updateOrderStatus, cancelOrder } from '../services/orderService.js';
 
-const session = initAdminShell({ page: 'orders', title: 'Order Details' });
-if (session) init();
-
 const params = new URLSearchParams(location.search);
 const id = params.get('id');
+const session = initAdminShell({ page: 'orders', title: 'Order Details' });
 const canEdit = session && hasPermission(session.role, 'orders.edit');
 const canCancel = session && hasPermission(session.role, 'orders.cancel');
+if (session) init();
 
 async function init() {
   let order;
