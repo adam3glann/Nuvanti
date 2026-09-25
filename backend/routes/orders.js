@@ -9,6 +9,7 @@ import { sendOrderWhatsApp } from '../lib/whatsapp.js';
 import { storePublicOrigin } from '../lib/publicOrigins.js';
 
 const router = Router();
+const asyncRoute = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
 const checkout = z.object({
   items: z.array(z.object({
     productId: z.coerce.number().int().positive(),
@@ -48,7 +49,7 @@ router.post('/validate-discount', discountPreviewLimiter, async (req, res) => {
   res.json({ code: discount.code, type: discount.type, value: discount.value, discountCents });
 });
 
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireAuth, asyncRoute(async (req, res) => {
   const { items, shipping, delivery, discountCode } = checkout.parse(req.body);
   const trackingToken = crypto.randomBytes(24).toString('hex');
   const { order, itemSummaries } = await transaction(async (client) => {
@@ -134,7 +135,7 @@ router.post('/', requireAuth, async (req, res) => {
     sendOrderWhatsApp({ phone: shipping.phone, message: `Hi ${shipping.name}, your Nuvanti order #${order.id} is confirmed! Track it here: ${trackingUrl}` })
       .catch((error) => console.error('Order confirmation WhatsApp failed:', error));
   }
-});
+}));
 router.get('/mine', requireAuth, async (req, res) => {
   const { rows } = await query(`SELECT o.id, o.status, o.total_cents AS "totalCents", o.created_at AS "createdAt", o.tracking_token AS "trackingToken", coalesce(sum(i.quantity), 0)::int AS "itemCount" FROM orders o LEFT JOIN order_items i ON i.order_id = o.id WHERE o.user_id = $1 GROUP BY o.id ORDER BY o.created_at DESC`, [req.user.sub]);
   const storeOrigin = storePublicOrigin();

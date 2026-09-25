@@ -71,6 +71,10 @@ const storeOrigin = safePublicOrigin(
   process.env.STORE_ORIGIN,
   defaultStoreOrigin,
 );
+// Keep the shipped Cloudflare Pages storefront trusted even if STORE_ORIGIN
+// was accidentally set to the Railway API/admin domain. Additional custom
+// storefront domains still have to be explicitly configured above.
+const storeOrigins = [...new Set([storeOrigin, defaultStoreOrigin])];
 const storePreviewOrigin = process.env.STORE_PREVIEW_ORIGIN
   ? safePublicOrigin(
       "STORE_PREVIEW_ORIGIN",
@@ -142,7 +146,7 @@ if (trustProxy) app.set("trust proxy", trustProxy);
 app.use(helmet({ crossOriginResourcePolicy: { policy: "same-site" } }));
 app.use(
   cors({
-    origin: [storeOrigin, storePreviewOrigin, adminOrigin].filter(Boolean),
+    origin: [...new Set([...storeOrigins, storePreviewOrigin, adminOrigin].filter(Boolean))],
     credentials: true,
     methods: ["GET", "POST", "PATCH", "DELETE"],
   }),
@@ -165,7 +169,7 @@ app.use(
     legacyHeaders: false,
   }),
 );
-app.use(sameOrigin({ storeOrigin, storePreviewOrigin, adminOrigin }));
+app.use(sameOrigin({ storeOrigin, storeOrigins, storePreviewOrigin, adminOrigin }));
 app.use(
   "/api/auth",
   rateLimit({

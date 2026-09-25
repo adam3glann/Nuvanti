@@ -3,16 +3,21 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { z } from 'zod';
 import { query, transaction } from '../lib/db.js';
-import { clearSession, readSession, requireAuth, sessionCookie, signSession } from '../lib/auth.js';
+import { clearMfaChallengeCookie, clearSession, issueSession, readMfaChallenge, readSession, requireAuth, requireRole, setMfaChallengeCookie, setSessionCookie } from '../lib/auth.js';
 import { sendPasswordReset, sendVerificationEmail } from '../lib/mail.js';
 import { logAudit } from '../lib/audit.js';
 import { adminPublicOrigin, storePublicOrigin } from '../lib/publicOrigins.js';
+import { createOtpAuthUri, createRecoveryCodes, createTotpSecret, decryptTotpSecret, encryptTotpSecret, hashRecoveryCode, verifyTotp } from '../lib/totp.js';
 
 const STAFF_ROLES = ['staff', 'manager', 'admin', 'super_admin'];
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_MINUTES = 15;
 
 const router = Router();
+// Express 4 does not forward rejected async route promises to error middleware.
+// Wrap route handlers so DB/decryption failures become safe HTTP errors rather
+// than unhandled rejections that can crash the Railway process.
+const asyncRoute = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
 const credentials = z.object({ email: z.string().trim().email().max(254).transform((v) => v.toLowerCase()), password: z.string().min(8).max(128) });
 const registrationCredentials = z.object({ email: z.string().trim().email().max(254).transform((v) => v.toLowerCase()), password: z.string().min(12).max(128) });
 const resetRequest = z.object({ email: z.string().trim().email().max(254).transform((v) => v.toLowerCase()) });
@@ -23,8 +28,8 @@ router.post('/register', async (req, res) => {
   const name = z.string().trim().min(2).max(100).parse(req.body.name);
   const passwordHash = await bcrypt.hash(password, 12);
   try {
-    const { rows } = await query('INSERT INTO users (email, name, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id, email, name, role', [email, name, passwordHash, 'customer']);
-    sessionCookie(res, signSession(rows[0]));
+    const { rows } = await query('INSERT INTO users (email, name, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id, email, name, role, session_version AS "sessionVersion"', [email, name, passwordHash, 'customer']);
+    setSessionCookie(res, await issueSession(rows[0], req));
     await logAudit({ req, actor: rows[0], action: 'auth.register', targetType: 'user', targetId: rows[0].id });
     res.status(201).json({ user: rows[0] });
     sendVerificationLink(rows[0]).catch((error) => console.error('Verification email failed:', error));
@@ -45,7 +50,7 @@ async function sendVerificationLink(user) {
 
 router.post('/login', async (req, res) => {
   const { email, password } = credentials.parse(req.body);
-  const { rows } = await query('SELECT id, email, name, role, password_hash, failed_login_count, locked_until FROM users WHERE email = $1 AND is_active = true', [email]);
+  const { rows } = await query('SELECT id, email, name, role, password_hash, failed_login_count, locked_until, session_version AS "sessionVersion", totp_secret_enc AS "totpSecretEnc", totp_enabled_at AS "totpEnabledAt" FROM users WHERE email = $1 AND is_active = true', [email]);
   const user = rows[0];
 
   if (user?.locked_until && new Date(user.locked_until) > new Date()) {
@@ -73,10 +78,55 @@ router.post('/login', async (req, res) => {
     await query('UPDATE users SET failed_login_count = 0, locked_until = NULL WHERE id = $1', [user.id]);
   }
   const safeUser = { id: user.id, email: user.email, name: user.name, role: user.role };
-  sessionCookie(res, signSession(safeUser));
+  clearSession(res);
+  if (user.totpEnabledAt && user.totpSecretEnc) {
+    setMfaChallengeCookie(res, user);
+    await logAudit({ req, actor: safeUser, action: 'auth.mfa_challenge', targetType: 'user', targetId: safeUser.id });
+    return res.json({ requiresTwoFactor: true });
+  }
+  setSessionCookie(res, await issueSession({ ...safeUser, sessionVersion: user.sessionVersion }, req));
   await logAudit({ req, actor: safeUser, action: 'auth.login_success', targetType: 'user', targetId: safeUser.id });
   res.json({ user: safeUser });
 });
+
+const mfaCodeInput = z.object({ code: z.string().trim().min(6).max(32) });
+
+router.post('/login/mfa', asyncRoute(async (req, res) => {
+  const challenge = readMfaChallenge(req);
+  const { code } = mfaCodeInput.parse(req.body);
+  if (!challenge) {
+    clearMfaChallengeCookie(res);
+    return res.status(401).json({ error: 'Your sign-in challenge expired. Enter your password again.' });
+  }
+  const { rows } = await query(`SELECT id, email, name, role, session_version AS "sessionVersion", totp_secret_enc AS "totpSecretEnc", totp_last_step AS "totpLastStep", totp_recovery_codes AS "recoveryCodes"
+    FROM users WHERE id = $1 AND is_active = true AND session_version = $2 AND totp_enabled_at IS NOT NULL`, [challenge.sub, challenge.ver]);
+  const user = rows[0];
+  if (!user) {
+    clearMfaChallengeCookie(res);
+    return res.status(401).json({ error: 'Your sign-in challenge expired. Enter your password again.' });
+  }
+
+  const step = verifyTotp(decryptTotpSecret(user.totpSecretEnc), code);
+  let authenticated = false;
+  if (step !== null) {
+    const consumed = await query(`UPDATE users SET totp_last_step = $1 WHERE id = $2 AND totp_last_step < $1`, [step, user.id]);
+    authenticated = consumed.rowCount === 1;
+  } else {
+    const recoveryHash = hashRecoveryCode(code);
+    const index = recoveryHash ? (user.recoveryCodes || []).indexOf(recoveryHash) : -1;
+    if (index >= 0) {
+      const consumed = await query(`UPDATE users SET totp_recovery_codes = totp_recovery_codes - $1 WHERE id = $2 AND totp_recovery_codes @> $3::jsonb`, [index, user.id, JSON.stringify([recoveryHash])]);
+      authenticated = consumed.rowCount === 1;
+    }
+  }
+  if (!authenticated) return res.status(401).json({ error: 'That authenticator or recovery code is invalid or already used.' });
+
+  const safeUser = { id: user.id, email: user.email, name: user.name, role: user.role, sessionVersion: user.sessionVersion };
+  clearMfaChallengeCookie(res);
+  setSessionCookie(res, await issueSession(safeUser, req));
+  await logAudit({ req, actor: safeUser, action: 'auth.login_success_mfa', targetType: 'user', targetId: safeUser.id });
+  res.json({ user: { id: user.id, email: user.email, name: user.name, role: user.role } });
+}));
 
 // Always return the same response so people cannot discover which emails
 // are registered. Works for every role — customers land back on the store,
@@ -121,10 +171,95 @@ router.post('/password-reset/confirm', async (req, res) => {
 
 router.post('/logout', async (req, res) => {
   const user = readSession(req);
-  if (user) await logAudit({ req, actor: { id: user.sub, email: user.email }, action: 'auth.logout', targetType: 'user', targetId: user.sub });
+  if (user) {
+    await query('UPDATE auth_sessions SET revoked_at = NOW() WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL', [user.jti, user.sub]);
+    await logAudit({ req, actor: { id: user.sub, email: user.email }, action: 'auth.logout', targetType: 'user', targetId: user.sub });
+  }
   clearSession(res);
   res.status(204).end();
 });
+
+const requireStaff = requireRole(...STAFF_ROLES);
+
+router.get('/sessions', requireAuth, requireStaff, asyncRoute(async (req, res) => {
+  const { rows } = await query(`SELECT id, user_agent AS "userAgent", created_at AS "createdAt", last_seen_at AS "lastSeenAt", expires_at AS "expiresAt"
+    FROM auth_sessions WHERE user_id = $1 AND session_version = (SELECT session_version FROM users WHERE id = $1)
+      AND revoked_at IS NULL AND expires_at > NOW() ORDER BY last_seen_at DESC`, [req.user.sub]);
+  res.json(rows.map((session) => ({ ...session, isCurrent: session.id === req.user.jti })));
+}));
+
+router.delete('/sessions/:id', requireAuth, requireStaff, asyncRoute(async (req, res) => {
+  const id = z.string().uuid().parse(req.params.id);
+  const { rows } = await query(`UPDATE auth_sessions SET revoked_at = NOW() WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL RETURNING id`, [id, req.user.sub]);
+  if (!rows[0]) return res.status(404).json({ error: 'Session not found or already revoked.' });
+  const isCurrent = id === req.user.jti;
+  if (isCurrent) clearSession(res);
+  await logAudit({ req, actor: req.user, action: isCurrent ? 'auth.session_revoked_current' : 'auth.session_revoked', targetType: 'session', targetId: id });
+  res.status(204).end();
+}));
+
+router.post('/sessions/revoke-others', requireAuth, requireStaff, asyncRoute(async (req, res) => {
+  const { rowCount } = await query(`UPDATE auth_sessions SET revoked_at = NOW() WHERE user_id = $1 AND id <> $2 AND revoked_at IS NULL AND expires_at > NOW()`, [req.user.sub, req.user.jti]);
+  await logAudit({ req, actor: req.user, action: 'auth.sessions_revoked_others', targetType: 'user', targetId: req.user.sub, metadata: { count: rowCount } });
+  res.json({ revoked: rowCount });
+}));
+
+router.post('/mfa/setup', requireAuth, requireStaff, asyncRoute(async (req, res) => {
+  const { currentPassword } = z.object({ currentPassword: z.string().min(1).max(128) }).parse(req.body);
+  const { rows } = await query('SELECT id, email, password_hash, totp_enabled_at AS "totpEnabledAt" FROM users WHERE id = $1 AND is_active = true', [req.user.sub]);
+  const user = rows[0];
+  if (!user || !(await bcrypt.compare(currentPassword, user.password_hash))) return res.status(401).json({ error: 'Current password is incorrect.' });
+  if (user.totpEnabledAt) return res.status(409).json({ error: 'Two-factor authentication is already enabled.' });
+  const secret = createTotpSecret();
+  let encryptedSecret;
+  try { encryptedSecret = encryptTotpSecret(secret); }
+  catch (error) { return res.status(error.status || 500).json({ error: error.message }); }
+  await query(`UPDATE users SET totp_pending_secret_enc = $1, totp_pending_expires_at = NOW() + INTERVAL '10 minutes' WHERE id = $2`, [encryptedSecret, user.id]);
+  res.json({ secret, otpauthUri: createOtpAuthUri(secret, user.email), expiresInSeconds: 600 });
+}));
+
+router.get('/mfa/status', requireAuth, requireStaff, asyncRoute(async (req, res) => {
+  const { rows } = await query(`SELECT totp_enabled_at IS NOT NULL AS enabled, jsonb_array_length(totp_recovery_codes) AS "recoveryCodesRemaining"
+    FROM users WHERE id = $1`, [req.user.sub]);
+  res.json(rows[0] || { enabled: false, recoveryCodesRemaining: 0 });
+}));
+
+router.post('/mfa/enable', requireAuth, requireStaff, asyncRoute(async (req, res) => {
+  const { code } = z.object({ code: z.string().regex(/^\d{6}$/) }).parse(req.body);
+  const { rows } = await query(`SELECT id, email, role, session_version AS "sessionVersion", totp_pending_secret_enc AS "pendingSecret", totp_last_step AS "lastStep"
+    FROM users WHERE id = $1 AND is_active = true AND totp_enabled_at IS NULL AND totp_pending_expires_at > NOW()`, [req.user.sub]);
+  const user = rows[0];
+  if (!user?.pendingSecret) return res.status(400).json({ error: 'Start authenticator setup again; the setup code expired.' });
+  const step = verifyTotp(decryptTotpSecret(user.pendingSecret), code);
+  if (step === null || step <= Number(user.lastStep)) return res.status(400).json({ error: 'The code is invalid or already used. Enter the current code from your authenticator app.' });
+  const { codes, hashes } = createRecoveryCodes();
+  const updated = await query(`UPDATE users SET totp_secret_enc = totp_pending_secret_enc, totp_pending_secret_enc = NULL, totp_pending_expires_at = NULL,
+    totp_enabled_at = NOW(), totp_last_step = $1, totp_recovery_codes = $2::jsonb, session_version = session_version + 1
+    WHERE id = $3 AND totp_enabled_at IS NULL AND totp_pending_expires_at > NOW() AND totp_last_step < $1 RETURNING session_version AS "sessionVersion"`, [step, JSON.stringify(hashes), user.id]);
+  if (!updated.rows[0]) return res.status(409).json({ error: 'Authenticator setup expired. Start again.' });
+  const currentUser = { id: user.id, email: user.email, role: user.role, sessionVersion: updated.rows[0].sessionVersion };
+  setSessionCookie(res, await issueSession(currentUser, req));
+  await logAudit({ req, actor: currentUser, action: 'auth.mfa_enabled', targetType: 'user', targetId: user.id });
+  res.json({ recoveryCodes: codes });
+}));
+
+router.post('/mfa/disable', requireAuth, requireStaff, asyncRoute(async (req, res) => {
+  const input = z.object({ currentPassword: z.string().min(1).max(128), code: z.string().regex(/^\d{6}$/) }).parse(req.body);
+  const { rows } = await query(`SELECT id, email, role, password_hash, session_version AS "sessionVersion", totp_secret_enc AS "totpSecret", totp_last_step AS "lastStep", totp_enabled_at AS "totpEnabledAt"
+    FROM users WHERE id = $1 AND is_active = true`, [req.user.sub]);
+  const user = rows[0];
+  if (!user?.totpEnabledAt || !(await bcrypt.compare(input.currentPassword, user.password_hash))) return res.status(401).json({ error: 'Current password is incorrect or two-factor authentication is not enabled.' });
+  const step = verifyTotp(decryptTotpSecret(user.totpSecret), input.code);
+  if (step === null || step <= Number(user.lastStep)) return res.status(401).json({ error: 'Authenticator code is invalid or already used.' });
+  const { rows: updated } = await query(`UPDATE users SET totp_secret_enc = NULL, totp_enabled_at = NULL, totp_recovery_codes = '[]'::jsonb,
+    totp_pending_secret_enc = NULL, totp_pending_expires_at = NULL, totp_last_step = $2, session_version = session_version + 1
+    WHERE id = $1 AND totp_last_step < $2 RETURNING session_version AS "sessionVersion"`, [user.id, step]);
+  if (!updated[0]) return res.status(401).json({ error: 'Authenticator code is invalid or already used.' });
+  const currentUser = { id: user.id, email: user.email, role: user.role, sessionVersion: updated[0].sessionVersion };
+  setSessionCookie(res, await issueSession(currentUser, req));
+  await logAudit({ req, actor: currentUser, action: 'auth.mfa_disabled', targetType: 'user', targetId: user.id });
+  res.status(204).end();
+}));
 router.get('/me', requireAuth, async (req, res) => {
   const { rows } = await query('SELECT id, email, name, role, email_verified_at AS "emailVerifiedAt" FROM users WHERE id = $1 AND is_active = true', [req.user.sub]);
   if (!rows[0]) return res.status(401).json({ error: 'Authentication required.' });
@@ -169,7 +304,8 @@ router.post('/change-password', requireAuth, async (req, res) => {
   if (!user || !(await bcrypt.compare(currentPassword, user.password_hash))) return res.status(401).json({ error: 'Current password is incorrect.' });
   const passwordHash = await bcrypt.hash(newPassword, 12);
   const { rows: updated } = await query('UPDATE users SET password_hash = $1, session_version = session_version + 1 WHERE id = $2 RETURNING role, session_version AS "sessionVersion"', [passwordHash, user.id]);
-  sessionCookie(res, signSession({ id: user.id, email: user.email, role: updated[0].role, sessionVersion: updated[0].sessionVersion }));
+  const currentUser = { id: user.id, email: user.email, role: updated[0].role, sessionVersion: updated[0].sessionVersion };
+  setSessionCookie(res, await issueSession(currentUser, req));
   await logAudit({ req, actor: user, action: 'auth.password_changed', targetType: 'user', targetId: user.id });
   res.status(204).end();
 });

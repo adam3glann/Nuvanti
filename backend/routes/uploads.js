@@ -32,7 +32,33 @@ router.post('/product-image', uploadLimiter, (req, res, next) => {
     const image = await uploadProductImage(req.file.buffer);
     res.status(201).json(image);
   } catch (error) {
-    next(error);
+    // Cloudinary SDK errors otherwise become an unhelpful generic 500. Log
+    // provider details server-side (never the API credentials) and return a
+    // specific, safe action the admin can take.
+    console.error('Cloudinary image upload failed:', {
+      name: error.name,
+      code: error.code,
+      httpCode: error.http_code || error.status,
+      message: error.message,
+    });
+    const providerStatus = Number(error.http_code || error.status);
+    const networkFailure = ['ENOTFOUND', 'EAI_AGAIN', 'ECONNRESET', 'ETIMEDOUT', 'ECONNREFUSED'].includes(error.code);
+    if (error.status === 503 && /Cloudinary is not configured/i.test(error.message || '')) {
+      return res.status(503).json({ error: error.message });
+    }
+    if (networkFailure) {
+      return res.status(502).json({ error: 'Railway could not connect to Cloudinary. Check the backend service outbound network/egress settings and retry.' });
+    }
+    if (providerStatus === 401) {
+      return res.status(502).json({ error: 'Cloudinary rejected its credentials. Check CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET in this Railway backend service.' });
+    }
+    if (providerStatus === 403) {
+      return res.status(502).json({ error: 'Cloudinary refused the upload. Check the Cloudinary account status, upload quota, and API key permissions.' });
+    }
+    if (providerStatus === 400) {
+      return res.status(400).json({ error: 'Cloudinary rejected this image or its upload settings. Use a JPEG, PNG, WebP, or GIF under 5 MB and check the Cloudinary account settings.' });
+    }
+    return res.status(502).json({ error: 'Cloudinary upload failed. Check the Railway backend logs for the provider error.' });
   }
 });
 export default router;

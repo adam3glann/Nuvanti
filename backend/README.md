@@ -72,6 +72,8 @@ The reset email is sent to the account's email address and will appear on the re
 ## Security included
 
 - HTTP-only, signed 8-hour session cookies; credentials never go in localStorage.
+- Staff can enroll authenticator-app TOTP with one-time recovery codes. MFA challenges are short-lived and separate from authenticated sessions; TOTP steps and recovery codes cannot be reused.
+- Staff sessions are stored in PostgreSQL, expire after 8 hours, and can be revoked from **Security**. Password changes and MFA changes invalidate prior sessions.
 - `bcrypt` password hashing (work factor 12).
 - Permission checks (not just a role check) on every `/api/admin/*` endpoint, backed by a real 4-tier role model — see "Roles & permissions" above.
 - Brute-force lockout: an account locks for 15 minutes after 5 consecutive failed logins.
@@ -81,9 +83,15 @@ The reset email is sent to the account's email address and will appear on the re
 - Parameterized SQL and Zod input validation everywhere, including admin mutations.
 - Customer-supplied strings (name, email, shipping address) are HTML-escaped before the admin UI renders them, to prevent stored XSS via order/checkout data.
 
-## Current boundaries
+## Security boundaries
 
-Two-factor authentication and per-device session tracking/"log out all devices" (sessions are currently a signed JWT cookie per browser — rotate `JWT_SECRET` to invalidate all of them at once) are not built. Customer registration sends an email-verification link and provides a resend action, but verification is not enforced before checkout. The admin **Security** page labels two-factor authentication unavailable. General/shipping settings, basic sales analytics, inventory adjustment history, contact inbox, newsletter management, and homepage slideshow editing are backend-connected. Other page copy remains in the storefront source. Card payments and carrier integrations are not connected; do not treat an order status as carrier tracking or a card refund.
+Authenticator MFA currently applies to staff accounts only. It requires an authenticator app (TOTP) and protects staff login; keep the recovery codes somewhere private. The encryption key must be a stable, unique Railway variable. **Do not rotate `MFA_ENCRYPTION_KEY` after enrolling staff**, because the server needs it to decrypt authenticator secrets. Generate a strong value locally, for example in PowerShell:
+
+```powershell
+[Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+```
+
+Add the result as `MFA_ENCRYPTION_KEY` in the Railway backend service Variables, then deploy. Never paste that key into chat, source files, or Git. Existing sessions created before session tracking was added will need to sign in once after deployment. Session labels use browser user-agent data, which is an approximate device description rather than a verified device identity. Customer registration sends an email-verification link and provides a resend action, but verification is not enforced before checkout. General/shipping settings, basic sales analytics, inventory adjustment history, contact inbox, newsletter management, and homepage slideshow editing are backend-connected. Other page copy remains in the storefront source. Card payments and carrier integrations are not connected; do not treat an order status as carrier tracking or a card refund.
 
 Discounts now have a real backend: admin create/activate/deactivate/delete goes through `/api/admin/discounts`, and the storefront cart and checkout pages validate a code against `/api/orders/validate-discount` (a public, no-login preview) before it's applied at order time in `/api/orders`, where it's re-validated and its usage count incremented inside the same row-locked transaction as inventory. Codes support a percentage or fixed amount, an optional minimum order subtotal, an optional usage limit, and an optional expiry — there is no scheduled "starts on" date and no free-shipping discount type; both would need a schema change first.
 

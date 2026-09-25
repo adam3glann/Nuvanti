@@ -1,8 +1,11 @@
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { query } from './db.js';
 
 const cookieName = 'nuvanti_session';
+const challengeCookieName = 'nuvanti_mfa_challenge';
 const cookieSameSite = process.env.NODE_ENV === 'production' ? 'none' : 'lax';
+const staffRoles = ['staff', 'manager', 'admin', 'super_admin'];
 
 function secret() {
   const value = process.env.JWT_SECRET;
@@ -10,51 +13,103 @@ function secret() {
   return value;
 }
 
-export function signSession(user) {
-  return jwt.sign({ sub: String(user.id), role: user.role, email: user.email, ver: user.sessionVersion ?? 0 }, secret(), { expiresIn: '8h', issuer: 'nuvanti-api', audience: 'nuvanti-web' });
+export async function issueSession(user, req) {
+  const id = crypto.randomUUID();
+  const sessionVersion = Number(user.sessionVersion ?? 0);
+  // Keep the session table bounded without deleting recent audit context.
+  await query(`DELETE FROM auth_sessions WHERE expires_at < NOW() - INTERVAL '7 days'
+    OR revoked_at < NOW() - INTERVAL '7 days'`);
+  await query(
+    `INSERT INTO auth_sessions (id, user_id, session_version, user_agent, expires_at)
+     VALUES ($1, $2, $3, $4, NOW() + INTERVAL '8 hours')`,
+    [id, user.id, sessionVersion, String(req.get('user-agent') || '').slice(0, 500)],
+  );
+  const token = jwt.sign(
+    { sub: String(user.id), role: user.role, email: user.email, ver: sessionVersion, jti: id },
+    secret(),
+    { expiresIn: '8h', issuer: 'nuvanti-api', audience: 'nuvanti-web' },
+  );
+  return token;
 }
 
 export function readSession(req) {
   const token = req.cookies?.[cookieName];
   if (!token) return null;
-  try { return jwt.verify(token, secret(), { issuer: 'nuvanti-api', audience: 'nuvanti-web' }); }
-  catch { return null; }
+  try {
+    const session = jwt.verify(token, secret(), { issuer: 'nuvanti-api', audience: 'nuvanti-web' });
+    return typeof session.jti === 'string' ? session : null;
+  } catch { return null; }
 }
 
-export function sessionCookie(res, token) {
+export function setSessionCookie(res, token) {
   res.cookie(cookieName, token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: cookieSameSite, maxAge: 8 * 60 * 60 * 1000, path: '/', ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}) });
 }
 
+export function setMfaChallengeCookie(res, user) {
+  const token = jwt.sign(
+    { sub: String(user.id), ver: Number(user.sessionVersion ?? 0), purpose: 'mfa' },
+    secret(),
+    { expiresIn: '5m', issuer: 'nuvanti-api', audience: 'nuvanti-mfa' },
+  );
+  res.cookie(challengeCookieName, token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: cookieSameSite, maxAge: 5 * 60 * 1000, path: '/', ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}) });
+}
+
+export function clearMfaChallengeCookie(res) {
+  res.clearCookie(challengeCookieName, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: cookieSameSite, path: '/', ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}) });
+}
+
+export function readMfaChallenge(req) {
+  try {
+    const token = req.cookies?.[challengeCookieName];
+    if (!token) return null;
+    const challenge = jwt.verify(token, secret(), { issuer: 'nuvanti-api', audience: 'nuvanti-mfa' });
+    return challenge.purpose === 'mfa' ? challenge : null;
+  } catch { return null; }
+}
+
 export function clearSession(res) {
-  res.clearCookie(cookieName, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: cookieSameSite, path: '/', ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}) });
+  const options = { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: cookieSameSite, path: '/', ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}) };
+  res.clearCookie(cookieName, options);
+  res.clearCookie(challengeCookieName, options);
+}
+
+async function resolveSession(session) {
+  const { rows } = await query(
+    `SELECT u.id, u.email, u.role, u.session_version AS "sessionVersion", s.id AS "sessionId"
+     FROM auth_sessions s JOIN users u ON u.id = s.user_id
+     WHERE s.id = $1 AND s.user_id = $2 AND s.revoked_at IS NULL AND s.expires_at > NOW()
+       AND s.session_version = u.session_version AND u.is_active = true`,
+    [session.jti, session.sub],
+  );
+  return rows[0] || null;
+}
+
+async function updateLastSeen(sessionId) {
+  await query(`UPDATE auth_sessions SET last_seen_at = NOW() WHERE id = $1 AND last_seen_at < NOW() - INTERVAL '5 minutes'`, [sessionId]);
 }
 
 export async function requireAuth(req, res, next) {
   const session = readSession(req);
   if (!session) return res.status(401).json({ error: 'Authentication required.' });
   try {
-    const { rows } = await query('SELECT id, email, role, session_version AS "sessionVersion" FROM users WHERE id = $1 AND is_active = true', [session.sub]);
-    const user = rows[0];
-    if (!user || Number(session.ver || 0) !== user.sessionVersion) return res.status(401).json({ error: 'Authentication required.' });
+    const user = await resolveSession(session);
+    if (!user) return res.status(401).json({ error: 'Authentication required.' });
+    await updateLastSeen(user.sessionId);
     req.user = { ...session, sub: String(user.id), email: user.email, role: user.role };
     next();
-  } catch (error) {
-    next(error);
-  }
+  } catch (error) { next(error); }
 }
 
 export async function requireAdminPage(req, res, next) {
   const session = readSession(req);
   if (!session) return res.redirect('/login.html');
   try {
-    const { rows } = await query('SELECT id, email, role, session_version AS "sessionVersion" FROM users WHERE id = $1 AND is_active = true', [session.sub]);
-    const user = rows[0];
-    if (!user || Number(session.ver || 0) !== user.sessionVersion) return res.redirect('/login.html');
+    const user = await resolveSession(session);
+    if (!user || !staffRoles.includes(user.role)) return res.redirect('/login.html');
+    await updateLastSeen(user.sessionId);
     req.user = { ...session, sub: String(user.id), email: user.email, role: user.role };
     next();
-  } catch (error) {
-    next(error);
-  }
+  } catch (error) { next(error); }
 }
 
 export function requireRole(...roles) {

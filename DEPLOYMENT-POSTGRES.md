@@ -29,7 +29,7 @@ or paste them into chat.
 | `NODE_ENV` | `production` |
 | `JWT_SECRET` | Unique random secret, at least 32 characters |
 | `TRUST_PROXY` | `1` |
-| `STORE_ORIGIN` | `https://nuvanti-shop.pages.dev` (the server defaults to this if omitted and upgrades `http://` to `https://` in production) |
+| `STORE_ORIGIN` | `https://nuvanti-shop.pages.dev` (the server defaults to this if omitted and upgrades `http://` to `https://` in production). Set this to the exact storefront origin if using a custom domain. |
 | `STORE_PREVIEW_ORIGIN` | Optional Cloudflare Pages preview origin, using `https://` |
 | `ADMIN_ORIGIN` | Optional; otherwise derived from Railway's public domain after it is generated |
 | `ADMIN_APP_URL` | Optional; defaults to `ADMIN_ORIGIN` |
@@ -43,6 +43,9 @@ or paste them into chat.
 | `SMTP_USER` | Your Gmail sending address |
 | `SMTP_PASS` | The Gmail App Password, not the normal Gmail password |
 | `MAIL_FROM` | `Nuvanti <your-sending-address@gmail.com>` |
+| `CLOUDINARY_CLOUD_NAME` | Cloudinary Dashboard → Product environment → Cloud name (the name only, not the full URL) |
+| `CLOUDINARY_API_KEY` | Cloudinary Dashboard → API Keys |
+| `CLOUDINARY_API_SECRET` | Cloudinary Dashboard → API Keys (keep private; backend service only) |
 
 The storefront's production fallback API origin is `https://nuvanti-production.up.railway.app` in `frontend/assets/js/config.js`. If your Railway service domain changes, update that fallback (or inject `window.NUVANTI_API_URL` before the storefront modules load) and redeploy Cloudflare Pages.
 In Admin → Settings → Email, check the provider status and use **Send test email** after configuring the variables. The test goes to the signed-in super administrator. Set the Customer Support Email in Settings → General to receive contact-form alerts. Production session cookies are secure and allow cross-origin storefront API calls; keep the API origin and `STORE_ORIGIN` aligned.

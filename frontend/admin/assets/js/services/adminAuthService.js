@@ -24,7 +24,22 @@ export async function loginAdmin(email, password) {
     const response = await fetch(`${API}/api/auth/login`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
     const body = await response.json();
     if (!response.ok) return { ok: false, error: body.error || 'Unable to sign in.' };
+    if (body.requiresTwoFactor) return { ok: false, requiresTwoFactor: true };
     if (!STAFF_TIER_ROLES.includes(body.user.role)) { await fetch(`${API}/api/auth/logout`, { method: 'POST', credentials: 'include' }); return { ok: false, error: 'This account is not authorized for the admin area.' }; }
+    const session = { email: body.user.email, name: body.user.name, role: body.user.role };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+    return { ok: true, session };
+  } catch { return { ok: false, error: 'Cannot reach the secure backend.' }; }
+}
+export async function completeAdminMfa(code) {
+  try {
+    const response = await fetch(`${API}/api/auth/login/mfa`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) return { ok: false, error: body.error || 'Unable to verify the code.' };
+    if (!STAFF_TIER_ROLES.includes(body.user?.role)) {
+      await fetch(`${API}/api/auth/logout`, { method: 'POST', credentials: 'include' });
+      return { ok: false, error: 'This account is not authorized for the admin area.' };
+    }
     const session = { email: body.user.email, name: body.user.name, role: body.user.role };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
     return { ok: true, session };
