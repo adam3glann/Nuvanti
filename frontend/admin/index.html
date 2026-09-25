@@ -21,6 +21,15 @@
         <div><h1>Dashboard</h1><p>An overview of Nuvanti's store performance.</p></div>
       </div>
 
+      <h2 style="margin-bottom:.75rem">Business Overview <span class="dash-period">All time · completed orders</span></h2>
+      <div class="stat-grid" id="businessGrid">
+        <div class="stat-card"><div class="a-skeleton" style="height:52px"></div></div>
+        <div class="stat-card"><div class="a-skeleton" style="height:52px"></div></div>
+        <div class="stat-card"><div class="a-skeleton" style="height:52px"></div></div>
+        <div class="stat-card"><div class="a-skeleton" style="height:52px"></div></div>
+      </div>
+      <p class="dash-finance-note" id="financeNote">Revenue excludes shipping and discounts are deducted. Profit uses the unit costs saved on each order.</p>
+
       <div class="stat-grid" id="statGrid">
         <div class="stat-card"><div class="a-skeleton" style="height:52px"></div></div>
         <div class="stat-card"><div class="a-skeleton" style="height:52px"></div></div>
@@ -68,7 +77,12 @@
     </div>
   </div>
 </div>
-<style>@media (max-width:960px){ .dash-split{ grid-template-columns:1fr !important; } }</style>
+<style>
+.dash-period{font-size:.75rem;font-weight:500;color:var(--a-muted);margin-left:.35rem}
+.dash-finance-note{font-size:.78rem;color:var(--a-muted);margin:-.75rem 0 1.5rem}
+.dash-finance-card .stat-card__value{font-size:clamp(1.15rem,2vw,1.6rem);overflow-wrap:anywhere}
+@media (max-width:960px){ .dash-split{ grid-template-columns:1fr !important; } }
+</style>
 <script type="module" src="assets/js/pages/dashboard.js"></script>
 </body>
 </html>

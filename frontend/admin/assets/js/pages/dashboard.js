@@ -6,12 +6,29 @@ import { orderStats, revenueStats, fetchAdminOrders } from '../services/orderSer
 import { fetchAdminProducts, productStockStatus } from '../services/productService.js';
 import { customerStats } from '../services/customerService.js';
 import { lowStockAlerts } from '../services/inventoryService.js';
-import { fetchRevenueSeries } from '../services/analyticsService.js';
+import { fetchRevenueSeries, fetchFinancialSummary } from '../services/analyticsService.js';
 
 const session = initAdminShell({ page: 'dashboard', title: 'Dashboard' });
 if (session) render();
 
 async function render() {
+  try {
+    const financial = await fetchFinancialSummary();
+    document.getElementById('businessGrid').innerHTML = `
+      ${businessCard('Total Revenue', formatPrice(financial.revenue), `${financial.completedOrders} completed orders`, 'var(--a-primary)')}
+      ${businessCard('Estimated Gross Profit', financial.grossProfit == null ? 'Add unit costs' : formatPrice(financial.grossProfit), financial.grossProfit == null ? 'No completed orders have cost data yet' : `Based on ${financial.costedOrders} fully costed orders`, 'var(--a-success)')}
+      ${businessCard('Gross Margin', financial.grossMargin == null ? '—' : `${financial.grossMargin.toFixed(1)}%`, financial.grossMargin == null ? 'Available after cost data is recorded' : 'On orders with complete cost data', 'var(--a-info)')}
+      ${businessCard('Recorded Product Costs', formatPrice(financial.costOfGoods), `${financial.costedOrders} fully costed orders`, 'var(--a-warning)')}
+    `;
+    if (financial.uncostedLines > 0) {
+      document.getElementById('financeNote').textContent = `${financial.uncostedLines} completed order line(s) have no saved unit cost. Profit and margin only include fully costed orders. Add a Unit Cost to products for accurate reports on future orders.`;
+    }
+  } catch (error) {
+    document.getElementById('businessGrid').innerHTML = '<div class="admin-empty"><p></p></div>';
+    document.querySelector('#businessGrid p').textContent = `Business summary unavailable: ${error.message}`;
+    document.getElementById('financeNote').textContent = 'Other dashboard sections will still load. Check that the latest database migration has deployed.';
+  }
+
   const rev = await revenueStats();
   const ord = await orderStats();
   const cust = await customerStats();
@@ -62,6 +79,10 @@ async function render() {
         ${statusBadge(a.stock - a.reserved <= 0 ? 'out' : 'low')}
       </div>`).join('')
     : `<p style="color:var(--a-muted);font-size:.83rem">All products are well stocked.</p>`;
+}
+
+function businessCard(label, value, detail, color) {
+  return `<div class="stat-card dash-finance-card"><p class="stat-card__label">${label}</p><p class="stat-card__value" style="color:${color}">${value}</p><p class="stat-card__delta">${detail}</p></div>`;
 }
 
 async function renderChart(range) {

@@ -15,6 +15,13 @@ export function toPublicProduct(row) {
   };
 }
 
+// Product costs are private business data; expose them only on admin catalog APIs.
+export function toAdminProduct(row) {
+  const product = toPublicProduct(row);
+  const costCents = row.metadata?.costCents;
+  return { ...product, cost: costCents == null ? null : Number(costCents) / 100 };
+}
+
 export function productPayload(input) {
   const inventory = input.inventory && typeof input.inventory === 'object' && !Array.isArray(input.inventory)
     ? input.inventory : { 'One Size': Number(input.inventory || 0) };
@@ -25,6 +32,6 @@ export function productPayload(input) {
     category: input.category, collection: input.collection || null, images: input.images || [],
     colors: input.colors || [], sizes: input.sizes || [], inventory: stock,
     isActive: input.status ? input.status === 'active' : input.isActive !== false,
-    metadata: { inventory, colorSwatches: input.colorSwatches || {}, badges: input.badges || [], featured: Boolean(input.featured), bestseller: Boolean(input.bestseller), newArrival: Boolean(input.newArrival), sku: input.sku || null, compareAtPrice: input.compareAtPrice || null },
+    metadata: { inventory, colorSwatches: input.colorSwatches || {}, badges: input.badges || [], featured: Boolean(input.featured), bestseller: Boolean(input.bestseller), newArrival: Boolean(input.newArrival), sku: input.sku || null, compareAtPrice: input.compareAtPrice || null, costCents: input.cost == null || input.cost === '' ? null : Math.round(Number(input.cost) * 100) },
   };
 }

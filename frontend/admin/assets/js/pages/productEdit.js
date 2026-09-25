@@ -34,7 +34,7 @@ async function init() {
 
 function blankProduct() {
   return {
-    id: null, name: '', slug: '', description: '', price: 0, compareAtPrice: null, cost: 0,
+    id: null, name: '', slug: '', description: '', price: 0, compareAtPrice: null, cost: null,
     sku: '', category: '', collection: '', material: '', colors: [], sizes: [], images: [],
     inventory: {}, badges: [], status: 'draft', featured: false, bestseller: false, newArrival: false,
     seoTitle: '', seoDescription: '',
@@ -187,7 +187,7 @@ function renderForm(product, cats, cols) {
     const patch = {
       name, slug, description: val('fDesc'),
       price, compareAtPrice: compareAt,
-      cost: cost ?? 0, sku: val('fSku').trim(), category, collection: val('fCollection'),
+      cost, sku: val('fSku').trim(), category, collection: val('fCollection'),
       material: val('fMaterial'), status: val('fStatus'),
       featured: document.getElementById('fFeatured').checked,
       bestseller: document.getElementById('fBestseller').checked,

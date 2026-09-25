@@ -22,6 +22,12 @@ export async function fetchRevenueSeries(range = '30d') { return (await load(ran
 export async function fetchTopProducts(range = '30d') { return (await load(range)).topProducts; }
 export async function fetchTopCategories(range = '30d') { return (await load(range)).topCategories; }
 export async function fetchPendingOrders(range = '30d') { return (await load(range)).pendingOrders; }
+export async function fetchFinancialSummary() {
+  const response = await fetch(`${API_ORIGIN}/api/admin/financial-summary`, { credentials: 'include' });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.error || 'Unable to load financial summary.');
+  return body;
+}
 export function summarize(series) {
   const revenue = series.reduce((sum, day) => sum + day.revenue, 0);
   const orders = series.reduce((sum, day) => sum + day.orders, 0);

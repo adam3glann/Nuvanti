@@ -3,14 +3,14 @@ import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { query, transaction } from '../lib/db.js';
-import { productPayload, toPublicProduct } from '../lib/catalog.js';
+import { productPayload, toAdminProduct, toPublicProduct } from '../lib/catalog.js';
 import { hasPermission, requirePermission } from '../lib/permissions.js';
 import { logAudit } from '../lib/audit.js';
 import { emailDeliveryStatus, sendAdminWelcome, sendTestEmail, sendOrderStatusUpdate } from '../lib/mail.js';
 import { adminPublicOrigin, storePublicOrigin } from '../lib/publicOrigins.js';
 const router = Router();
 const MANAGEABLE_ROLES = ['staff', 'manager', 'admin', 'super_admin'];
-const productFields = z.object({ slug: z.string().regex(/^[a-z0-9-]+$/).max(160), name: z.string().min(2).max(160), description: z.string().max(5000).optional(), price: z.coerce.number().min(0).max(21474836.47).optional(), priceCents: z.coerce.number().int().min(0).max(2147483647).optional(), category: z.string().min(1).max(80), collection: z.string().max(80).nullable().optional(), images: z.array(z.string()).max(12).optional(), colors: z.array(z.string().max(40)).max(20).optional(), colorSwatches: z.record(z.string().max(40), z.string().regex(/^#[0-9a-fA-F]{6}$/)).optional(), sizes: z.array(z.string().max(20)).max(20).optional(), inventory: z.union([z.coerce.number().int().min(0), z.record(z.coerce.number().int().min(0))]).optional(), status: z.enum(['active', 'draft']).optional(), isActive: z.boolean().optional(), badges: z.array(z.string().max(30)).optional(), featured: z.boolean().optional(), bestseller: z.boolean().optional(), newArrival: z.boolean().optional(), sku: z.string().max(100).optional(), compareAtPrice: z.coerce.number().min(0).max(21474836.47).nullable().optional() });
+const productFields = z.object({ slug: z.string().regex(/^[a-z0-9-]+$/).max(160), name: z.string().min(2).max(160), description: z.string().max(5000).optional(), price: z.coerce.number().min(0).max(21474836.47).optional(), priceCents: z.coerce.number().int().min(0).max(2147483647).optional(), cost: z.number().min(0).max(21474836.47).nullable().optional(), category: z.string().min(1).max(80), collection: z.string().max(80).nullable().optional(), images: z.array(z.string()).max(12).optional(), colors: z.array(z.string().max(40)).max(20).optional(), colorSwatches: z.record(z.string().max(40), z.string().regex(/^#[0-9a-fA-F]{6}$/)).optional(), sizes: z.array(z.string().max(20)).max(20).optional(), inventory: z.union([z.coerce.number().int().min(0), z.record(z.coerce.number().int().min(0))]).optional(), status: z.enum(['active', 'draft']).optional(), isActive: z.boolean().optional(), badges: z.array(z.string().max(30)).optional(), featured: z.boolean().optional(), bestseller: z.boolean().optional(), newArrival: z.boolean().optional(), sku: z.string().max(100).optional(), compareAtPrice: z.coerce.number().min(0).max(21474836.47).nullable().optional() });
 const productInput = productFields.refine((value) => value.price !== undefined || value.priceCents !== undefined, { message: 'Price is required.' });
 const columns = 'id, slug, name, description, price_cents, category, collection, images, colors, sizes, inventory, is_active, metadata';
 const categoryInput = z.object({ name: z.string().min(2).max(80), slug: z.string().regex(/^[a-z0-9-]+$/).max(80), description: z.string().max(1000).optional() });
@@ -117,7 +117,41 @@ router.get('/analytics', requirePermission('analytics.view'), async (req, res) =
     pendingOrders: counts[0].pendingOrders,
   });
 });
-router.get('/products', requirePermission('products.view'), async (req, res) => { const { rows } = await query(`SELECT ${columns} FROM products ORDER BY updated_at DESC`); res.json(rows.map(toPublicProduct)); });
+router.get('/financial-summary', requirePermission('analytics.view'), async (req, res) => {
+  const { rows } = await query(`WITH completed_orders AS (
+    SELECT o.id,
+      GREATEST(o.subtotal_cents - COALESCE(o.discount_cents, 0), 0)::bigint AS net_revenue_cents,
+      count(i.id)::int AS line_count,
+      count(i.unit_cost_cents)::int AS costed_line_count,
+      coalesce(sum(i.unit_cost_cents::bigint * i.quantity) FILTER (WHERE i.unit_cost_cents IS NOT NULL), 0)::bigint AS cost_cents
+    FROM orders o
+    JOIN order_items i ON i.order_id = o.id
+    WHERE o.status IN ('paid', 'fulfilled')
+    GROUP BY o.id
+  )
+  SELECT coalesce(sum(net_revenue_cents), 0)::bigint AS "revenueCents",
+    coalesce(sum(net_revenue_cents) FILTER (WHERE line_count = costed_line_count), 0)::bigint AS "costedRevenueCents",
+    coalesce(sum(cost_cents) FILTER (WHERE line_count = costed_line_count), 0)::bigint AS "costCents",
+    count(*)::int AS "completedOrders",
+    count(*) FILTER (WHERE line_count = costed_line_count)::int AS "costedOrders",
+    (SELECT count(*)::int FROM order_items i JOIN orders o ON o.id = i.order_id
+      WHERE o.status IN ('paid', 'fulfilled') AND i.unit_cost_cents IS NULL) AS "uncostedLines"
+  FROM completed_orders`);
+  const row = rows[0];
+  const costedRevenueCents = Number(row.costedRevenueCents);
+  const grossProfitCents = costedRevenueCents - Number(row.costCents);
+  res.json({
+    revenue: Number(row.revenueCents) / 100,
+    costedRevenue: costedRevenueCents / 100,
+    costOfGoods: Number(row.costCents) / 100,
+    grossProfit: Number(row.costedOrders) ? grossProfitCents / 100 : null,
+    grossMargin: costedRevenueCents > 0 ? (grossProfitCents / costedRevenueCents) * 100 : null,
+    completedOrders: row.completedOrders,
+    costedOrders: row.costedOrders,
+    uncostedLines: row.uncostedLines,
+  });
+});
+router.get('/products', requirePermission('products.view'), async (req, res) => { const { rows } = await query(`SELECT ${columns} FROM products ORDER BY updated_at DESC`); res.json(rows.map(toAdminProduct)); });
 const PAYMENT_METHOD_LABELS = { cod: 'Cash on Delivery' };
 router.get('/orders', requirePermission('orders.view'), async (req, res) => {
   const { rows } = await query(`SELECT o.id, o.status, o.total_cents AS "totalCents", o.subtotal_cents AS "subtotalCents", o.shipping_cents AS "shippingCents", o.delivery, o.payment_method AS "paymentMethod", o.created_at AS "createdAt", o.shipping_address AS "shippingAddress", u.email, u.name,
@@ -188,11 +222,11 @@ router.get('/collections', requirePermission('products.view'), async (req, res) 
 router.post('/collections', requirePermission('products.create'), async (req, res) => { const c = collectionInput.parse(req.body); const { rows } = await query('INSERT INTO collections (name, slug) VALUES ($1, $2) RETURNING id::text, name, slug, is_active AS "isActive"', [c.name, c.slug]); await logAudit({ req, action: 'collection.created', targetType: 'collection', targetId: rows[0].id, metadata: { name: c.name, slug: c.slug } }); res.status(201).json({ ...rows[0], productCount: 0, status: 'published' }); });
 router.patch('/collections/:id', requirePermission('products.edit'), async (req, res) => { const isActive = z.boolean().parse(req.body?.isActive); const { rows } = await query('UPDATE collections SET is_active = $1 WHERE id = $2 RETURNING id::text, is_active AS "isActive"', [isActive, req.params.id]); if (!rows[0]) return res.status(404).json({ error: 'Collection not found.' }); res.json(rows[0]); });
 router.delete('/collections/:id', requirePermission('products.delete'), async (req, res) => { const result = await query('DELETE FROM collections WHERE id = $1', [req.params.id]); if (!result.rowCount) return res.status(404).json({ error: 'Collection not found.' }); await logAudit({ req, action: 'collection.deleted', targetType: 'collection', targetId: req.params.id }); res.status(204).end(); });
-router.post('/products', requirePermission('products.create'), async (req, res) => { const p = productPayload(productInput.parse(req.body)); try { const { rows } = await query(`INSERT INTO products (slug,name,description,price_cents,category,collection,images,colors,sizes,inventory,is_active,metadata) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9::jsonb,$10,$11,$12::jsonb) RETURNING ${columns}`, [p.slug,p.name,p.description,p.priceCents,p.category,p.collection,JSON.stringify(p.images),JSON.stringify(p.colors),JSON.stringify(p.sizes),p.inventory,p.isActive,JSON.stringify(p.metadata)]); res.status(201).json(toPublicProduct(rows[0])); } catch (error) { if (error.code === '23505') return res.status(409).json({ error: 'A product with that slug already exists.' }); throw error; } });
-router.patch('/products/:id', requirePermission('products.edit'), async (req, res) => { const existing = await query(`SELECT ${columns} FROM products WHERE id = $1`, [req.params.id]); if (!existing.rows[0]) return res.status(404).json({ error: 'Product not found.' }); const current = toPublicProduct(existing.rows[0]); const patch = productFields.partial().parse(req.body); const merged = { ...current, ...patch }; // The public product includes both EGP and cents; drop the stale counterpart when either is explicitly changed.
+router.post('/products', requirePermission('products.create'), async (req, res) => { const p = productPayload(productInput.parse(req.body)); try { const { rows } = await query(`INSERT INTO products (slug,name,description,price_cents,category,collection,images,colors,sizes,inventory,is_active,metadata) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9::jsonb,$10,$11,$12::jsonb) RETURNING ${columns}`, [p.slug,p.name,p.description,p.priceCents,p.category,p.collection,JSON.stringify(p.images),JSON.stringify(p.colors),JSON.stringify(p.sizes),p.inventory,p.isActive,JSON.stringify(p.metadata)]); res.status(201).json(toAdminProduct(rows[0])); } catch (error) { if (error.code === '23505') return res.status(409).json({ error: 'A product with that slug already exists.' }); throw error; } });
+router.patch('/products/:id', requirePermission('products.edit'), async (req, res) => { const existing = await query(`SELECT ${columns} FROM products WHERE id = $1`, [req.params.id]); if (!existing.rows[0]) return res.status(404).json({ error: 'Product not found.' }); const current = toAdminProduct(existing.rows[0]); const patch = productFields.partial().parse(req.body); const merged = { ...current, ...patch }; // The public product includes both EGP and cents; drop the stale counterpart when either is explicitly changed.
   if (patch.priceCents !== undefined && patch.price === undefined) merged.price = undefined;
   else merged.priceCents = undefined;
-  const p = productPayload(productInput.parse(merged)); const { rows } = await query(`UPDATE products SET slug=$1,name=$2,description=$3,price_cents=$4,category=$5,collection=$6,images=$7::jsonb,colors=$8::jsonb,sizes=$9::jsonb,inventory=$10,is_active=$11,metadata=$12::jsonb,updated_at=NOW() WHERE id=$13 RETURNING ${columns}`, [p.slug,p.name,p.description,p.priceCents,p.category,p.collection,JSON.stringify(p.images),JSON.stringify(p.colors),JSON.stringify(p.sizes),p.inventory,p.isActive,JSON.stringify(p.metadata),req.params.id]); res.json(toPublicProduct(rows[0])); });
+  const p = productPayload(productInput.parse(merged)); const { rows } = await query(`UPDATE products SET slug=$1,name=$2,description=$3,price_cents=$4,category=$5,collection=$6,images=$7::jsonb,colors=$8::jsonb,sizes=$9::jsonb,inventory=$10,is_active=$11,metadata=$12::jsonb,updated_at=NOW() WHERE id=$13 RETURNING ${columns}`, [p.slug,p.name,p.description,p.priceCents,p.category,p.collection,JSON.stringify(p.images),JSON.stringify(p.colors),JSON.stringify(p.sizes),p.inventory,p.isActive,JSON.stringify(p.metadata),req.params.id]); res.json(toAdminProduct(rows[0])); });
 router.get('/inventory/history', requirePermission('inventory.view'), async (req, res) => {
   const { rows } = await query(`SELECT a.product_id::text AS "productId", a.size, a.change, a.reason, a.created_at AS "createdAt", u.name AS "actorName" FROM inventory_adjustments a LEFT JOIN users u ON u.id = a.actor_user_id ORDER BY a.created_at DESC LIMIT 2000`);
   res.json(rows);

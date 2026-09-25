@@ -100,6 +100,17 @@ export async function requireAuth(req, res, next) {
   } catch (error) { next(error); }
 }
 
+export async function requireVerifiedEmail(req, res, next) {
+  try {
+    const { rows } = await query('SELECT email_verified_at FROM users WHERE id = $1 AND is_active = true', [req.user.sub]);
+    if (!rows[0]) return res.status(401).json({ error: 'Authentication required.' });
+    if (!rows[0].email_verified_at) return res.status(403).json({ code: 'EMAIL_NOT_VERIFIED', error: 'Confirm your email before placing an order.' });
+    next();
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function requireAdminPage(req, res, next) {
   const session = readSession(req);
   if (!session) return res.redirect('/login.html');

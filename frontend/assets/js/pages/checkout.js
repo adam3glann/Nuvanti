@@ -54,6 +54,11 @@ async function initializeCheckout() {
     summary.innerHTML = '';
     return;
   }
+  if (!currentUser.emailVerifiedAt) {
+    form.innerHTML = '<div class="state-block"><h3>Verify your email to order</h3><p>Confirm your email address before placing an order. Open the confirmation link from your inbox, then return here to finish checkout.</p><a class="btn btn-primary" href="account.html?tab=profile">Open account and resend email</a></div>';
+    summary.innerHTML = '';
+    return;
+  }
   try { savedAddress = (await fetchAddresses()).find((address) => address.isDefault) || null; }
   catch { savedAddress = null; }
   render();

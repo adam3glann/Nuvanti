@@ -288,10 +288,14 @@ router.post('/verify-email/request', requireAuth, async (req, res) => {
 router.post('/verify-email/confirm', async (req, res) => {
   const { token } = z.object({ token: z.string().regex(/^[a-f0-9]{64}$/) }).parse(req.body);
   const hash = crypto.createHash('sha256').update(token).digest('hex');
-  const { rows } = await query('SELECT user_id FROM email_verification_tokens WHERE token_hash = $1 AND expires_at > NOW()', [hash]);
-  if (!rows[0]) return res.status(400).json({ error: 'This verification link is invalid or has expired.' });
-  await query('UPDATE users SET email_verified_at = NOW() WHERE id = $1', [rows[0].user_id]);
-  await query('DELETE FROM email_verification_tokens WHERE user_id = $1', [rows[0].user_id]);
+  const userId = await transaction(async (client) => {
+    const { rows } = await client.query('SELECT user_id FROM email_verification_tokens WHERE token_hash = $1 AND expires_at > NOW() FOR UPDATE', [hash]);
+    if (!rows[0]) return null;
+    await client.query('UPDATE users SET email_verified_at = coalesce(email_verified_at, NOW()) WHERE id = $1', [rows[0].user_id]);
+    await client.query('DELETE FROM email_verification_tokens WHERE user_id = $1', [rows[0].user_id]);
+    return rows[0].user_id;
+  });
+  if (!userId) return res.status(400).json({ error: 'This verification link is invalid or has expired.' });
   res.status(204).end();
 });
 
