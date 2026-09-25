@@ -246,9 +246,11 @@ await query("SELECT 1");
 if (process.env.NODE_ENV === "production") {
   // Railway exposes one service port for both the API and protected admin.
   // The storefront is hosted separately; every non-API request to this
-  // service should therefore go through the protected admin gateway.
+  // service goes through the protected admin gateway, except the bare root:
+  // it is the public entry point people commonly try, so send it to the store.
   const publicApp = express();
   publicApp.use((req, res, next) => {
+    if (req.path === "/") return res.redirect(302, storeOrigin);
     if (!req.path.startsWith("/api/")) return adminApp(req, res, next);
     return app(req, res, next);
   });
