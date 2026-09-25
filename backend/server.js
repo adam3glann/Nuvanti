@@ -106,7 +106,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const frontendRoot = path.resolve(__dirname, "../frontend");
 const trustProxy = process.env.TRUST_PROXY
   ? Number(process.env.TRUST_PROXY)
-  : 0;
+  : isProduction
+    ? 1
+    : 0;
 if (!Number.isInteger(trustProxy) || trustProxy < 0)
   throw new Error("TRUST_PROXY must be a non-negative integer.");
 if (process.env.NODE_ENV === "production") {
