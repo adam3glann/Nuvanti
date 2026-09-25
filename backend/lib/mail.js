@@ -129,6 +129,19 @@ export async function sendOrderConfirmation({ to, name, orderId, items, totalCen
     devDetail: `order #${orderId}, ${trackingUrl}`,
   });
 }
+export async function sendOrderStatusUpdate({ to, name, orderId, status, trackingUrl }) {
+  const labels = { pending: 'Order received', paid: 'Payment received', processing: 'Being prepared', shipped: 'Shipped', out_for_delivery: 'Out for delivery', fulfilled: 'Delivered', cancelled: 'Cancelled' };
+  const label = labels[status] || 'Updated';
+  await deliver({
+    to,
+    subject: `Update on your Nuvanti order #${orderId}: ${label}`,
+    text: `Hi ${name}, your Nuvanti order #${orderId} is now: ${label}.\n\nView the latest status: ${trackingUrl}`,
+    html: `<p>Hi ${escapeHtml(name)}, your Nuvanti order <strong>#${orderId}</strong> is now: <strong>${escapeHtml(label)}</strong>.</p><p><a href="${trackingUrl}">View your order status</a></p>`,
+    devLabel: 'Development order-status email',
+    devDetail: `order #${orderId}: ${label}, ${trackingUrl}`,
+  });
+}
+
 // Sent when a super_admin creates a new staff/manager/admin account. The
 // account starts with an unusable random password — this link (via the same
 // reset-token flow) is the only way to set a real one.

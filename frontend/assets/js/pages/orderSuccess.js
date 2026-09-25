@@ -20,7 +20,7 @@ if (!order) {
     <div class="order-success">
       <div class="order-success__icon">${icon('check')}</div>
       <h1>Thank you for your order.</h1>
-      <p class="text-muted">Your order is saved in My Account → Orders. We’ll send updates to ${escapeHtml(order.customer.email)} when email delivery is available.</p>
+      <p class="text-muted">Your order is saved in My Account → Orders. A confirmation and shipping updates will be sent to ${escapeHtml(order.customer.email)} when store email delivery is configured.</p>
 
       <div class="order-detail-card">
         <div class="order-detail-row"><span>Order Number</span><strong>${escapeHtml(order.orderNumber)}</strong></div>

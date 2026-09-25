@@ -9,8 +9,8 @@ const params = new URLSearchParams(location.search);
 const orderId = params.get('order');
 const token = params.get('token');
 
-const STATUS_STEPS = ['pending', 'paid', 'fulfilled'];
-const STATUS_LABELS = { pending: 'Order Received', paid: 'Payment Received', fulfilled: 'Fulfilled', cancelled: 'Cancelled' };
+const STATUS_STEPS = ['pending', 'processing', 'shipped', 'out_for_delivery', 'fulfilled'];
+const STATUS_LABELS = { pending: 'Order Received', paid: 'Payment Received', processing: 'Being Prepared', shipped: 'Shipped', out_for_delivery: 'Out for Delivery', fulfilled: 'Delivered', cancelled: 'Cancelled' };
 
 if (orderId && token) {
   loadOrder(orderId, token);
@@ -51,7 +51,7 @@ async function loadOrder(id, token) {
 
 function renderOrder(order) {
   const cancelled = order.status === 'cancelled';
-  const stepIndex = STATUS_STEPS.indexOf(order.status);
+  const stepIndex = STATUS_STEPS.indexOf(order.status === 'paid' ? 'processing' : order.status);
 
   root.innerHTML = `
     <div class="order-detail-card">

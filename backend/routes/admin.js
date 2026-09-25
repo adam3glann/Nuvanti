@@ -6,8 +6,8 @@ import { query, transaction } from '../lib/db.js';
 import { productPayload, toPublicProduct } from '../lib/catalog.js';
 import { requirePermission } from '../lib/permissions.js';
 import { logAudit } from '../lib/audit.js';
-import { emailDeliveryStatus, sendAdminWelcome, sendTestEmail } from '../lib/mail.js';
-import { adminPublicOrigin } from '../lib/publicOrigins.js';
+import { emailDeliveryStatus, sendAdminWelcome, sendTestEmail, sendOrderStatusUpdate } from '../lib/mail.js';
+import { adminPublicOrigin, storePublicOrigin } from '../lib/publicOrigins.js';
 const router = Router();
 const MANAGEABLE_ROLES = ['staff', 'manager', 'admin', 'super_admin'];
 const productFields = z.object({ slug: z.string().regex(/^[a-z0-9-]+$/).max(160), name: z.string().min(2).max(160), description: z.string().max(5000).optional(), price: z.coerce.number().min(0).optional(), priceCents: z.coerce.number().int().min(0).optional(), category: z.string().min(1).max(80), collection: z.string().max(80).nullable().optional(), images: z.array(z.string()).max(12).optional(), colors: z.array(z.string().max(40)).max(20).optional(), sizes: z.array(z.string().max(20)).max(20).optional(), inventory: z.union([z.coerce.number().int().min(0), z.record(z.coerce.number().int().min(0))]).optional(), status: z.enum(['active', 'draft']).optional(), isActive: z.boolean().optional(), badges: z.array(z.string().max(30)).optional(), featured: z.boolean().optional(), bestseller: z.boolean().optional(), newArrival: z.boolean().optional(), sku: z.string().max(100).optional(), compareAtPrice: z.coerce.number().min(0).nullable().optional() });
@@ -136,14 +136,15 @@ router.get('/orders', requirePermission('orders.view'), async (req, res) => {
   })));
 });
 router.patch('/orders/:id', requirePermission('orders.edit'), async (req, res) => {
-  const status = z.enum(['pending', 'paid', 'fulfilled', 'cancelled']).parse(req.body?.status);
+  const status = z.enum(['pending', 'paid', 'processing', 'shipped', 'out_for_delivery', 'fulfilled', 'cancelled']).parse(req.body?.status);
   const result = await transaction(async (client) => {
-    const { rows } = await client.query('SELECT id, status FROM orders WHERE id = $1 FOR UPDATE', [req.params.id]);
+    const { rows } = await client.query('SELECT o.id, o.status, o.tracking_token AS "trackingToken", u.email, u.name FROM orders o JOIN users u ON u.id = o.user_id WHERE o.id = $1 FOR UPDATE OF o', [req.params.id]);
     const order = rows[0];
     if (!order) return { notFound: true };
-    if (order.status === status) return order;
-    if (order.status === 'cancelled' || order.status === 'fulfilled' || (status === 'cancelled' && order.status !== 'pending')) {
-      return { conflict: 'This order status cannot be changed. Only pending orders can be cancelled; cancelled and fulfilled orders are final.' };
+    if (order.status === status) return { ...order, unchanged: true };
+    const stage = { pending: 0, paid: 1, processing: 1, shipped: 2, out_for_delivery: 3, fulfilled: 4 };
+    if (order.status === 'cancelled' || order.status === 'fulfilled' || (status !== 'cancelled' && (stage[status] === undefined || stage[status] <= (stage[order.status] ?? -1))) || (status === 'cancelled' && order.status !== 'pending')) {
+      return { conflict: 'Statuses can only move forward. Only pending orders can be cancelled; delivered and cancelled orders are final.' };
     }
     if (status === 'cancelled') {
       const { rows: items } = await client.query(`SELECT product_id AS "productId", COALESCE(size, 'One Size') AS size, SUM(quantity)::int AS quantity
@@ -164,12 +165,17 @@ router.patch('/orders/:id', requirePermission('orders.edit'), async (req, res) =
       }
     }
     const updated = await client.query('UPDATE orders SET status = $1 WHERE id = $2 RETURNING id, status', [status, order.id]);
-    return updated.rows[0];
+    return { ...updated.rows[0], email: order.email, name: order.name, trackingToken: order.trackingToken };
   });
   if (result.notFound) return res.status(404).json({ error: 'Order not found.' });
   if (result.conflict) return res.status(409).json({ error: result.conflict });
   await logAudit({ req, action: 'order.status_changed', targetType: 'order', targetId: result.id, metadata: { status } });
-  res.json(result);
+  res.json({ id: result.id, status: result.status });
+  if (result.email && !result.unchanged) {
+    const trackingUrl = `${storePublicOrigin()}/track.html?order=${result.id}&token=${encodeURIComponent(result.trackingToken)}`;
+    sendOrderStatusUpdate({ to: result.email, name: result.name || 'Customer', orderId: result.id, status, trackingUrl })
+      .catch((error) => console.error('Order status email failed:', error));
+  }
 });
 router.get('/categories', requirePermission('products.view'), async (req, res) => { const { rows } = await query(`SELECT c.id::text, c.name, c.slug, c.description, c.is_active AS "isActive", count(p.id)::int AS "productCount" FROM categories c LEFT JOIN products p ON p.category = c.slug GROUP BY c.id ORDER BY c.name`); res.json(rows.map((c) => ({ ...c, status: c.isActive ? 'active' : 'disabled' }))); });
 router.post('/categories', requirePermission('products.create'), async (req, res) => { const c = categoryInput.parse(req.body); const { rows } = await query('INSERT INTO categories (name, slug, description) VALUES ($1, $2, $3) RETURNING id::text, name, slug, description, is_active AS "isActive"', [c.name, c.slug, c.description || '']); await logAudit({ req, action: 'category.created', targetType: 'category', targetId: rows[0].id, metadata: { name: c.name, slug: c.slug } }); res.status(201).json({ ...rows[0], productCount: 0, status: 'active' }); });

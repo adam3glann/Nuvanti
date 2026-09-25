@@ -93,7 +93,7 @@ function render(order) {
             <div class="o-timeline" id="orderTimeline"></div>
             ${canEdit ? `
               <div class="field" style="margin-top:1rem"><label for="statusSelect">Update Status</label>
-                <select id="statusSelect">${['pending', 'paid', 'fulfilled', 'cancelled'].map((s) => `<option value="${s}" ${s === order.status ? 'selected' : ''}>${cap(s)}</option>`).join('')}</select>
+                <select id="statusSelect">${statusChoices(order.status)}</select>
               </div>
               <button class="btn btn-primary" id="updateStatusBtn" style="width:100%">Update Status</button>
             ` : ''}
@@ -130,7 +130,7 @@ function render(order) {
   });
 
   document.getElementById('cancelBtn')?.addEventListener('click', async () => {
-    const ok = await confirmDialog({ title: 'Cancel Order?', body: 'This action cannot be easily reversed. The customer will be notified once this connects to a real notification system.', confirmLabel: 'Cancel Order' });
+    const ok = await confirmDialog({ title: 'Cancel Order?', body: 'This action cannot be easily reversed. The customer will receive an email if store email delivery is configured.', confirmLabel: 'Cancel Order' });
     if (!ok) return;
     try {
       const updated = await cancelOrder(order.id);
@@ -142,10 +142,15 @@ function render(order) {
 }
 
 function renderTimeline(order) {
-  const labels = { pending: 'Order received', paid: 'Payment received', fulfilled: 'Fulfilled', cancelled: 'Cancelled' };
+  const labels = { pending: 'Order received', paid: 'Payment received', processing: 'Being prepared', shipped: 'Shipped', out_for_delivery: 'Out for delivery', fulfilled: 'Delivered', cancelled: 'Cancelled' };
   document.getElementById('orderTimeline').innerHTML = `
     <div class="o-timeline__item" data-done="true"><p class="o-timeline__title">Order placed</p><p class="o-timeline__time">${formatDateTime(order.createdAt)}</p></div>
     <div class="o-timeline__item" data-done="${order.status !== 'pending'}"><p class="o-timeline__title">${labels[order.status] || escapeHtml(order.status)}</p></div>`;
 }
 
-function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+function statusChoices(current) {
+  const labels = { pending: 'Pending', paid: 'Payment Received (legacy)', processing: 'Processing', shipped: 'Shipped', out_for_delivery: 'Out for Delivery', fulfilled: 'Delivered', cancelled: 'Cancelled' };
+  const rank = { pending: 0, paid: 1, processing: 1, shipped: 2, out_for_delivery: 3, fulfilled: 4 };
+  const options = Object.entries(labels).filter(([value]) => value === current || (value === 'cancelled' && current === 'pending') || (rank[value] !== undefined && rank[value] > (rank[current] ?? -1)));
+  return options.map(([value, label]) => `<option value="${value}" ${value === current ? 'selected' : ''}>${label}</option>`).join('');
+}

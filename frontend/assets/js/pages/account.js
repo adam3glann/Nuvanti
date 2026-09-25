@@ -151,7 +151,7 @@ function checkValid(form) {
   return true;
 }
 
-const STATUS_LABELS = { pending: 'Order Received', paid: 'Payment Received', fulfilled: 'Fulfilled', cancelled: 'Cancelled' };
+const STATUS_LABELS = { pending: 'Order Received', paid: 'Payment Received', processing: 'Being Prepared', shipped: 'Shipped', out_for_delivery: 'Out for Delivery', fulfilled: 'Delivered', cancelled: 'Cancelled' };
 
 async function renderDashboard(session, tab) {
   root.innerHTML = `
