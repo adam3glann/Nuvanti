@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { query, transaction } from '../lib/db.js';
 import { productPayload, toPublicProduct } from '../lib/catalog.js';
-import { requirePermission } from '../lib/permissions.js';
+import { hasPermission, requirePermission } from '../lib/permissions.js';
 import { logAudit } from '../lib/audit.js';
 import { emailDeliveryStatus, sendAdminWelcome, sendTestEmail, sendOrderStatusUpdate } from '../lib/mail.js';
 import { adminPublicOrigin, storePublicOrigin } from '../lib/publicOrigins.js';
@@ -137,14 +137,17 @@ router.get('/orders', requirePermission('orders.view'), async (req, res) => {
 });
 router.patch('/orders/:id', requirePermission('orders.edit'), async (req, res) => {
   const status = z.enum(['pending', 'paid', 'processing', 'shipped', 'out_for_delivery', 'fulfilled', 'cancelled']).parse(req.body?.status);
+  if (status === 'cancelled' && !hasPermission(req.user.role, 'orders.cancel')) return res.status(403).json({ error: 'You do not have permission to cancel orders.' });
   const result = await transaction(async (client) => {
     const { rows } = await client.query('SELECT o.id, o.status, o.tracking_token AS "trackingToken", u.email, u.name FROM orders o JOIN users u ON u.id = o.user_id WHERE o.id = $1 FOR UPDATE OF o', [req.params.id]);
     const order = rows[0];
     if (!order) return { notFound: true };
     if (order.status === status) return { ...order, unchanged: true };
-    const stage = { pending: 0, paid: 1, processing: 1, shipped: 2, out_for_delivery: 3, fulfilled: 4 };
-    if (order.status === 'cancelled' || order.status === 'fulfilled' || (status !== 'cancelled' && (stage[status] === undefined || stage[status] <= (stage[order.status] ?? -1))) || (status === 'cancelled' && order.status !== 'pending')) {
-      return { conflict: 'Statuses can only move forward. Only pending orders can be cancelled; delivered and cancelled orders are final.' };
+    if (order.status === 'cancelled') {
+      return { conflict: 'Cancelled orders cannot be reopened. Create a new order if the customer still wants the items.' };
+    }
+    if (status === 'cancelled' && order.status !== 'pending') {
+      return { conflict: 'Only pending orders can be cancelled. Correct the fulfillment status instead.' };
     }
     if (status === 'cancelled') {
       const { rows: items } = await client.query(`SELECT product_id AS "productId", COALESCE(size, 'One Size') AS size, SUM(quantity)::int AS quantity

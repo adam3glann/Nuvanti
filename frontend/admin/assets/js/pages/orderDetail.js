@@ -91,11 +91,12 @@ function render(order) {
           <div class="card-head"><h2>Status</h2></div>
           <div class="card-pad">
             <div class="o-timeline" id="orderTimeline"></div>
-            ${canEdit ? `
+            ${canEdit && order.status !== 'cancelled' ? `
               <div class="field" style="margin-top:1rem"><label for="statusSelect">Update Status</label>
-                <select id="statusSelect">${statusChoices(order.status)}</select>
+                <select id="statusSelect">${statusChoices(order.status, canCancel)}</select>
+                <span class="hint">You can correct a status if it was set by mistake. The customer’s account and tracking page update, and an email is attempted.</span>
               </div>
-              <button class="btn btn-primary" id="updateStatusBtn" style="width:100%">Update Status</button>
+              <button class="btn btn-primary" id="updateStatusBtn" style="width:100%">Save Status</button>
             ` : ''}
           </div>
         </div>
@@ -106,7 +107,7 @@ function render(order) {
             <button class="btn btn-outline" id="printInvoiceBtn">Print Invoice</button>
             <button class="btn btn-outline" id="printSlipBtn">Print Packing Slip</button>
             <button class="btn btn-outline" id="contactBtn">Contact Customer</button>
-            ${canCancel && order.status !== 'cancelled' ? `<button class="btn btn-outline" style="color:var(--a-danger);border-color:var(--a-danger)" id="cancelBtn">Cancel Order</button>` : ''}
+            ${canCancel && order.status === 'pending' ? `<button class="btn btn-outline" style="color:var(--a-danger);border-color:var(--a-danger)" id="cancelBtn">Cancel Order</button>` : ''}
           </div>
         </div>
 
@@ -148,9 +149,8 @@ function renderTimeline(order) {
     <div class="o-timeline__item" data-done="${order.status !== 'pending'}"><p class="o-timeline__title">${labels[order.status] || escapeHtml(order.status)}</p></div>`;
 }
 
-function statusChoices(current) {
+function statusChoices(current, canCancelOrder) {
   const labels = { pending: 'Pending', paid: 'Payment Received (legacy)', processing: 'Processing', shipped: 'Shipped', out_for_delivery: 'Out for Delivery', fulfilled: 'Delivered', cancelled: 'Cancelled' };
-  const rank = { pending: 0, paid: 1, processing: 1, shipped: 2, out_for_delivery: 3, fulfilled: 4 };
-  const options = Object.entries(labels).filter(([value]) => value === current || (value === 'cancelled' && current === 'pending') || (rank[value] !== undefined && rank[value] > (rank[current] ?? -1)));
+  const options = Object.entries(labels).filter(([value]) => value === current || value !== 'cancelled' || (current === 'pending' && canCancelOrder));
   return options.map(([value, label]) => `<option value="${value}" ${value === current ? 'selected' : ''}>${label}</option>`).join('');
 }
