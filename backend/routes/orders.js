@@ -59,7 +59,10 @@ router.post('/', requireAuth, asyncRoute(async (req, res) => {
         THEN jsonb_build_object('One Size', inventory) ELSE metadata->'inventory' END AS "stockBySize"
       FROM products WHERE id = ANY($1) AND is_active = true FOR UPDATE`, [ids]);
     if (products.length !== ids.length) { const error = new Error('One or more products are unavailable.'); error.status = 400; throw error; }
-    const map = new Map(products.map((p) => [p.id, p]));
+    // PostgreSQL BIGSERIAL (`int8`) values are returned as strings by node-pg,
+    // while validated productId values from the request are numbers. Normalize
+    // the keys so valid cart lines resolve instead of throwing during checkout.
+    const map = new Map(products.map((product) => [Number(product.id), product]));
     const variantQuantities = new Map();
     const productQuantities = new Map();
     let subtotal = 0;
