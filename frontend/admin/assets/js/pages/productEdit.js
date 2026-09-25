@@ -63,7 +63,7 @@ function renderForm(product, cats, cols) {
               <div class="field"><label for="fCompare">Compare-at Price</label><input type="text" inputmode="decimal" id="fCompare" value="${product.compareAtPrice == null ? '' : formatMoney(product.compareAtPrice)}" placeholder="12,345" /></div>
               <div class="field"><label for="fCost">Cost Price</label><input type="text" inputmode="decimal" id="fCost" value="${product.cost == null ? '' : formatMoney(product.cost)}" placeholder="12,345" /></div>
             </div>
-            <small class="hint">Enter amounts up to 99,999.99 EGP. Thousands are grouped automatically, e.g. 12,345.</small>
+            <small class="hint">Enter amounts up to 21,474,836.47 EGP. Thousands are grouped automatically, e.g. 12,345.</small>
           </div>
         </div>
 
@@ -178,9 +178,9 @@ function renderForm(product, cats, cols) {
     const price = parseMoney(val('fPrice'));
     const compareAt = val('fCompare') ? parseMoney(val('fCompare')) : null;
     const cost = val('fCost') ? parseMoney(val('fCost')) : null;
-    if (!Number.isFinite(price) || price < 0 || price > 99999.99) return showAdminToast('Price must be between 0 and 99,999.99 EGP.', 'error');
-    if (compareAt !== null && (!Number.isFinite(compareAt) || compareAt < 0 || compareAt > 99999.99)) return showAdminToast('Compare-at price must be between 0 and 99,999.99 EGP.', 'error');
-    if (cost !== null && (!Number.isFinite(cost) || cost < 0 || cost > 99999.99)) return showAdminToast('Cost price must be between 0 and 99,999.99 EGP.', 'error');
+    if (!Number.isFinite(price) || price < 0 || price > 21474836.47) return showAdminToast('Price must be between 0 and 21,474,836.47 EGP.', 'error');
+    if (compareAt !== null && (!Number.isFinite(compareAt) || compareAt < 0 || compareAt > 21474836.47)) return showAdminToast('Compare-at price must be between 0 and 21,474,836.47 EGP.', 'error');
+    if (cost !== null && (!Number.isFinite(cost) || cost < 0 || cost > 21474836.47)) return showAdminToast('Cost price must be between 0 and 21,474,836.47 EGP.', 'error');
     const colors = splitList(val('fColors'));
     const sizes = splitList(val('fSizes'));
     const stockProduct = { ...product, colors, sizes };

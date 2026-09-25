@@ -14,7 +14,8 @@ export function escapeHtml(value) {
 }
 
 export function formatPrice(v) {
-  return `${Math.round(v).toLocaleString('en-US')} EGP`;
+  const amount = Number(v);
+  return Number.isFinite(amount) ? `${amount.toLocaleString('en-US', { maximumFractionDigits: 2 })} EGP` : 'Price unavailable';
 }
 export function formatDate(iso) {
   return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
