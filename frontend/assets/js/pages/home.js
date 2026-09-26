@@ -70,7 +70,6 @@ function renderHero(slides) {
     ${slides.map((s, i) => `
       <div class="hero-slide" data-active="${i === 0}" data-index="${i}" data-duration="${Math.min(30, Math.max(3, Math.floor(Number(s.durationSeconds) || 5)))}" aria-hidden="${i !== 0}">
         <img class="hero-slide__img" src="${escapeHtml(s.imageUrl)}" alt="" ${i === 0 ? 'fetchpriority="high"' : 'loading="lazy"'} />
-        <img class="hero-slide__backdrop" src="${escapeHtml(s.imageUrl)}" alt="" aria-hidden="true" loading="lazy" />
         <div class="hero-slide__scrim"></div>
         <div class="hero-slide__content">
           ${s.eyebrow ? `<p class="label hero-slide__eyebrow">${escapeHtml(s.eyebrow)}</p>` : ''}
