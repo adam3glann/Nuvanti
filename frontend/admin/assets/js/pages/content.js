@@ -42,6 +42,7 @@ function renderSlide(slide) {
   const image = safePreviewUrl(slide.imageUrl) ? slide.imageUrl : '';
   const textColor = safeColor(slide.textColor) ? slide.textColor : '#f5f2eb';
   const gradients = normalizeTextGradients(slide.textGradients);
+  const fonts = normalizeTextFonts(slide.textFonts);
   return `<form class="card slide-card" data-slide-id="${escapeHtml(slide.id)}">
     <div class="slide-card__head">
       <img class="slide-preview" src="${escapeHtml(image)}" alt="" data-preview />
@@ -55,6 +56,15 @@ function renderSlide(slide) {
       </div>
       <div class="field"><label>Headline</label><input name="title" value="${escapeHtml(slide.title)}" maxlength="160" minlength="3" required /></div>
       <div class="field"><label>Description</label><textarea name="description" rows="3" maxlength="500">${escapeHtml(slide.description)}</textarea></div>
+      <section class="slide-font-settings" aria-label="Slide fonts"><h3>Fonts</h3><p class="hint">Use one font across the slide or choose a font for each text part. These choices use built-in or already-loaded fonts.</p>
+        <div class="slide-font-all"><label class="slide-gradient-toggle"><input type="checkbox" name="textFontAllEnabled" ${fonts.all.enabled ? 'checked' : ''} /> Use one font for all text</label><div class="field"><label for="slide-${slide.id}-font-all">All-text font</label><select id="slide-${slide.id}-font-all" name="textFontAll">${renderFontOptions(fonts.all.font)}</select></div></div>
+        <div class="field-row slide-font-grid">
+          ${renderFontTarget(slide.id, 'eyebrow', 'Eyebrow', fonts.eyebrow)}
+          ${renderFontTarget(slide.id, 'title', 'Headline', fonts.title)}
+          ${renderFontTarget(slide.id, 'description', 'Description', fonts.description)}
+          ${renderFontTarget(slide.id, 'button', 'Button text', fonts.button)}
+        </div>
+      </section>
       <section class="slide-text-colors" aria-label="Slide text colors"><h3>Text colors</h3><p class="hint">Choose one color for all text, or enable individual colors below to customize particular text.</p>
         <label class="slide-gradient-toggle"><input type="checkbox" name="textGradientAllEnabled" ${gradients.all.enabled ? 'checked' : ''} /> Apply a gradient to all text on this slide</label>
         <div class="field-row slide-gradient-pickers">
@@ -107,6 +117,23 @@ function renderGradientTarget(slideId, key, label, gradient) {
   return `<div class="slide-gradient-target"><div class="field"><label for="slide-${slideId}-${key}-mode">${label} gradient</label><select id="slide-${slideId}-${key}-mode" name="textGradient${key[0].toUpperCase()}${key.slice(1)}Mode"><option value="inherit" ${gradient.mode === 'inherit' ? 'selected' : ''}>Follow all text</option><option value="gradient" ${gradient.mode === 'gradient' ? 'selected' : ''}>Custom gradient</option><option value="solid" ${gradient.mode === 'solid' ? 'selected' : ''}>Solid color</option></select></div><div class="slide-gradient-target__colors">${renderGradientColor(slideId, `textGradient${key[0].toUpperCase()}${key.slice(1)}Start`, `${label} gradient start`, gradient.start)}${renderGradientColor(slideId, `textGradient${key[0].toUpperCase()}${key.slice(1)}End`, `${label} gradient end`, gradient.end)}</div></div>`;
 }
 
+function renderFontOptions(selected, includeInherit = false) {
+  const choices = [
+    ...(includeInherit ? [['inherit', 'Follow all / default']] : []),
+    ['display', 'Bricolage Grotesque'],
+    ['body', 'Inter'],
+    ['serif', 'Georgia (serif)'],
+    ['system', 'System UI'],
+  ];
+  return choices.map(([value, label]) => `<option value="${value}" ${selected === value ? 'selected' : ''}>${label}</option>`).join('');
+}
+
+function renderFontTarget(slideId, key, label, font) {
+  const name = `textFont${key[0].toUpperCase()}${key.slice(1)}`;
+  const id = `slide-${slideId}-${name}`;
+  return `<div class="field slide-font-target"><label for="${id}">${label} font</label><select id="${id}" name="${name}">${renderFontOptions(font, true)}</select></div>`;
+}
+
 function normalizeTextGradients(value = {}) {
   const defaults = {
     all: { enabled: true, start: '#83a88a', end: '#f5f2eb' },
@@ -128,6 +155,18 @@ function normalizeTextGradients(value = {}) {
     else if (!['inherit', 'gradient', 'solid'].includes(current.mode)) result[key].mode = fallback.mode;
   }
   return result;
+}
+
+function normalizeTextFonts(value = {}) {
+  const allowed = ['display', 'body', 'serif', 'system'];
+  const all = value?.all || {};
+  return {
+    all: { enabled: all.enabled === true, font: allowed.includes(all.font) ? all.font : 'display' },
+    eyebrow: allowed.includes(value?.eyebrow) ? value.eyebrow : 'inherit',
+    title: allowed.includes(value?.title) ? value.title : 'inherit',
+    description: allowed.includes(value?.description) ? value.description : 'inherit',
+    button: allowed.includes(value?.button) ? value.button : 'inherit',
+  };
 }
 
 function renderOverrideColor(slideId, label, name, value, fallback) {
@@ -234,6 +273,13 @@ root?.addEventListener('submit', async (event) => {
       title: readGradient('Title'),
       description: readGradient('Description'),
       button: readGradient('Button'),
+    },
+    textFonts: {
+      all: { enabled: form.elements.namedItem('textFontAllEnabled').checked, font: value('textFontAll') },
+      eyebrow: value('textFontEyebrow'),
+      title: value('textFontTitle'),
+      description: value('textFontDescription'),
+      button: value('textFontButton'),
     },
     position: Number(value('position')), durationSeconds: Number(value('durationSeconds')), isActive: form.elements.namedItem('isActive').checked,
   };

@@ -114,7 +114,18 @@ function textGradientAttributes(slide, part) {
   const colors = specific.mode === 'gradient' ? specific : all;
   const start = /^#[0-9a-fA-F]{6}$/.test(colors.start || '') ? colors.start : defaults.start;
   const end = /^#[0-9a-fA-F]{6}$/.test(colors.end || '') ? colors.end : defaults.end;
-  return `data-text-gradient="${enabled}" style="--text-gradient-start:${start};--text-gradient-end:${end}"`;
+  const fontSettings = slide.textFonts || {};
+  const individualFont = fontSettings[part];
+  const font = individualFont && individualFont !== 'inherit' ? individualFont : (fontSettings.all?.enabled ? fontSettings.all.font : '');
+  const fontStacks = {
+    display: 'var(--font-display)',
+    body: 'var(--font-body)',
+    serif: "Georgia, 'Times New Roman', serif",
+    system: 'system-ui, sans-serif',
+  };
+  const styles = [`--text-gradient-start:${start}`, `--text-gradient-end:${end}`];
+  if (fontStacks[font]) styles.push(`font-family:${fontStacks[font]}`);
+  return `data-text-gradient="${enabled}" style="${styles.join(';')}"`;
 }
 
 function initHeroSlider() {
