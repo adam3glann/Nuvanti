@@ -96,42 +96,58 @@ function initHeroSlider() {
   const slider = document.getElementById('heroSlider');
   const slides = [...slider.querySelectorAll('.hero-slide')];
   const dots = [...slider.querySelectorAll('.hero-dot')];
+  if (slides.length < 2) return;
+
   let current = 0;
   let timer;
-  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const intervalMs = 5000;
 
   function goTo(index) {
     current = (index + slides.length) % slides.length;
-    slides.forEach((s, i) => { s.dataset.active = String(i === current); s.setAttribute('aria-hidden', String(i !== current)); });
-    dots.forEach((d, i) => { d.dataset.active = String(i === current); d.setAttribute('aria-pressed', String(i === current)); });
+    slides.forEach((slide, i) => {
+      const active = i === current;
+      slide.dataset.active = String(active);
+      slide.setAttribute('aria-hidden', String(!active));
+    });
+    dots.forEach((dot, i) => {
+      const active = i === current;
+      dot.dataset.active = String(active);
+      dot.setAttribute('aria-pressed', String(active));
+    });
   }
   function next() { goTo(current + 1); }
   function prev() { goTo(current - 1); }
-  function startAutoplay() { stopAutoplay(); if (!reducedMotion && slides.length > 1) timer = setInterval(next, 6000); }
-  function stopAutoplay() { clearInterval(timer); }
+  function stopAutoplay() { clearTimeout(timer); }
+  function startAutoplay() {
+    stopAutoplay();
+    if (document.hidden) return;
+    timer = setTimeout(() => {
+      next();
+      startAutoplay();
+    }, intervalMs);
+  }
+  function manualGo(action) {
+    action();
+    startAutoplay();
+  }
 
-  document.getElementById('heroNext').addEventListener('click', () => { next(); stopAutoplay(); startAutoplay(); });
-  document.getElementById('heroPrev').addEventListener('click', () => { prev(); stopAutoplay(); startAutoplay(); });
-  dots.forEach((d) => d.addEventListener('click', () => { goTo(Number(d.dataset.goto)); stopAutoplay(); startAutoplay(); }));
-
-  slider.addEventListener('mouseenter', stopAutoplay);
-  slider.addEventListener('mouseleave', startAutoplay);
-  slider.addEventListener('focusin', stopAutoplay);
-  slider.addEventListener('focusout', startAutoplay);
+  document.getElementById('heroNext').addEventListener('click', () => manualGo(next));
+  document.getElementById('heroPrev').addEventListener('click', () => manualGo(prev));
+  dots.forEach((dot) => dot.addEventListener('click', () => manualGo(() => goTo(Number(dot.dataset.goto)))));
+  document.addEventListener('visibilitychange', startAutoplay);
 
   slider.setAttribute('tabindex', '0');
-  slider.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowRight') next();
-    if (e.key === 'ArrowLeft') prev();
+  slider.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowRight') manualGo(next);
+    if (event.key === 'ArrowLeft') manualGo(prev);
   });
 
-  // touch swipe
   let startX = null;
-  slider.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; }, { passive: true });
-  slider.addEventListener('touchend', (e) => {
+  slider.addEventListener('touchstart', (event) => { startX = event.touches[0].clientX; }, { passive: true });
+  slider.addEventListener('touchend', (event) => {
     if (startX == null) return;
-    const dx = e.changedTouches[0].clientX - startX;
-    if (Math.abs(dx) > 40) (dx < 0 ? next() : prev());
+    const dx = event.changedTouches[0].clientX - startX;
+    if (Math.abs(dx) > 40) manualGo(dx < 0 ? next : prev);
     startX = null;
   }, { passive: true });
 

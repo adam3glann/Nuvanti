@@ -2098,3 +2098,13 @@
 }
 
 .product-card.reveal { transition-delay: calc(var(--card-order, 0) * 35ms); }
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-slide,
+  .hero-slide__img {
+    transition: none !important;
+  }
+  .hero-slide__img {
+    transform: none !important;
+  }
+}
