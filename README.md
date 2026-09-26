@@ -167,6 +167,16 @@ Follow [DEPLOYMENT-POSTGRES.md](DEPLOYMENT-POSTGRES.md) for the Railway, Supabas
 
 For the full security model and operational boundaries, see [backend/README.md](backend/README.md).
 
+### Administrator access handoff
+
+Treat administrator credentials as private secrets. **Do not give a client your own super-admin login or reuse one password for multiple people.** Create a separate named account for each client or staff member in **Admin Users**, and grant only the role they need. New accounts should be activated through the one-time setup email. Require authenticator MFA for every staff account and store recovery codes somewhere private.
+
+If a temporary password is unavoidable, generate a unique one, deliver it through a password manager or another private channel, and have the recipient change it immediately. Never put a real password in this README, a Git commit, a source file, a screenshot, or a support message. Disable former staff accounts and revoke their sessions when access is no longer needed.
+
+After the first production administrator is created, remove `NUVANTI_BOOTSTRAP_ADMIN_EMAIL`, `NUVANTI_BOOTSTRAP_ADMIN_PASSWORD`, and `NUVANTI_BOOTSTRAP_ADMIN_NAME` from Railway. Keep production credentials in Railway Variables or the relevant provider’s secret manager; `.env.example` is only a template. If a password, API key, database URL, MFA key, or SSH private key is exposed, replace/revoke it at its provider immediately. Removing it from the latest commit does not remove it from Git history.
+
+Security controls reduce risk but cannot guarantee that a site is impossible to compromise. Keep dependencies and the runtime updated, use individual staff accounts and MFA, review audit logs, and follow the deployment checklist before accepting real orders.
+
 ## Repository layout
 
 ```text

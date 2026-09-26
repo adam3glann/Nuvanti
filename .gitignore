@@ -3,5 +3,10 @@ node_modules/
 .env.*
 !.env.example
 *.log
-backend/railway\ ssh
-backend/railway\ ssh.pub
+# Never commit private keys or local Railway SSH key material.
+*.pem
+*.key
+/backend/railway\ ssh
+/backend/railway\ ssh.pub
+/backend/id_rsa
+/backend/id_ed25519
