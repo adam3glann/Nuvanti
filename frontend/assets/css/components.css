@@ -368,6 +368,7 @@
   display: block;
   aspect-ratio: 4 / 5;
   overflow: hidden;
+  touch-action: pan-y pinch-zoom;
   background: var(--color-border);
   margin-bottom: var(--space-3);
   border-radius: var(--radius-md);

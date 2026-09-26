@@ -71,7 +71,45 @@ export function bindProductCardEvents(container, { products, onCartChange } = {}
   }
   const binding = { products: products || [], onCartChange };
   productCardBindings.set(container, binding);
+  let touchStart = null;
+  let suppressClickUntil = 0;
+  container.addEventListener('touchstart', (event) => {
+    const media = event.target.closest('.product-card__media');
+    const touch = event.changedTouches[0];
+    touchStart = media && touch ? { media, x: touch.clientX, y: touch.clientY } : null;
+  }, { passive: true });
+  container.addEventListener('touchend', (event) => {
+    if (!touchStart) return;
+    const touch = event.changedTouches[0];
+    const dx = touch.clientX - touchStart.x;
+    const dy = touch.clientY - touchStart.y;
+    const media = touchStart.media;
+    touchStart = null;
+    if (Math.abs(dx) < 45 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
+    const card = media.closest('.product-card');
+    const product = binding.products.find((item) => String(item.id) === card?.dataset.productId);
+    const images = product?.images?.filter(Boolean) || [];
+    if (images.length < 2) return;
+    event.preventDefault();
+    suppressClickUntil = Date.now() + 500;
+    const index = Number(media.dataset.imageIndex) || 0;
+    const nextIndex = (index + (dx < 0 ? 1 : -1) + images.length) % images.length;
+    media.dataset.imageIndex = String(nextIndex);
+    const primary = media.querySelector('img:not(.img-alt)');
+    const alternate = media.querySelector('img.img-alt');
+    if (primary) {
+      primary.src = images[nextIndex];
+      primary.alt = product.name || 'Nuvanti item';
+    }
+    if (alternate) alternate.src = images[(nextIndex + 1) % images.length];
+  }, { passive: false });
+  container.addEventListener('touchcancel', () => { touchStart = null; }, { passive: true });
   container.addEventListener('click', (e) => {
+    if (Date.now() < suppressClickUntil && e.target.closest('.product-card__media')) {
+      e.preventDefault();
+      suppressClickUntil = 0;
+      return;
+    }
     const wishBtn = e.target.closest('[data-wishlist-toggle]');
     if (wishBtn) {
       e.preventDefault();

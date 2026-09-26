@@ -28,14 +28,14 @@
   aspect-ratio: 4/5;
   overflow: hidden;
   background: var(--color-border);
-  touch-action: manipulation;
+  touch-action: pan-y pinch-zoom;
 }
 .gallery__main img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   object-position: center top;
-  transition: transform var(--dur-med) var(--ease-editorial);
+  transition: opacity var(--dur-fast) var(--ease-editorial), transform var(--dur-med) var(--ease-editorial);
 }
 /* Click-to-zoom is a mouse-hover affordance; only offer it on devices that actually have a mouse.
    On touch devices the tap instead opens the full-screen lightbox (see .lightbox below), which is

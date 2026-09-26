@@ -295,12 +295,34 @@ function renderGallery() {
     "(hover: hover) and (pointer: fine)",
   ).matches;
 
+  let touchStart = null;
+  let suppressGalleryClick = false;
+  if (images.length > 1) {
+    main.addEventListener("touchstart", (event) => {
+      const touch = event.changedTouches[0];
+      touchStart = touch ? { x: touch.clientX, y: touch.clientY } : null;
+    }, { passive: true });
+    main.addEventListener("touchend", (event) => {
+      if (!touchStart) return;
+      const touch = event.changedTouches[0];
+      const dx = touch.clientX - touchStart.x;
+      const dy = touch.clientY - touchStart.y;
+      touchStart = null;
+      if (Math.abs(dx) < 45 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
+      event.preventDefault();
+      suppressGalleryClick = true;
+      setGalleryImage(galleryIndex + (dx < 0 ? 1 : -1));
+      window.setTimeout(() => { suppressGalleryClick = false; }, 700);
+    }, { passive: false });
+    main.addEventListener("touchcancel", () => { touchStart = null; }, { passive: true });
+  }
   if (hasMouse) {
     /*
      * Desktop:
      * Click = zoom.
      */
     main.addEventListener("click", () => {
+      if (suppressGalleryClick) { suppressGalleryClick = false; return; }
       main.classList.toggle("is-zoomed");
     });
   } else {
@@ -309,6 +331,7 @@ function renderGallery() {
      * Open fullscreen lightbox.
      */
     main.addEventListener("click", () => {
+      if (suppressGalleryClick) { suppressGalleryClick = false; return; }
       openLightbox(galleryIndex);
     });
   }
