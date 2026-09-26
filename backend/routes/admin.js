@@ -39,6 +39,7 @@ const slideLink = z.string().trim().min(1).max(500).refine((value) => {
   }
   return /^(?!\/\/)[\w./?%&=+#-]+$/.test(value) && !value.toLowerCase().startsWith('javascript:');
 }, 'Use an internal page link or an HTTPS URL.');
+const slideColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 const homepageSlideInput = z.object({
   imageUrl: slideAsset,
   eyebrow: z.string().trim().max(80).default(''),
@@ -50,9 +51,14 @@ const homepageSlideInput = z.object({
   secondaryHref: z.string().trim().max(500).default(''),
   position: z.coerce.number().int().min(0).max(1000).default(0),
   durationSeconds: z.coerce.number().int().min(3).max(30).default(5),
+  textColor: slideColor.default('#f5f2eb'),
+  eyebrowColor: slideColor.nullable().default(null),
+  titleColor: slideColor.nullable().default(null),
+  descriptionColor: slideColor.nullable().default(null),
+  buttonTextColor: slideColor.nullable().default(null),
   isActive: z.boolean().default(true),
 }).refine((slide) => !slide.secondaryLabel || slide.secondaryHref, { message: 'Add a link for the secondary button.' });
-const homepageSlideColumns = 'id::text, image_url AS "imageUrl", eyebrow, title, description, cta_label AS "ctaLabel", cta_href AS "ctaHref", secondary_label AS "secondaryLabel", secondary_href AS "secondaryHref", position, duration_seconds AS "durationSeconds", is_active AS "isActive"';
+const homepageSlideColumns = 'id::text, image_url AS "imageUrl", eyebrow, title, description, cta_label AS "ctaLabel", cta_href AS "ctaHref", secondary_label AS "secondaryLabel", secondary_href AS "secondaryHref", position, duration_seconds AS "durationSeconds", text_color AS "textColor", eyebrow_color AS "eyebrowColor", title_color AS "titleColor", description_color AS "descriptionColor", button_text_color AS "buttonTextColor", is_active AS "isActive"';
 router.get('/store-presence', asyncRoute(async (req, res) => {
   const { rows } = await query(`SELECT count(DISTINCT visitor_id)::int AS "activeVisitors"
     FROM storefront_presence WHERE last_seen_at >= NOW() - INTERVAL '70 seconds'`);
@@ -62,11 +68,19 @@ router.get('/homepage-slides', requirePermission('content.manage'), async (req, 
   const { rows } = await query(`SELECT ${homepageSlideColumns} FROM homepage_slides ORDER BY position, id`);
   res.json(rows);
 });
+router.patch('/homepage-slides/text-color', requirePermission('content.manage'), async (req, res) => {
+  const { textColor } = z.object({ textColor: slideColor }).parse(req.body);
+  const { rowCount } = await query(`UPDATE homepage_slides SET text_color = $1,
+    eyebrow_color = NULL, title_color = NULL, description_color = NULL, button_text_color = NULL,
+    updated_at = NOW()`, [textColor]);
+  await logAudit({ req, action: 'homepage_slide.text_color_applied', targetType: 'homepage_slides', targetId: 'all', metadata: { textColor, count: rowCount } });
+  res.json({ updated: rowCount, textColor });
+});
 router.post('/homepage-slides', requirePermission('content.manage'), async (req, res) => {
   const slide = homepageSlideInput.parse(req.body);
-  const { rows } = await query(`INSERT INTO homepage_slides (image_url, eyebrow, title, description, cta_label, cta_href, secondary_label, secondary_href, position, duration_seconds, is_active)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING ${homepageSlideColumns}`,
-  [slide.imageUrl, slide.eyebrow, slide.title, slide.description, slide.ctaLabel, slide.ctaHref, slide.secondaryLabel, slide.secondaryHref, slide.position, slide.durationSeconds, slide.isActive]);
+  const { rows } = await query(`INSERT INTO homepage_slides (image_url, eyebrow, title, description, cta_label, cta_href, secondary_label, secondary_href, position, duration_seconds, text_color, eyebrow_color, title_color, description_color, button_text_color, is_active)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING ${homepageSlideColumns}`,
+  [slide.imageUrl, slide.eyebrow, slide.title, slide.description, slide.ctaLabel, slide.ctaHref, slide.secondaryLabel, slide.secondaryHref, slide.position, slide.durationSeconds, slide.textColor, slide.eyebrowColor, slide.titleColor, slide.descriptionColor, slide.buttonTextColor, slide.isActive]);
   await logAudit({ req, action: 'homepage_slide.created', targetType: 'homepage_slide', targetId: rows[0].id, metadata: { title: slide.title } });
   res.status(201).json(rows[0]);
 });
@@ -74,9 +88,9 @@ router.patch('/homepage-slides/:id', requirePermission('content.manage'), async 
   const current = await query(`SELECT ${homepageSlideColumns} FROM homepage_slides WHERE id = $1`, [req.params.id]);
   if (!current.rows[0]) return res.status(404).json({ error: 'Homepage slide not found.' });
   const slide = homepageSlideInput.parse({ ...current.rows[0], ...req.body });
-  const { rows } = await query(`UPDATE homepage_slides SET image_url=$1, eyebrow=$2, title=$3, description=$4, cta_label=$5, cta_href=$6, secondary_label=$7, secondary_href=$8, position=$9, duration_seconds=$10, is_active=$11, updated_at=NOW()
-    WHERE id=$12 RETURNING ${homepageSlideColumns}`,
-  [slide.imageUrl, slide.eyebrow, slide.title, slide.description, slide.ctaLabel, slide.ctaHref, slide.secondaryLabel, slide.secondaryHref, slide.position, slide.durationSeconds, slide.isActive, req.params.id]);
+  const { rows } = await query(`UPDATE homepage_slides SET image_url=$1, eyebrow=$2, title=$3, description=$4, cta_label=$5, cta_href=$6, secondary_label=$7, secondary_href=$8, position=$9, duration_seconds=$10, text_color=$11, eyebrow_color=$12, title_color=$13, description_color=$14, button_text_color=$15, is_active=$16, updated_at=NOW()
+    WHERE id=$17 RETURNING ${homepageSlideColumns}`,
+  [slide.imageUrl, slide.eyebrow, slide.title, slide.description, slide.ctaLabel, slide.ctaHref, slide.secondaryLabel, slide.secondaryHref, slide.position, slide.durationSeconds, slide.textColor, slide.eyebrowColor, slide.titleColor, slide.descriptionColor, slide.buttonTextColor, slide.isActive, req.params.id]);
   await logAudit({ req, action: 'homepage_slide.updated', targetType: 'homepage_slide', targetId: rows[0].id, metadata: { title: slide.title } });
   res.json(rows[0]);
 });

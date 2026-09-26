@@ -14,6 +14,7 @@ async function request(path, options = {}) {
 export const fetchHomepageSlides = () => request('/api/admin/homepage-slides');
 export const createHomepageSlide = (slide) => request('/api/admin/homepage-slides', { method: 'POST', body: JSON.stringify(slide) });
 export const updateHomepageSlide = (id, slide) => request(`/api/admin/homepage-slides/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(slide) });
+export const applyHomepageTextColor = (textColor) => request('/api/admin/homepage-slides/text-color', { method: 'PATCH', body: JSON.stringify({ textColor }) });
 export const deleteHomepageSlide = (id) => request(`/api/admin/homepage-slides/${encodeURIComponent(id)}`, { method: 'DELETE' });
 
 export async function uploadHomepageSlideImage(file) {

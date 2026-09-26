@@ -68,7 +68,7 @@ function renderHero(slides) {
   el.hidden = false;
   el.innerHTML = `
     ${slides.map((s, i) => `
-      <div class="hero-slide" data-active="${i === 0}" data-index="${i}" data-duration="${Math.min(30, Math.max(3, Math.floor(Number(s.durationSeconds) || 5)))}" aria-hidden="${i !== 0}">
+      <div class="hero-slide" data-active="${i === 0}" data-index="${i}" data-duration="${Math.min(30, Math.max(3, Math.floor(Number(s.durationSeconds) || 5)))}" aria-hidden="${i !== 0}" style="${slideTextStyle(s)}">
         <img class="hero-slide__img" src="${escapeHtml(s.imageUrl)}" alt="" ${i === 0 ? 'fetchpriority="high"' : 'loading="lazy"'} />
         <div class="hero-slide__scrim"></div>
         <div class="hero-slide__content">
@@ -90,6 +90,18 @@ function renderHero(slides) {
       <button class="hero-arrow" id="heroNext" aria-label="Next slide">${icon('chevronRight')}</button>
     </div>
   `;
+}
+
+function slideTextStyle(slide) {
+  const vars = [
+    ['text', slide.textColor],
+    ['eyebrow', slide.eyebrowColor],
+    ['title', slide.titleColor],
+    ['description', slide.descriptionColor],
+    ['button-text', slide.buttonTextColor],
+  ];
+  return vars.filter(([, color]) => /^#[0-9a-fA-F]{6}$/.test(color || ''))
+    .map(([name, color]) => `--slide-${name}-color:${color};`).join('');
 }
 
 function initHeroSlider() {

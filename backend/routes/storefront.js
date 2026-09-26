@@ -42,7 +42,9 @@ router.get('/settings', async (req, res) => {
 router.get('/homepage-slides', async (req, res) => {
   const { rows } = await query(`SELECT image_url AS "imageUrl", eyebrow, title, description,
     cta_label AS "ctaLabel", cta_href AS "ctaHref", secondary_label AS "secondaryLabel",
-    secondary_href AS "secondaryHref", position, duration_seconds AS "durationSeconds"
+    secondary_href AS "secondaryHref", position, duration_seconds AS "durationSeconds",
+    text_color AS "textColor", eyebrow_color AS "eyebrowColor", title_color AS "titleColor",
+    description_color AS "descriptionColor", button_text_color AS "buttonTextColor"
     FROM homepage_slides WHERE is_active = true ORDER BY position, id`);
   res.set('Cache-Control', 'no-store');
   res.json(rows);
