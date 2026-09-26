@@ -17,6 +17,12 @@ export function formatPrice(v) {
   const amount = Number(v);
   return Number.isFinite(amount) ? `${amount.toLocaleString('en-US', { maximumFractionDigits: 2 })} EGP` : 'Price unavailable';
 }
+// Business totals are shown without grouping separators to match the exact
+// amount owners asked to see (for example, 112231 EGP).
+export function formatBusinessAmount(v) {
+  const amount = Number(v);
+  return Number.isFinite(amount) ? `${amount.toLocaleString('en-US', { useGrouping: false, maximumFractionDigits: 2 })} EGP` : 'Amount unavailable';
+}
 export function formatDate(iso) {
   return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }

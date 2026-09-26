@@ -4,7 +4,10 @@ import { query } from './db.js';
 
 const cookieName = 'nuvanti_session';
 const challengeCookieName = 'nuvanti_mfa_challenge';
-const cookieSameSite = process.env.NODE_ENV === 'production' ? 'none' : 'lax';
+// Both frontends call the API through same-origin routes (Railway for admin,
+// Cloudflare Pages Functions for the store). Lax keeps these cookies first-party
+// on mobile browsers while blocking cross-site cookie attachment.
+const cookieSameSite = 'lax';
 const staffRoles = ['staff', 'manager', 'admin', 'super_admin'];
 
 function secret() {
@@ -75,17 +78,23 @@ export function clearSession(res) {
 
 async function resolveSession(session) {
   const { rows } = await query(
-    `SELECT u.id, u.email, u.role, u.session_version AS "sessionVersion", s.id AS "sessionId"
-     FROM auth_sessions s JOIN users u ON u.id = s.user_id
-     WHERE s.id = $1 AND s.user_id = $2 AND s.revoked_at IS NULL AND s.expires_at > NOW()
-       AND s.session_version = u.session_version AND u.is_active = true`,
+    `WITH valid_session AS (
+       SELECT u.id, u.email, u.role, u.email_verified_at AS "emailVerifiedAt",
+         u.session_version AS "sessionVersion", s.id AS "sessionId", s.last_seen_at AS "lastSeenAt"
+       FROM auth_sessions s JOIN users u ON u.id = s.user_id
+       WHERE s.id = $1 AND s.user_id = $2 AND s.revoked_at IS NULL AND s.expires_at > NOW()
+         AND s.session_version = u.session_version AND u.is_active = true
+     ), touch AS (
+       UPDATE auth_sessions s SET last_seen_at = NOW()
+       FROM valid_session v
+       WHERE s.id = v."sessionId" AND (v."lastSeenAt" IS NULL OR v."lastSeenAt" < NOW() - INTERVAL '5 minutes')
+       RETURNING s.id
+     )
+     SELECT v.id, v.email, v.role, v."emailVerifiedAt", v."sessionVersion", v."sessionId"
+     FROM valid_session v`,
     [session.jti, session.sub],
   );
   return rows[0] || null;
-}
-
-async function updateLastSeen(sessionId) {
-  await query(`UPDATE auth_sessions SET last_seen_at = NOW() WHERE id = $1 AND last_seen_at < NOW() - INTERVAL '5 minutes'`, [sessionId]);
 }
 
 export async function requireAuth(req, res, next) {
@@ -94,21 +103,15 @@ export async function requireAuth(req, res, next) {
   try {
     const user = await resolveSession(session);
     if (!user) return res.status(401).json({ error: 'Authentication required.' });
-    await updateLastSeen(user.sessionId);
-    req.user = { ...session, sub: String(user.id), email: user.email, role: user.role };
+    req.user = { ...session, sub: String(user.id), email: user.email, role: user.role, emailVerifiedAt: user.emailVerifiedAt };
     next();
   } catch (error) { next(error); }
 }
 
 export async function requireVerifiedEmail(req, res, next) {
-  try {
-    const { rows } = await query('SELECT email_verified_at FROM users WHERE id = $1 AND is_active = true', [req.user.sub]);
-    if (!rows[0]) return res.status(401).json({ error: 'Authentication required.' });
-    if (!rows[0].email_verified_at) return res.status(403).json({ code: 'EMAIL_NOT_VERIFIED', error: 'Confirm your email before placing an order.' });
-    next();
-  } catch (error) {
-    next(error);
-  }
+  if (!req.user) return res.status(401).json({ error: 'Authentication required.' });
+  if (!req.user.emailVerifiedAt) return res.status(403).json({ code: 'EMAIL_NOT_VERIFIED', error: 'Confirm your email before placing an order.' });
+  next();
 }
 
 export async function requireAdminPage(req, res, next) {
@@ -117,8 +120,7 @@ export async function requireAdminPage(req, res, next) {
   try {
     const user = await resolveSession(session);
     if (!user || !staffRoles.includes(user.role)) return res.redirect('/login.html');
-    await updateLastSeen(user.sessionId);
-    req.user = { ...session, sub: String(user.id), email: user.email, role: user.role };
+    req.user = { ...session, sub: String(user.id), email: user.email, role: user.role, emailVerifiedAt: user.emailVerifiedAt };
     next();
   } catch (error) { next(error); }
 }

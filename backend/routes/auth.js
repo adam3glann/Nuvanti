@@ -23,7 +23,7 @@ const registrationCredentials = z.object({ email: z.string().trim().email().max(
 const resetRequest = z.object({ email: z.string().trim().email().max(254).transform((v) => v.toLowerCase()) });
 const resetPassword = z.object({ token: z.string().regex(/^[a-f0-9]{64}$/), password: z.string().min(12).max(128) });
 
-router.post('/register', async (req, res) => {
+router.post('/register', asyncRoute(async (req, res) => {
   const { email, password } = registrationCredentials.parse(req.body);
   const name = z.string().trim().min(2).max(100).parse(req.body.name);
   const passwordHash = await bcrypt.hash(password, 12);
@@ -37,7 +37,7 @@ router.post('/register', async (req, res) => {
     if (error.code === '23505') return res.status(409).json({ error: 'An account already exists for this email.' });
     throw error;
   }
-});
+}));
 
 async function sendVerificationLink(user) {
   const token = crypto.randomBytes(32).toString('hex');
@@ -48,7 +48,7 @@ async function sendVerificationLink(user) {
   await sendVerificationEmail({ to: user.email, name: user.name, verifyUrl: `${storeOrigin}/account.html?verify=${token}` });
 }
 
-router.post('/login', async (req, res) => {
+router.post('/login', asyncRoute(async (req, res) => {
   const { email, password } = credentials.parse(req.body);
   const { rows } = await query('SELECT id, email, name, role, password_hash, failed_login_count, locked_until, session_version AS "sessionVersion", totp_secret_enc AS "totpSecretEnc", totp_enabled_at AS "totpEnabledAt" FROM users WHERE email = $1 AND is_active = true', [email]);
   const user = rows[0];
@@ -61,12 +61,15 @@ router.post('/login', async (req, res) => {
   const valid = user && (await bcrypt.compare(password, user.password_hash));
   if (!valid) {
     if (user) {
-      const nextCount = user.failed_login_count + 1;
-      const lock = nextCount >= MAX_FAILED_ATTEMPTS;
-      await query(
-        `UPDATE users SET failed_login_count = $1, locked_until = ${lock ? `NOW() + INTERVAL '${LOCKOUT_MINUTES} minutes'` : 'locked_until'} WHERE id = $2`,
-        [nextCount, user.id],
+      const { rows: attempts } = await query(
+        `UPDATE users SET failed_login_count = failed_login_count + 1,
+          locked_until = CASE WHEN failed_login_count + 1 >= $1
+            THEN NOW() + ($2::int * INTERVAL '1 minute') ELSE locked_until END
+          WHERE id = $3 RETURNING failed_login_count`,
+        [MAX_FAILED_ATTEMPTS, LOCKOUT_MINUTES, user.id],
       );
+      const nextCount = Number(attempts[0]?.failed_login_count || MAX_FAILED_ATTEMPTS);
+      const lock = nextCount >= MAX_FAILED_ATTEMPTS;
       await logAudit({ req, actor: user, action: lock ? 'auth.account_locked' : 'auth.login_failed', targetType: 'user', targetId: user.id, metadata: { failedAttempts: nextCount } });
     } else {
       await logAudit({ req, action: 'auth.login_failed', metadata: { email } });
@@ -87,7 +90,7 @@ router.post('/login', async (req, res) => {
   setSessionCookie(res, await issueSession({ ...safeUser, sessionVersion: user.sessionVersion }, req));
   await logAudit({ req, actor: safeUser, action: 'auth.login_success', targetType: 'user', targetId: safeUser.id });
   res.json({ user: safeUser });
-});
+}));
 
 const mfaCodeInput = z.object({ code: z.string().trim().min(6).max(32) });
 
@@ -131,7 +134,7 @@ router.post('/login/mfa', asyncRoute(async (req, res) => {
 // Always return the same response so people cannot discover which emails
 // are registered. Works for every role — customers land back on the store,
 // staff-tier accounts land on the admin login page.
-router.post('/password-reset/request', async (req, res) => {
+router.post('/password-reset/request', asyncRoute(async (req, res) => {
   const { email } = resetRequest.parse(req.body);
   const { rows } = await query(`SELECT id, email, role FROM users WHERE email = $1 AND is_active = true`, [email]);
   const user = rows[0];
@@ -151,9 +154,9 @@ router.post('/password-reset/request', async (req, res) => {
     await logAudit({ req, actor: user, action: 'auth.password_reset_requested', targetType: 'user', targetId: user.id });
   }
   res.status(202).json({ message: 'If an account exists for that email, a reset link has been sent.' });
-});
+}));
 
-router.post('/password-reset/confirm', async (req, res) => {
+router.post('/password-reset/confirm', asyncRoute(async (req, res) => {
   const { token, password } = resetPassword.parse(req.body);
   const hash = crypto.createHash('sha256').update(token).digest('hex');
   const passwordHash = await bcrypt.hash(password, 12);
@@ -167,9 +170,9 @@ router.post('/password-reset/confirm', async (req, res) => {
   if (!reset) return res.status(400).json({ error: 'This reset link is invalid or has expired. Request a new one.' });
   await logAudit({ req, actor: { id: reset.user_id, email: reset.email }, action: 'auth.password_reset_completed', targetType: 'user', targetId: reset.user_id });
   res.status(204).end();
-});
+}));
 
-router.post('/logout', async (req, res) => {
+router.post('/logout', asyncRoute(async (req, res) => {
   const user = readSession(req);
   if (user) {
     await query('UPDATE auth_sessions SET revoked_at = NOW() WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL', [user.jti, user.sub]);
@@ -177,7 +180,7 @@ router.post('/logout', async (req, res) => {
   }
   clearSession(res);
   res.status(204).end();
-});
+}));
 
 const requireStaff = requireRole(...STAFF_ROLES);
 
@@ -260,19 +263,19 @@ router.post('/mfa/disable', requireAuth, requireStaff, asyncRoute(async (req, re
   await logAudit({ req, actor: currentUser, action: 'auth.mfa_disabled', targetType: 'user', targetId: user.id });
   res.status(204).end();
 }));
-router.get('/me', requireAuth, async (req, res) => {
+router.get('/me', requireAuth, asyncRoute(async (req, res) => {
   const { rows } = await query('SELECT id, email, name, role, email_verified_at AS "emailVerifiedAt" FROM users WHERE id = $1 AND is_active = true', [req.user.sub]);
   if (!rows[0]) return res.status(401).json({ error: 'Authentication required.' });
   res.json({ user: rows[0] });
-});
+}));
 
-router.patch('/me', requireAuth, async (req, res) => {
+router.patch('/me', requireAuth, asyncRoute(async (req, res) => {
   const name = z.string().min(2).max(100).parse(req.body?.name).trim();
   const { rows } = await query('UPDATE users SET name = $1 WHERE id = $2 RETURNING id, email, name, role', [name, req.user.sub]);
   res.json({ user: rows[0] });
-});
+}));
 
-router.post('/verify-email/request', requireAuth, async (req, res) => {
+router.post('/verify-email/request', requireAuth, asyncRoute(async (req, res) => {
   const { rows } = await query('SELECT id, email, name, email_verified_at AS "emailVerifiedAt" FROM users WHERE id = $1', [req.user.sub]);
   if (!rows[0]) return res.status(404).json({ error: 'Account not found.' });
   if (rows[0].emailVerifiedAt) return res.status(400).json({ error: 'Your email is already verified.' });
@@ -283,9 +286,9 @@ router.post('/verify-email/request', requireAuth, async (req, res) => {
     return res.status(502).json({ error: 'The verification email could not be sent. Check the mail provider settings in Railway and try again.' });
   }
   res.status(202).json({ message: 'Verification email sent.' });
-});
+}));
 
-router.post('/verify-email/confirm', async (req, res) => {
+router.post('/verify-email/confirm', asyncRoute(async (req, res) => {
   const { token } = z.object({ token: z.string().regex(/^[a-f0-9]{64}$/) }).parse(req.body);
   const hash = crypto.createHash('sha256').update(token).digest('hex');
   const userId = await transaction(async (client) => {
@@ -297,11 +300,11 @@ router.post('/verify-email/confirm', async (req, res) => {
   });
   if (!userId) return res.status(400).json({ error: 'This verification link is invalid or has expired.' });
   res.status(204).end();
-});
+}));
 
 // Self-service password change for a logged-in user (distinct from the
 // token-based reset flow above, which is for people who are locked out).
-router.post('/change-password', requireAuth, async (req, res) => {
+router.post('/change-password', requireAuth, asyncRoute(async (req, res) => {
   const { currentPassword, newPassword } = z.object({ currentPassword: z.string().min(1).max(128), newPassword: z.string().min(12).max(128) }).parse(req.body);
   const { rows } = await query('SELECT id, email, password_hash FROM users WHERE id = $1 AND is_active = true', [req.user.sub]);
   const user = rows[0];
@@ -312,6 +315,6 @@ router.post('/change-password', requireAuth, async (req, res) => {
   setSessionCookie(res, await issueSession(currentUser, req));
   await logAudit({ req, actor: user, action: 'auth.password_changed', targetType: 'user', targetId: user.id });
   res.status(204).end();
-});
+}));
 
 export default router;

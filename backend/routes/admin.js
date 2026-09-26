@@ -9,6 +9,7 @@ import { logAudit } from '../lib/audit.js';
 import { emailDeliveryStatus, sendAdminWelcome, sendTestEmail, sendOrderStatusUpdate } from '../lib/mail.js';
 import { adminPublicOrigin, storePublicOrigin } from '../lib/publicOrigins.js';
 const router = Router();
+const asyncRoute = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
 const MANAGEABLE_ROLES = ['staff', 'manager', 'admin', 'super_admin'];
 const productFields = z.object({ slug: z.string().regex(/^[a-z0-9-]+$/).max(160), name: z.string().min(2).max(160), description: z.string().max(5000).optional(), price: z.coerce.number().min(0).max(21474836.47).optional(), priceCents: z.coerce.number().int().min(0).max(2147483647).optional(), cost: z.number().min(0).max(21474836.47).nullable().optional(), category: z.string().min(1).max(80), collection: z.string().max(80).nullable().optional(), images: z.array(z.string()).max(12).optional(), colors: z.array(z.string().max(40)).max(20).optional(), colorSwatches: z.record(z.string().max(40), z.string().regex(/^#[0-9a-fA-F]{6}$/)).optional(), sizes: z.array(z.string().max(20)).max(20).optional(), inventory: z.union([z.coerce.number().int().min(0), z.record(z.coerce.number().int().min(0))]).optional(), status: z.enum(['active', 'draft']).optional(), isActive: z.boolean().optional(), badges: z.array(z.string().max(30)).optional(), featured: z.boolean().optional(), bestseller: z.boolean().optional(), newArrival: z.boolean().optional(), sku: z.string().max(100).optional(), compareAtPrice: z.coerce.number().min(0).max(21474836.47).nullable().optional() });
 const productInput = productFields.refine((value) => value.price !== undefined || value.priceCents !== undefined, { message: 'Price is required.' });
@@ -86,14 +87,52 @@ router.post('/email/test', requirePermission('settings.edit'), async (req, res) 
     res.status(502).json({ error: 'The email provider rejected or could not send the test email. Check the provider credentials, sender verification, and server logs.' });
   }
 });
-router.get('/dashboard', requirePermission('analytics.view'), async (req, res) => { const { rows } = await query(`SELECT (SELECT count(*)::int FROM orders) AS "orders", (SELECT count(*)::int FROM products WHERE is_active) AS "products", (SELECT count(*)::int FROM users WHERE role = 'customer') AS "customers", (SELECT coalesce(sum(total_cents), 0)::bigint FROM orders WHERE status <> 'cancelled') AS "revenueCents"`); res.json(rows[0]); });
-router.get('/analytics', requirePermission('analytics.view'), async (req, res) => {
+router.get('/dashboard', requirePermission('analytics.view'), asyncRoute(async (req, res) => {
+  const { rows } = await query(`WITH product_stock AS (
+    SELECT p.id, p.name,
+      CASE WHEN p.metadata->'inventory' IS NULL OR p.metadata->'inventory' = '{}'::jsonb
+        THEN jsonb_build_object('One Size', p.inventory) ELSE p.metadata->'inventory' END AS stock_by_size
+    FROM products p WHERE p.is_active = true
+  ), stock_totals AS (
+    SELECT p.id, sum(CASE WHEN kv.value #>> '{}' ~ '^-?[0-9]+$'
+      THEN GREATEST((kv.value #>> '{}')::int, 0) ELSE 0 END)::int AS total_stock
+    FROM product_stock p CROSS JOIN LATERAL jsonb_each(p.stock_by_size) kv GROUP BY p.id
+  ), low_stock AS (
+    SELECT p.name AS "productName", kv.key AS size,
+      CASE WHEN kv.value #>> '{}' ~ '^-?[0-9]+$'
+        THEN GREATEST((kv.value #>> '{}')::int, 0) ELSE 0 END AS stock
+    FROM product_stock p CROSS JOIN LATERAL jsonb_each(p.stock_by_size) kv
+    WHERE CASE WHEN kv.value #>> '{}' ~ '^-?[0-9]+$'
+      THEN GREATEST((kv.value #>> '{}')::int, 0) ELSE 0 END <= 5
+  )
+  SELECT
+    (SELECT count(*)::int FROM orders) AS "orders",
+    (SELECT count(*)::int FROM orders WHERE status IN ('pending', 'processing', 'shipped', 'out_for_delivery')) AS "pendingOrders",
+    (SELECT count(*)::int FROM orders WHERE status = 'fulfilled') AS "fulfilledOrders",
+    (SELECT count(*)::int FROM orders WHERE status = 'cancelled') AS "cancelledOrders",
+    (SELECT count(*)::int FROM products WHERE is_active) AS "products",
+    (SELECT count(*)::int FROM stock_totals WHERE total_stock = 0) AS "outOfStockProducts",
+    (SELECT count(*)::int FROM stock_totals WHERE total_stock BETWEEN 1 AND 10) AS "lowStockProducts",
+    (SELECT count(*)::int FROM users WHERE role = 'customer' AND is_active) AS "customers",
+    (SELECT count(*)::int FROM users WHERE role = 'customer' AND is_active AND created_at >= date_trunc('month', NOW())) AS "newCustomersThisMonth",
+    (SELECT coalesce(sum(GREATEST(subtotal_cents - COALESCE(discount_cents, 0), 0)), 0)::bigint
+      FROM orders WHERE status IN ('paid', 'fulfilled') AND created_at >= CURRENT_DATE) AS "revenueTodayCents",
+    (SELECT coalesce(sum(GREATEST(subtotal_cents - COALESCE(discount_cents, 0), 0)), 0)::bigint
+      FROM orders WHERE status IN ('paid', 'fulfilled') AND created_at >= date_trunc('month', NOW())) AS "revenueMonthCents",
+    (SELECT coalesce(json_agg(alert), '[]'::json) FROM (
+      SELECT "productName", size, stock FROM low_stock ORDER BY stock, "productName" LIMIT 5
+    ) alert) AS "lowStockAlerts"`);
+  const row = rows[0];
+  res.json({ ...row, revenueToday: Number(row.revenueTodayCents) / 100, revenueMonth: Number(row.revenueMonthCents) / 100 });
+}));
+router.get('/analytics', requirePermission('analytics.view'), asyncRoute(async (req, res) => {
   const days = ({ '7d': 7, '30d': 30, '90d': 90, '1y': 365 })[req.query.range] || 30;
   const { rows: series } = await query(`WITH days AS (
     SELECT generate_series(CURRENT_DATE - ($1::int - 1), CURRENT_DATE, interval '1 day')::date AS day
   )
   SELECT to_char(days.day, 'YYYY-MM-DD') AS date,
-    coalesce(sum(o.total_cents) FILTER (WHERE o.status IN ('paid', 'fulfilled')), 0)::bigint AS "revenueCents",
+    coalesce(sum(GREATEST(o.subtotal_cents - COALESCE(o.discount_cents, 0), 0))
+      FILTER (WHERE o.status IN ('paid', 'fulfilled')), 0)::bigint AS "revenueCents",
     count(o.id)::int AS orders
   FROM days LEFT JOIN orders o ON o.created_at >= days.day
     AND o.created_at < days.day + interval '1 day' AND o.status IN ('paid', 'fulfilled')
@@ -116,8 +155,8 @@ router.get('/analytics', requirePermission('analytics.view'), async (req, res) =
     topCategories: topCategories.map((row) => ({ ...row, revenue: Number(row.revenueCents) / 100 })),
     pendingOrders: counts[0].pendingOrders,
   });
-});
-router.get('/financial-summary', requirePermission('analytics.view'), async (req, res) => {
+}));
+router.get('/financial-summary', requirePermission('analytics.view'), asyncRoute(async (req, res) => {
   const { rows } = await query(`WITH completed_orders AS (
     SELECT o.id,
       GREATEST(o.subtotal_cents - COALESCE(o.discount_cents, 0), 0)::bigint AS net_revenue_cents,
@@ -134,6 +173,10 @@ router.get('/financial-summary', requirePermission('analytics.view'), async (req
     coalesce(sum(cost_cents) FILTER (WHERE line_count = costed_line_count), 0)::bigint AS "costCents",
     count(*)::int AS "completedOrders",
     count(*) FILTER (WHERE line_count = costed_line_count)::int AS "costedOrders",
+    (SELECT coalesce(sum(total_cents), 0)::bigint FROM orders
+      WHERE status IN ('pending', 'processing', 'shipped', 'out_for_delivery')) AS "pendingOrderValueCents",
+    (SELECT count(*)::int FROM orders
+      WHERE status IN ('pending', 'processing', 'shipped', 'out_for_delivery')) AS "pendingOrderCount",
     (SELECT count(*)::int FROM order_items i JOIN orders o ON o.id = i.order_id
       WHERE o.status IN ('paid', 'fulfilled') AND i.unit_cost_cents IS NULL) AS "uncostedLines"
   FROM completed_orders`);
@@ -144,19 +187,22 @@ router.get('/financial-summary', requirePermission('analytics.view'), async (req
     revenue: Number(row.revenueCents) / 100,
     costedRevenue: costedRevenueCents / 100,
     costOfGoods: Number(row.costCents) / 100,
+    pendingOrderValue: Number(row.pendingOrderValueCents) / 100,
+    pendingOrderCount: row.pendingOrderCount,
     grossProfit: Number(row.costedOrders) ? grossProfitCents / 100 : null,
     grossMargin: costedRevenueCents > 0 ? (grossProfitCents / costedRevenueCents) * 100 : null,
     completedOrders: row.completedOrders,
     costedOrders: row.costedOrders,
     uncostedLines: row.uncostedLines,
   });
-});
+}));
 router.get('/products', requirePermission('products.view'), async (req, res) => { const { rows } = await query(`SELECT ${columns} FROM products ORDER BY updated_at DESC`); res.json(rows.map(toAdminProduct)); });
 const PAYMENT_METHOD_LABELS = { cod: 'Cash on Delivery' };
-router.get('/orders', requirePermission('orders.view'), async (req, res) => {
+router.get('/orders', requirePermission('orders.view'), asyncRoute(async (req, res) => {
+  const limit = req.query.limit === undefined ? 100 : z.coerce.number().int().min(1).max(100).parse(req.query.limit);
   const { rows } = await query(`SELECT o.id, o.status, o.total_cents AS "totalCents", o.subtotal_cents AS "subtotalCents", o.shipping_cents AS "shippingCents", o.delivery, o.payment_method AS "paymentMethod", o.created_at AS "createdAt", o.shipping_address AS "shippingAddress", u.email, u.name,
     coalesce(json_agg(json_build_object('productId', i.product_id, 'name', i.product_name, 'price', i.unit_price_cents::numeric / 100, 'quantity', i.quantity, 'color', i.color, 'size', i.size, 'image', i.image_url)) FILTER (WHERE i.id IS NOT NULL), '[]') AS items
-    FROM orders o JOIN users u ON u.id = o.user_id LEFT JOIN order_items i ON i.order_id = o.id GROUP BY o.id, u.email, u.name ORDER BY o.created_at DESC LIMIT 100`);
+    FROM orders o JOIN users u ON u.id = o.user_id LEFT JOIN order_items i ON i.order_id = o.id GROUP BY o.id, u.email, u.name ORDER BY o.created_at DESC LIMIT $1`, [limit]);
   res.json(rows.map((row) => ({
     id: `NV-${row.id}`, dbId: String(row.id), status: row.status, paymentStatus: ['paid', 'fulfilled'].includes(row.status) ? 'paid' : 'pending',
     total: Number(row.totalCents) / 100, totalCents: Number(row.totalCents),
@@ -168,7 +214,7 @@ router.get('/orders', requirePermission('orders.view'), async (req, res) => {
     trackingNumber: null, transactionRef: null,
     items: row.items, notes: [],
   })));
-});
+}));
 router.patch('/orders/:id', requirePermission('orders.edit'), async (req, res) => {
   const status = z.enum(['pending', 'paid', 'processing', 'shipped', 'out_for_delivery', 'fulfilled', 'cancelled']).parse(req.body?.status);
   if (status === 'cancelled' && !hasPermission(req.user.role, 'orders.cancel')) return res.status(403).json({ error: 'You do not have permission to cancel orders.' });
