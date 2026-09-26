@@ -68,7 +68,7 @@ function renderHero(slides) {
   el.hidden = false;
   el.innerHTML = `
     ${slides.map((s, i) => `
-      <div class="hero-slide" data-active="${i === 0}" data-index="${i}" aria-hidden="${i !== 0}">
+      <div class="hero-slide" data-active="${i === 0}" data-index="${i}" data-duration="${Math.min(30, Math.max(3, Math.floor(Number(s.durationSeconds) || 5)))}" aria-hidden="${i !== 0}">
         <img class="hero-slide__img" src="${escapeHtml(s.imageUrl)}" alt="" ${i === 0 ? 'fetchpriority="high"' : 'loading="lazy"'} />
         <div class="hero-slide__scrim"></div>
         <div class="hero-slide__content">
@@ -100,7 +100,6 @@ function initHeroSlider() {
 
   let current = 0;
   let timer;
-  const intervalMs = 5000;
 
   function goTo(index) {
     current = (index + slides.length) % slides.length;
@@ -121,10 +120,11 @@ function initHeroSlider() {
   function startAutoplay() {
     stopAutoplay();
     if (document.hidden) return;
+    const durationMs = Math.min(30, Math.max(3, Number(slides[current].dataset.duration) || 5)) * 1000;
     timer = setTimeout(() => {
       next();
       startAutoplay();
-    }, intervalMs);
+    }, durationMs);
   }
   function manualGo(action) {
     action();

@@ -42,13 +42,13 @@
 .slide-card__meta { display:grid; gap:.45rem; margin-right:auto; }
 .slide-toggle { display:flex; align-items:center; gap:.45rem; color:var(--a-muted); font-size:.8rem; }
 .slide-card__foot,.slide-upload { display:flex; align-items:flex-end; justify-content:space-between; gap:.75rem; }
-.slide-position { width:180px; margin:0; }
+.slide-position,.slide-duration { width:180px; margin:0; }
 .slide-upload { justify-content:flex-end; }
 .slide-card textarea { resize:vertical; min-height:4rem; }
 @media (max-width:720px) {
   .slides-toolbar,.slide-card__head,.slide-card__foot { align-items:stretch; flex-direction:column; }
   .slide-upload { justify-content:flex-start; flex-wrap:wrap; }
-  .slide-position { width:100%; }
+  .slide-position,.slide-duration { width:100%; }
   .slide-preview { width:100%; height:150px; }
 }
 

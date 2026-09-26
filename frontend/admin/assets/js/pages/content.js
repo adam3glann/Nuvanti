@@ -61,6 +61,7 @@ function renderSlide(slide) {
       </div>
       <div class="slide-card__foot">
         <div class="field slide-position"><label>Position (0 is first)</label><input name="position" type="number" min="0" max="1000" step="1" value="${Number(slide.position)}" required /></div>
+        <div class="field slide-duration"><label>Time on screen (seconds)</label><input name="durationSeconds" type="number" min="3" max="30" step="1" value="${Math.min(30, Math.max(3, Number(slide.durationSeconds) || 5))}" required /><span class="hint">3–30 seconds before the next slide.</span></div>
         <div class="slide-upload"><input type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-file hidden /><button class="btn btn-outline btn-sm" type="button" data-upload>Upload image</button><button class="btn btn-primary" type="submit">Save slide</button></div>
       </div>
     </div>
@@ -71,7 +72,7 @@ root?.addEventListener('click', async (event) => {
   if (event.target.closest('#addSlideBtn')) {
     const position = slides.length ? Math.max(...slides.map((slide) => Number(slide.position))) + 1 : 0;
     try {
-      await createHomepageSlide({ imageUrl: 'assets/img/lifestyle/campaign-banner.webp', eyebrow: '', title: 'New featured story', description: '', ctaLabel: 'Shop now', ctaHref: 'shop.html', secondaryLabel: '', secondaryHref: '', position, isActive: true });
+      await createHomepageSlide({ imageUrl: 'assets/img/lifestyle/campaign-banner.webp', eyebrow: '', title: 'New featured story', description: '', ctaLabel: 'Shop now', ctaHref: 'shop.html', secondaryLabel: '', secondaryHref: '', position, durationSeconds: 5, isActive: true });
       await loadSlides();
       showAdminToast('Slide added. Edit it and save when ready.', 'success');
     } catch (error) { showAdminToast(error.message, 'error'); }
@@ -129,7 +130,7 @@ root?.addEventListener('submit', async (event) => {
     imageUrl: value('imageUrl'), eyebrow: value('eyebrow'), title: value('title'),
     description: value('description'), ctaLabel: value('ctaLabel'), ctaHref: value('ctaHref'),
     secondaryLabel: value('secondaryLabel'), secondaryHref: value('secondaryHref'),
-    position: Number(value('position')), isActive: form.elements.namedItem('isActive').checked,
+    position: Number(value('position')), durationSeconds: Number(value('durationSeconds')), isActive: form.elements.namedItem('isActive').checked,
   };
   const button = form.querySelector('[type="submit"]');
   button.disabled = true;
