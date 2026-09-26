@@ -453,7 +453,9 @@ router.get('/customers', requirePermission('customers.view'), async (req, res) =
 router.get('/customers/:id', requirePermission('customers.view'), async (req, res) => {
   const { rows } = await query(`SELECT id::text, name, email, is_active AS "isActive", created_at AS "createdAt" FROM users WHERE id = $1 AND role = 'customer'`, [req.params.id]);
   if (!rows[0]) return res.status(404).json({ error: 'Customer not found.' });
-  const { rows: orders } = await query(`SELECT id::text, status, payment_status AS "paymentStatus", payment_method AS "paymentMethod", total_cents AS "totalCents", created_at AS "createdAt" FROM orders WHERE user_id = $1 ORDER BY created_at DESC`, [req.params.id]);
+  const { rows: orders } = await query(`SELECT o.id::text, o.status, o.payment_status AS "paymentStatus", o.payment_method AS "paymentMethod", o.total_cents AS "totalCents", o.created_at AS "createdAt", o.shipping_address AS "shippingAddress",
+    coalesce((SELECT sum(i.quantity)::int FROM order_items i WHERE i.order_id = o.id), 0) AS "itemCount"
+    FROM orders o WHERE o.user_id = $1 ORDER BY o.created_at DESC`, [req.params.id]);
   const { rows: addresses } = await query(`SELECT id::text, label, name, phone, address1, city, country, postal_code AS "postalCode", is_default AS "isDefault" FROM addresses WHERE user_id = $1 ORDER BY is_default DESC, created_at DESC`, [req.params.id]);
   res.json({ ...rows[0], orders, addresses });
 });
