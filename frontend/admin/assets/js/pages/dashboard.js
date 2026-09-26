@@ -40,7 +40,9 @@ async function render() {
       <div class="stat-card"><p class="stat-card__label">Revenue This Month</p><p class="stat-card__value">${formatBusinessAmount(dashboard.revenueMonth)}</p></div>
       <div class="stat-card"><p class="stat-card__label">Total Orders</p><p class="stat-card__value">${dashboard.orders}</p><p class="stat-card__delta up">${dashboard.pendingOrders} open</p></div>
       <div class="stat-card"><p class="stat-card__label">Total Customers</p><p class="stat-card__value">${dashboard.customers}</p><p class="stat-card__delta">${dashboard.newCustomersThisMonth} joined this month</p></div>
+      <div class="stat-card"><p class="stat-card__label">Live Store Visitors</p><p class="stat-card__value" id="dashboardPresenceCount">Loading…</p><p class="stat-card__delta">Unique browsers · updates every 15 seconds</p></div>
     `;
+    window.dispatchEvent(new Event('nuvanti:refresh-store-presence'));
     document.getElementById('orderStatusGrid').innerHTML = `
       ${row('Awaiting Fulfillment', dashboard.pendingOrders, 'neutral')} ${row('Fulfilled', dashboard.fulfilledOrders, 'success')}
       ${row('Cancelled', dashboard.cancelledOrders, 'danger')}

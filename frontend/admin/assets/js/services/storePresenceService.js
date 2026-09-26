@@ -17,11 +17,16 @@ export function watchStorePresence() {
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok || !Number.isSafeInteger(body.activeVisitors)) throw new Error('Presence unavailable');
-      label.textContent = `${body.activeVisitors} online`;
+      const text = `${body.activeVisitors} online`;
+      label.textContent = text;
+      const dashboardLabel = document.getElementById('dashboardPresenceCount');
+      if (dashboardLabel) dashboardLabel.textContent = text;
       badge.dataset.state = 'online';
       badge.title = `Active storefront sessions · refreshed ${new Date().toLocaleTimeString()}`;
     } catch {
       label.textContent = 'Online unavailable';
+      const dashboardLabel = document.getElementById('dashboardPresenceCount');
+      if (dashboardLabel) dashboardLabel.textContent = 'Unavailable';
       badge.dataset.state = 'unavailable';
       badge.title = 'Could not refresh the live storefront count. It will retry automatically.';
     } finally {
@@ -31,6 +36,7 @@ export function watchStorePresence() {
 
   refresh();
   const timer = window.setInterval(refresh, refreshIntervalMs);
+  window.addEventListener('nuvanti:refresh-store-presence', refresh);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') refresh();
   });
