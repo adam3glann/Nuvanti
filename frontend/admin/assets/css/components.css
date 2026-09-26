@@ -212,4 +212,11 @@
 .image-tile-add { display: flex; align-items: center; justify-content: center; aspect-ratio: 1/1; border: 1px dashed var(--a-border-strong); border-radius: var(--a-radius-sm); color: var(--a-muted); font-size: 0.72rem; flex-direction: column; gap: 0.3rem; }
 
 /* ---------- Variant table ---------- */
-.variant-table input { padding: 0.4rem 0.5rem; font-size: 0.8rem; }
+.variant-stock-control { display:flex; align-items:center; gap:.55rem; min-width:190px; }
+.variant-table .variant-stock-input { width:84px; min-height:40px; padding:.45rem .55rem; border:1px solid var(--a-border-strong); border-radius:var(--a-radius-sm); background:var(--a-surface-raised); color:var(--a-text); font-size:.95rem; font-weight:700; text-align:center; color-scheme:light; }
+[data-theme="dark"] .variant-table .variant-stock-input { color-scheme:dark; }
+.variant-stock-count { display:inline-flex; align-items:center; min-height:28px; padding:.25rem .55rem; border-radius:999px; font-size:.72rem; font-weight:700; white-space:nowrap; }
+.variant-stock-count--in { background:var(--a-success-tint); color:var(--a-success); }
+.variant-stock-count--low { background:var(--a-warning-tint); color:var(--a-warning); }
+.variant-stock-count--out { background:var(--a-danger-tint); color:var(--a-danger); }
+.variant-stock-note { color:var(--a-muted); font-size:.75rem !important; }
