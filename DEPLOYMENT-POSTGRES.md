@@ -36,15 +36,23 @@ or paste them into chat.
 | `NUVANTI_BOOTSTRAP_ADMIN_EMAIL` | Your administrator email |
 | `NUVANTI_BOOTSTRAP_ADMIN_PASSWORD` | A private password of at least 12 characters |
 | `NUVANTI_BOOTSTRAP_ADMIN_NAME` | Your administrator display name |
+| `MFA_ENCRYPTION_KEY` | Unique random value of at least 32 characters. Set before enrolling staff and never rotate after enrollment. |
 | `SMTP_HOST` | `smtp.gmail.com` |
 | `SMTP_PORT` | `465` |
 | `SMTP_SECURE` | `true` |
 | `SMTP_USER` | Your Gmail sending address |
 | `SMTP_PASS` | The Gmail App Password, not the normal Gmail password |
 | `MAIL_FROM` | `Nuvanti <your-sending-address@gmail.com>` |
+| `RESEND_API_KEY` | Optional alternative to SMTP; use a verified sender/domain with `MAIL_FROM` |
 | `CLOUDINARY_CLOUD_NAME` | Cloudinary Dashboard → Product environment → Cloud name (the name only, not the full URL) |
 | `CLOUDINARY_API_KEY` | Cloudinary Dashboard → API Keys |
 | `CLOUDINARY_API_SECRET` | Cloudinary Dashboard → API Keys (keep private; backend service only) |
+| `PAYMOB_SECRET_KEY` | Optional; Paymob server-side secret for hosted online checkout |
+| `PAYMOB_PUBLIC_KEY` | Optional; Paymob public key for Unified Checkout |
+| `PAYMOB_PAYMENT_METHODS` | Optional; comma-separated integration IDs matching the same Paymob test/live mode |
+| `PAYMOB_HMAC_SECRET` | Optional; Paymob callback signature secret |
+
+After the initial administrator exists and the initial catalog is initialized, remove `NUVANTI_BOOTSTRAP_ADMIN_EMAIL`, `NUVANTI_BOOTSTRAP_ADMIN_PASSWORD`, and `NUVANTI_BOOTSTRAP_ADMIN_NAME` from Railway. The bootstrap command leaves the existing catalog and active super-admin unchanged on subsequent deploys.
 
 In Cloudflare Pages, set the project root to `frontend/`. The proxy defaults to `https://nuvanti-production.up.railway.app`; if the Railway domain changes, set the Pages environment variable `NUVANTI_API_ORIGIN` to the new HTTPS origin and redeploy Pages. In Railway, set `STORE_ORIGIN` to the exact storefront origin and leave `COOKIE_DOMAIN` blank. The storefront uses same-origin API requests so session cookies remain first-party on phones.
 

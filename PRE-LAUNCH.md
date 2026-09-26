@@ -1,13 +1,39 @@
 # Nuvanti pre-launch checklist
 
-The project now has working storefront and protected admin applications with a PostgreSQL API. Complete these brand and infrastructure items before taking real orders:
+Use this checklist before opening the store to real customers. Application code cannot verify that external provider accounts, DNS, payment credentials, merchant settlement, or backups are correctly configured; confirm those in their provider dashboards.
 
-- Deploy the backend and protected admin portal to Railway and keep the repository root as the service root. Set all Railway variables listed in [DEPLOYMENT-POSTGRES.md](DEPLOYMENT-POSTGRES.md), including `DATABASE_URL` and `DATABASE_SSL_CA`, before startup.
-- Set Cloudflare Pages project root to `frontend/` and deploy the `/api/*` Pages Function proxy. Set Railway `STORE_ORIGIN` to the exact storefront URL and leave `COOKIE_DOMAIN` blank. Never publish `frontend/admin` from the shop host.
-- Provision PostgreSQL, set a unique 32+ character production `JWT_SECRET`, apply migrations, and seed the starting catalog and first super-admin. Back up the database and test restoring it.
-- Configure and test SMTP or Resend delivery for account verification, account recovery, admin setup, order confirmations, and newsletter confirmation in Admin → Settings → Email. Contact messages remain saved in Admin → Customers → Contact Messages; email alerts use the support address in Settings. Optional WhatsApp and Cloudinary features need their own production credentials.
-- Confirm every product name, description, price, SKU, size/color variant, stock quantity, image, and brand asset. Test a real device-size storefront and the admin workflows with production-shaped catalog data.
-- Confirm shipping areas, courier rates, service levels, delivery estimates, returns/refunds, privacy, and terms with the actual operator and qualified local counsel. The checkout currently supports Egypt, flat standard/express rates, and Cash on Delivery. It does not book a courier or receive carrier scans.
-- Configure Paymob keys, integration IDs, and the signed callback URL in the backend before enabling hosted online checkout. Run a test payment and confirm the signed webhook updates the order before switching Paymob to live mode. Checkout keeps Cash on Delivery available. Refunds are not automated; process and reconcile refunds in Paymob and update the order record manually.
-- Replace or confirm social handles, customer support details, campaign dates, and policies in the frontend source. Homepage slideshow images and copy can be managed in Admin → Content & Marketing → Homepage Slides.
-- Place and fulfill an end-to-end test order; verify confirmation email, the private tracking link, the admin order status, stock changes, customer account history, contact inbox, newsletter confirmation/unsubscribe, and scheduled database backups.
+## Hosting and database
+
+- [ ] Railway deploys from the repository root and passes `/api/health` after migrations and bootstrap.
+- [ ] Cloudflare Pages uses `frontend/` as its project root and deploys the `/api/*` proxy. If the Railway domain changes, set `NUVANTI_API_ORIGIN` in Pages and redeploy.
+- [ ] Railway `STORE_ORIGIN` exactly matches the live storefront origin; `COOKIE_DOMAIN` is blank. The `frontend/admin/` directory is not deployed as public static content.
+- [ ] Production variables from [DEPLOYMENT-POSTGRES.md](DEPLOYMENT-POSTGRES.md) are set. `JWT_SECRET` and `MFA_ENCRYPTION_KEY` are unique, random, and private. Keep the MFA key stable after enrollment.
+- [ ] Supabase PostgreSQL is reachable with TLS certificate verification enabled. Confirm migrations are applied and the initial active super-admin can sign in.
+- [ ] Remove the one-time `NUVANTI_BOOTSTRAP_ADMIN_*` variables after the initial super-admin and catalog are set up.
+- [ ] Database backup schedule and retention are enabled for the selected Supabase plan; complete and document a restore rehearsal before launch.
+
+## Account security and email
+
+- [ ] Enable 2FA for each staff account and store its recovery codes in a private password manager. Confirm that login requires a fresh authenticator code.
+- [ ] Configure SMTP or Resend and a valid `MAIL_FROM`. In Admin → Settings → Email, send a test message and confirm it arrives.
+- [ ] Create a fresh customer account and confirm the verification email arrives. Confirm the link verifies the account and checkout rejects unverified accounts through the API.
+- [ ] Verify password reset, administrator setup, order confirmation, order status, and newsletter confirmation/unsubscribe emails. Check provider logs and spam folders if a message is missing.
+- [ ] Optional: configure Cloudinary and upload a product image and a homepage/category image. Optional: configure Twilio WhatsApp and confirm the recipient number is eligible.
+
+## Catalog, checkout, and fulfillment
+
+- [ ] Review product names, descriptions, prices, costs, SKUs, images, colors, sizes, and per-size stock. Confirm slideshow imagery, customer support details, social links, and campaign dates.
+- [ ] Confirm shipping areas, rates, delivery estimates, courier arrangements, exchange/refund rules, privacy policy, and terms with the actual operator and appropriate local professionals. Checkout currently supports Egypt and configured standard/express rates; it does not book a courier or receive carrier scans.
+- [ ] Place a Cash on Delivery order and verify totals, inventory, email, account history, private tracking link, and admin status updates.
+- [ ] If enabling Paymob, configure all four Paymob variables and the transaction callback URL. Complete a test payment, verify the signed webhook updates the correct order, and reconcile the result in Paymob before switching to live credentials. Refunds are not automated; document the manual refund and order reconciliation procedure.
+- [ ] Test the customer storefront on desktop and mobile, including sign-in, email verification, cart, discounts, checkout, and order tracking. Test admin product editing, customer/order pages, exports, and image uploads.
+- [ ] Confirm contact messages appear in Admin → Customers → Contact Messages and that configured support notifications arrive.
+
+## Policies and launch decision
+
+- [ ] Ensure all public policy and checkout text matches the real operation, including the current exchange/refund process. Refunds and carrier integrations are not automated by this application.
+- [ ] Confirm production Paymob merchant approval, accepted payment methods, fees, settlement timing, and support contacts before collecting live payments.
+- [ ] Keep Cash on Delivery available while Paymob remains unconfigured; the online payment choice stays hidden until Paymob settings are complete.
+- [ ] Review Railway, Cloudflare, Supabase, email, Cloudinary, and Paymob usage, billing, and alerting. Assign an owner to respond to failed deployments, mail, and payment callbacks.
+
+Do not announce launch until the required items above are checked and the full customer order path has been completed successfully in production or a production-like environment.

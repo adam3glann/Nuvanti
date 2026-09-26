@@ -44,7 +44,7 @@ The storefront calls the API through a same-origin Cloudflare Pages Function. Th
 ### Customer storefront
 
 - Product catalog, categories, collections, search, cart, wishlist, and homepage slides.
-- Customer registration, sign-in, email verification, password reset, saved addresses, and account order history.
+- Customer registration, sign-in, email verification (required by both the checkout UI and API), password reset, saved addresses, and account order history.
 - Checkout with server-calculated prices, inventory reservation, shipping options, and discount validation.
 - Cash on Delivery and optional Paymob hosted checkout.
 - Order confirmation, customer tracking links, and transactional email hooks.
