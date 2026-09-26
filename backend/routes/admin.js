@@ -47,6 +47,11 @@ const homepageSlideInput = z.object({
   isActive: z.boolean().default(true),
 }).refine((slide) => !slide.secondaryLabel || slide.secondaryHref, { message: 'Add a link for the secondary button.' });
 const homepageSlideColumns = 'id::text, image_url AS "imageUrl", eyebrow, title, description, cta_label AS "ctaLabel", cta_href AS "ctaHref", secondary_label AS "secondaryLabel", secondary_href AS "secondaryHref", position, is_active AS "isActive"';
+router.get('/store-presence', asyncRoute(async (req, res) => {
+  const { rows } = await query(`SELECT count(DISTINCT visitor_id)::int AS "activeVisitors"
+    FROM storefront_presence WHERE last_seen_at >= NOW() - INTERVAL '70 seconds'`);
+  res.set('Cache-Control', 'no-store').json(rows[0] || { activeVisitors: 0 });
+}));
 router.get('/homepage-slides', requirePermission('content.manage'), async (req, res) => {
   const { rows } = await query(`SELECT ${homepageSlideColumns} FROM homepage_slides ORDER BY position, id`);
   res.json(rows);

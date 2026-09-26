@@ -55,10 +55,13 @@ The storefront calls the API through a same-origin Cloudflare Pages Function. Th
 - Product, category, collection, image, pricing, color, size, and inventory management.
 - Order management, customer records, discount management, and order status updates.
 - Dashboard analytics, sales and cost summaries, contact inbox, newsletter management, and exports.
+- Live storefront visitor count in the admin header, refreshed automatically across admin pages.
 - Homepage slideshow management, store settings, audit records, admin users, roles, and permissions.
 - Staff authenticator-based two-factor authentication and session controls.
 
 Some connected services require external credentials. Email, Cloudinary uploads, and Paymob checkout remain unavailable until their providers are configured. Carrier booking and live carrier scans are not integrated; order statuses are managed in Admin.
+
+The live visitor count is an approximate count of active browser sessions: multiple open tabs in one browser count once; separate devices count separately. Sessions are anonymous, heartbeat while the storefront page is visible, and expire shortly after closing or losing connection. No name, email, or IP address is stored for this count.
 
 ## Technology
 

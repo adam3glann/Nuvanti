@@ -74,6 +74,7 @@ The reset email is sent to the account's email address and will appear on the re
 - HTTP-only, signed 8-hour session cookies; credentials never go in localStorage.
 - Staff can enroll authenticator-app TOTP with one-time recovery codes. MFA challenges are short-lived and separate from authenticated sessions; TOTP steps and recovery codes cannot be reused.
 - Staff sessions are stored in PostgreSQL, expire after 8 hours, and can be revoked from **Security**. Password changes and MFA changes invalidate prior sessions.
+- The admin header shows an anonymous live storefront visitor count. A random browser identifier is used only for presence; it rotates after 30 minutes of inactivity. Presence rows expire after about 90 seconds without a heartbeat. Names, emails, and IP addresses are not stored in the presence table.
 - `bcrypt` password hashing (work factor 12).
 - Permission checks (not just a role check) on every `/api/admin/*` endpoint, backed by a real 4-tier role model — see "Roles & permissions" above.
 - Brute-force lockout: an account locks for 15 minutes after 5 consecutive failed logins.

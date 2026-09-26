@@ -1,6 +1,7 @@
 import { icon } from './icons.js';
 import { ROLE_LABELS } from './permissions.js';
 import { adminLogout } from '../services/adminAuthService.js';
+import { watchStorePresence } from '../services/storePresenceService.js';
 import { openMobileSidebar } from './sidebar.js';
 
 export function renderAdminHeader({ title, session }) {
@@ -20,6 +21,9 @@ export function renderAdminHeader({ title, session }) {
         <input type="search" id="globalSearch" placeholder="Search orders, products, customers, SKUs…" />
       </div>
       <div class="admin-header__right">
+        <div class="admin-presence" id="storePresence" data-state="loading" role="status" aria-live="polite" title="Live storefront visitor count">
+          <span class="admin-presence__dot" aria-hidden="true"></span><span id="storePresenceCount">Loading</span>
+        </div>
         <button class="icon-btn" id="themeToggle" aria-label="Toggle dark mode">${icon(document.documentElement.dataset.theme === 'dark' ? 'sun' : 'moon')}</button>
         <a class="icon-btn" href="orders.html" aria-label="View orders" title="View orders">${icon('bag')}</a>
         <div class="rel">
@@ -40,6 +44,7 @@ export function renderAdminHeader({ title, session }) {
 
   document.getElementById('adminHamburger')?.addEventListener('click', openMobileSidebar);
   document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+  watchStorePresence();
 
   bindPopover('userMenuBtn', 'userPopover');
 
@@ -73,4 +78,3 @@ function toggleTheme() {
   const btn = document.getElementById('themeToggle');
   btn.innerHTML = icon(next === 'dark' ? 'sun' : 'moon');
 }
-

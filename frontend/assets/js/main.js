@@ -7,8 +7,10 @@ import { onCartChange } from './services/cartService.js';
 import { onWishlistChange } from './services/wishlistService.js';
 import { loadStoreSettings } from './services/storeSettingsService.js';
 import { configureFreeShippingThreshold } from './services/cartService.js';
+import { startStorePresence } from './services/presenceService.js';
 
 export function initShell({ transparentHeader = false, currentPage = '' } = {}) {
+  startStorePresence();
   renderHeader({ transparentOnHero: transparentHeader, currentPage });
   renderFooter();
   mountCartDrawer();
