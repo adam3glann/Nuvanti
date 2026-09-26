@@ -30,8 +30,9 @@ export async function fetchAdminCustomers({ query, status, page = 1, perPage = 1
 export async function fetchAdminCustomer(id) {
   try {
     const row = await request(`/api/admin/customers/${encodeURIComponent(id)}`);
-    const totalCents = row.orders.reduce((sum, order) => sum + (order.status === 'cancelled' ? 0 : Number(order.totalCents)), 0);
-    return { ...row, status: row.isActive ? 'active' : 'disabled', orders: row.orders, addresses: row.addresses, orderCount: row.orders.length, totalSpent: totalCents / 100 };
+    const paidOrders = row.orders.filter((order) => order.status !== 'cancelled' && order.paymentStatus === 'paid');
+    const totalCents = paidOrders.reduce((sum, order) => sum + Number(order.totalCents), 0);
+    return { ...row, status: row.isActive ? 'active' : 'disabled', orders: row.orders, addresses: row.addresses, orderCount: row.orders.filter((order) => order.status !== 'cancelled').length, totalSpent: totalCents / 100 };
   } catch (error) {
     if (/not found/i.test(error.message)) return null;
     throw error;

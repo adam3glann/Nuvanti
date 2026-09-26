@@ -35,7 +35,7 @@ function render(mfa, sessions) {
           <div class="card-head"><h2>Account Security</h2></div>
           <div class="card-pad">
             <div class="settings-row"><div><p class="settings-row__label">Password</p><p class="settings-row__desc">Signed in as ${escapeHtml(session.email)}</p></div><button class="btn btn-outline btn-sm" id="changePwBtn">Change Password</button></div>
-            <div class="settings-row"><div><p class="settings-row__label">Two-Factor Authentication</p><p class="settings-row__desc">Use an authenticator app and one-time recovery codes to protect admin sign-in.</p></div><span class="status-badge ${mfa.enabled ? 'status-success' : 'status-neutral'}">${mfa.enabled ? 'Enabled' : 'Not enabled'}</span></div>
+            <div class="settings-row"><div><p class="settings-row__label">Two-Factor Authentication</p><p class="settings-row__desc">Use an authenticator app and one-time recovery codes to protect admin sign-in. Codes change every 30 seconds.</p></div><span class="status-badge ${mfa.enabled ? 'status-success' : 'status-neutral'}">${mfa.enabled ? 'Enabled' : 'Not enabled'}</span></div>
             <div class="settings-row"><div><p class="settings-row__desc">${mfa.enabled ? `${Number(mfa.recoveryCodesRemaining)} recovery codes remain.` : 'Recommended for every administrator account.'}</p></div><button class="btn btn-outline btn-sm" id="mfaActionBtn">${mfa.enabled ? 'Manage 2FA' : 'Set Up 2FA'}</button></div>
           </div>
         </div>
@@ -74,7 +74,7 @@ function openEnableMfa() {
         <p>In your authenticator app, choose <strong>Enter setup key</strong> and add this account:</p>
         <div class="field"><label>Account</label><input readonly value="${escapeHtml(session.email)}" /></div>
         <div class="field"><label>Setup key</label><input id="mfaSetupSecret" readonly value="${escapeHtml(setup.secret)}" /></div>
-        <p class="hint">Use a time-based one-time password (TOTP). Keep the key private. It expires in 10 minutes.</p>
+        <p class="hint">In Google Authenticator, Microsoft Authenticator, or another TOTP app, add an account using the setup key above and choose time-based codes. Enter the current 6-digit code here. If it is rejected, sync your phone's date and time automatically, wait for the next code, and try again. Keep the setup key private. This setup expires in 10 minutes.</p>
         <div class="field"><label for="mfaSetupCode">6-digit code from the app</label><input id="mfaSetupCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" /></div>`;
       modal.root.querySelector('.a-modal__foot').innerHTML = '<button class="btn btn-outline" id="mfaCopyKey">Copy setup key</button><button class="btn btn-primary" id="mfaVerifySetup">Verify and Enable</button>';
       modal.root.querySelector('#mfaCopyKey').addEventListener('click', async () => {

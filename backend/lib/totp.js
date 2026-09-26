@@ -22,9 +22,15 @@ export function encryptTotpSecret(secret) {
 export function decryptTotpSecret(value) {
   const [iv, tag, encrypted] = String(value || '').split('.').map((part) => Buffer.from(part, 'base64url'));
   if (!iv || iv.length !== 12 || !tag || tag.length !== 16 || !encrypted?.length) throw new Error('Invalid encrypted authenticator secret.');
-  const decipher = crypto.createDecipheriv('aes-256-gcm', encryptionKey(), iv);
-  decipher.setAuthTag(tag);
-  return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString('utf8');
+  try {
+    const decipher = crypto.createDecipheriv('aes-256-gcm', encryptionKey(), iv);
+    decipher.setAuthTag(tag);
+    return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString('utf8');
+  } catch {
+    const error = new Error('The authenticator secret could not be decrypted. Restore the original MFA_ENCRYPTION_KEY in Railway; do not rotate this key after setting up MFA.');
+    error.status = 503;
+    throw error;
+  }
 }
 
 export function verifyTotp(secret, code, now = Date.now()) {
@@ -61,7 +67,7 @@ function totpAt(secret, step) {
 
 function encryptionKey() {
   const secret = process.env.MFA_ENCRYPTION_KEY;
-  if (!secret || secret.length < 32) {
+  if (!secret || secret.length < 32 || /replace-with|example|paste[_ -]?your/i.test(secret)) {
     const error = new Error('Set MFA_ENCRYPTION_KEY to a stable random value of at least 32 characters before enabling two-factor authentication.');
     error.status = 503;
     throw error;

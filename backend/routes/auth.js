@@ -122,7 +122,9 @@ router.post('/login/mfa', asyncRoute(async (req, res) => {
       authenticated = consumed.rowCount === 1;
     }
   }
-  if (!authenticated) return res.status(401).json({ error: 'That authenticator or recovery code is invalid or already used.' });
+  if (!authenticated) return res.status(401).json({ error: step !== null
+    ? 'This authenticator code was already used. Wait for the next 30-second code and try again.'
+    : 'That authenticator or recovery code is invalid or already used.' });
 
   const safeUser = { id: user.id, email: user.email, name: user.name, role: user.role, sessionVersion: user.sessionVersion };
   clearMfaChallengeCookie(res);

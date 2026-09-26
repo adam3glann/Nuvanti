@@ -225,7 +225,7 @@ router.patch('/orders/:id', requirePermission('orders.edit'), async (req, res) =
   const status = z.enum(['pending', 'paid', 'processing', 'shipped', 'out_for_delivery', 'fulfilled', 'cancelled']).parse(req.body?.status);
   if (status === 'cancelled' && !hasPermission(req.user.role, 'orders.cancel')) return res.status(403).json({ error: 'You do not have permission to cancel orders.' });
   const result = await transaction(async (client) => {
-    const { rows } = await client.query('SELECT o.id, o.status, o.tracking_token AS "trackingToken", u.email, u.name FROM orders o JOIN users u ON u.id = o.user_id WHERE o.id = $1 FOR UPDATE OF o', [req.params.id]);
+    const { rows } = await client.query('SELECT o.id, o.status, o.payment_method AS "paymentMethod", o.payment_status AS "paymentStatus", o.tracking_token AS "trackingToken", u.email, u.name FROM orders o JOIN users u ON u.id = o.user_id WHERE o.id = $1 FOR UPDATE OF o', [req.params.id]);
     const order = rows[0];
     if (!order) return { notFound: true };
     if (order.status === status) return { ...order, unchanged: true };
@@ -253,7 +253,11 @@ router.patch('/orders/:id', requirePermission('orders.edit'), async (req, res) =
           VALUES ($1, $2, $3, $4, $5)`, [item.productId, item.size, item.quantity, `Cancelled order NV-${order.id}`, req.user.sub]);
       }
     }
-    const updated = await client.query('UPDATE orders SET status = $1 WHERE id = $2 RETURNING id, status', [status, order.id]);
+    const paidCashOrder = order.paymentMethod === 'cod' && ['paid', 'fulfilled'].includes(status);
+    const updated = await client.query(`UPDATE orders SET status = $1,
+      payment_status = CASE WHEN $3::boolean THEN 'paid' ELSE payment_status END,
+      payment_updated_at = CASE WHEN $3::boolean AND payment_status <> 'paid' THEN NOW() ELSE payment_updated_at END
+      WHERE id = $2 RETURNING id, status`, [status, order.id, paidCashOrder]);
     return { ...updated.rows[0], email: order.email, name: order.name, trackingToken: order.trackingToken };
   });
   if (result.notFound) return res.status(404).json({ error: 'Order not found.' });
@@ -433,13 +437,19 @@ router.delete('/messages/:id', requirePermission('customers.edit'), async (req, 
 
 // --- Customers (real users with role = 'customer') ---
 router.get('/customers', requirePermission('customers.view'), async (req, res) => {
-  const { rows } = await query(`SELECT u.id::text, u.name, u.email, u.is_active AS "isActive", u.created_at AS "createdAt", count(o.id)::int AS "orderCount", max(o.created_at) AS "lastOrder", coalesce(sum(o.total_cents) FILTER (WHERE o.status <> 'cancelled'), 0)::bigint AS "totalSpentCents" FROM users u LEFT JOIN orders o ON o.user_id = u.id WHERE u.role = 'customer' GROUP BY u.id ORDER BY u.created_at DESC`);
+  const { rows } = await query(`SELECT u.id::text, u.name, u.email, u.is_active AS "isActive", u.created_at AS "createdAt",
+    count(o.id) FILTER (WHERE o.status <> 'cancelled')::int AS "orderCount",
+    max(o.created_at) FILTER (WHERE o.status <> 'cancelled') AS "lastOrder",
+    coalesce(sum(o.total_cents) FILTER (WHERE o.payment_status = 'paid' AND o.status <> 'cancelled'), 0)::bigint AS "totalSpentCents",
+    count(*) OVER (PARTITION BY lower(btrim(u.email)))::int AS "matchingEmailAccounts"
+    FROM users u LEFT JOIN orders o ON o.user_id = u.id WHERE u.role = 'customer'
+    GROUP BY u.id ORDER BY u.created_at DESC`);
   res.json(rows);
 });
 router.get('/customers/:id', requirePermission('customers.view'), async (req, res) => {
   const { rows } = await query(`SELECT id::text, name, email, is_active AS "isActive", created_at AS "createdAt" FROM users WHERE id = $1 AND role = 'customer'`, [req.params.id]);
   if (!rows[0]) return res.status(404).json({ error: 'Customer not found.' });
-  const { rows: orders } = await query(`SELECT id::text, status, total_cents AS "totalCents", created_at AS "createdAt" FROM orders WHERE user_id = $1 ORDER BY created_at DESC`, [req.params.id]);
+  const { rows: orders } = await query(`SELECT id::text, status, payment_status AS "paymentStatus", payment_method AS "paymentMethod", total_cents AS "totalCents", created_at AS "createdAt" FROM orders WHERE user_id = $1 ORDER BY created_at DESC`, [req.params.id]);
   const { rows: addresses } = await query(`SELECT id::text, label, name, phone, address1, city, country, postal_code AS "postalCode", is_default AS "isDefault" FROM addresses WHERE user_id = $1 ORDER BY is_default DESC, created_at DESC`, [req.params.id]);
   res.json({ ...rows[0], orders, addresses });
 });

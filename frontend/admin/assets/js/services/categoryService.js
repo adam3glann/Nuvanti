@@ -8,7 +8,17 @@ export const editCategory = (id, data) => request(`/api/admin/categories/${encod
 export async function uploadCategoryImage(file) {
   const form = new FormData();
   form.append('image', file);
-  const response = await fetch(`${API}/api/admin/uploads/category-image`, { method: 'POST', credentials: 'include', body: form });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 60_000);
+  let response;
+  try {
+    response = await fetch(`${API}/api/admin/uploads/category-image`, { method: 'POST', credentials: 'include', body: form, signal: controller.signal });
+  } catch (error) {
+    if (error.name === 'AbortError') throw new Error('Image upload timed out. Check the Cloudinary settings and try again.');
+    throw new Error('Could not reach the image upload service. Check your connection and try again.');
+  } finally {
+    clearTimeout(timeout);
+  }
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body.error || 'Category cover upload failed.');
   return body;

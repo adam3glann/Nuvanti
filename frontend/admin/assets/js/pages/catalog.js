@@ -126,9 +126,9 @@ function openCategoryEditor(category = null) {
       <div class="field"><label for="mName">Name</label><input id="mName" maxlength="80" value="${escapeHtml(category?.name || '')}" /></div>
       <div class="field"><label for="mSlug">Slug</label><input id="mSlug" maxlength="80" value="${escapeHtml(category?.slug || '')}" ${editing ? 'readonly' : ''} /></div>
       <div class="field"><label for="mDesc">Description</label><textarea id="mDesc" rows="3" maxlength="1000">${escapeHtml(category?.description || '')}</textarea></div>
-      <div class="field"><label for="mCoverFile">Cover photo</label><input id="mCoverFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" /><span class="hint">JPEG, PNG, WebP, or GIF up to 5 MB. Uploaded securely to Cloudinary.</span></div>
+      <div class="field"><label for="mCoverFile">Cover photo</label><input id="mCoverFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" aria-describedby="mUploadHint mUploadStatus" /><span class="hint" id="mUploadHint">JPEG, PNG, WebP, or GIF up to 5 MB. Uploaded securely to Cloudinary.</span><span class="hint" id="mUploadStatus" role="status" aria-live="polite"></span></div>
       <div class="field"><label for="mImageUrl">Image URL</label><input id="mImageUrl" type="url" maxlength="1000" placeholder="Upload a cover or paste an HTTPS image URL" value="${escapeHtml(category?.imageUrl || '')}" /></div>
-      <img id="mCoverPreview" src="${category?.imageUrl ? escapeHtml(storeAssetSrc(category.imageUrl)) : ''}" alt="Cover preview" ${category?.imageUrl ? '' : 'hidden'} style="max-width:100%;max-height:220px;object-fit:cover;border-radius:8px" />
+      <span id="mPreviewStatus" class="hint" role="status" hidden>Image preview could not be loaded. Check the image URL or upload a new image.</span><img id="mCoverPreview" src="${category?.imageUrl ? escapeHtml(storeAssetSrc(category.imageUrl)) : ''}" alt="Cover preview" ${category?.imageUrl ? '' : 'hidden'} style="max-width:100%;max-height:220px;object-fit:cover;border-radius:8px" />
     `,
     footHTML: `<button class="btn btn-outline" id="mCancel">Cancel</button><button class="btn btn-primary" id="mSave">${editing ? 'Save Changes' : 'Create Category'}</button>`,
   });
@@ -137,25 +137,49 @@ function openCategoryEditor(category = null) {
   const preview = modal.root.querySelector('#mCoverPreview');
   const fileInput = modal.root.querySelector('#mCoverFile');
   const saveButton = modal.root.querySelector('#mSave');
+  const uploadStatus = modal.root.querySelector('#mUploadStatus');
+  const previewStatus = modal.root.querySelector('#mPreviewStatus');
+  let uploading = false;
   const previewImage = (url) => {
     const value = url.trim();
+    previewStatus.hidden = true;
     preview.hidden = !value;
     preview.src = value ? storeAssetSrc(value) : '';
   };
+  preview.addEventListener('error', () => { preview.hidden = true; previewStatus.hidden = false; });
+  preview.addEventListener('load', () => { previewStatus.hidden = true; });
   imageUrl.addEventListener('input', () => previewImage(imageUrl.value));
   fileInput.addEventListener('change', async () => {
     const file = fileInput.files?.[0];
     if (!file) return;
+    if (!/^image\/(jpeg|png|webp|gif)$/.test(file.type) || file.size > 5 * 1024 * 1024) {
+      fileInput.value = '';
+      uploadStatus.textContent = 'Choose a JPEG, PNG, WebP, or GIF image up to 5 MB.';
+      return;
+    }
+    uploading = true;
     saveButton.disabled = true;
+    fileInput.disabled = true;
+    imageUrl.disabled = true;
+    uploadStatus.textContent = 'Uploading image securely to Cloudinary…';
     try {
       const uploaded = await uploadCategoryImage(file);
       imageUrl.value = uploaded.url;
       previewImage(uploaded.url);
+      uploadStatus.textContent = 'Upload complete. Save Changes to publish this cover.';
       showAdminToast('Category cover uploaded. Save the category to publish it.', 'success');
-    } catch (error) { showAdminToast(error.message, 'error'); }
-    finally { saveButton.disabled = false; }
+    } catch (error) {
+      uploadStatus.textContent = `${error.message} You can retry the upload or paste an HTTPS image URL.`;
+      showAdminToast(error.message, 'error');
+    } finally {
+      uploading = false;
+      fileInput.disabled = false;
+      imageUrl.disabled = false;
+      saveButton.disabled = false;
+    }
   });
   modal.root.querySelector('#mSave').addEventListener('click', async () => {
+    if (uploading) return showAdminToast('Wait for the cover upload to finish.', 'info');
     const name = modal.root.querySelector('#mName').value.trim();
     if (name.length < 2) return showAdminToast('Category name must have at least 2 characters.', 'error');
     const rawSlug = modal.root.querySelector('#mSlug').value.trim();
