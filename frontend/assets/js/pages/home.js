@@ -123,7 +123,7 @@ function initHeroSlider() {
   function stopAutoplay() { clearTimeout(timer); }
   function startAutoplay() {
     stopAutoplay();
-    if (document.hidden || motionPreference.matches || slider.matches(':hover') || slider.contains(document.activeElement)) return;
+    if (document.hidden || motionPreference.matches) return;
     const durationMs = Math.min(30, Math.max(3, Number(slides[current].dataset.duration) || 5)) * 1000;
     timer = setTimeout(() => {
       next();
@@ -140,12 +140,6 @@ function initHeroSlider() {
   dots.forEach((dot) => dot.addEventListener('click', () => manualGo(() => goTo(Number(dot.dataset.goto)))));
   document.addEventListener('visibilitychange', startAutoplay);
   motionPreference.addEventListener?.('change', startAutoplay);
-  slider.addEventListener('mouseenter', stopAutoplay);
-  slider.addEventListener('mouseleave', startAutoplay);
-  slider.addEventListener('focusin', stopAutoplay);
-  slider.addEventListener('focusout', (event) => {
-    if (!slider.contains(event.relatedTarget)) startAutoplay();
-  });
 
   slider.setAttribute('tabindex', '0');
   slider.addEventListener('keydown', (event) => {
