@@ -1,4 +1,4 @@
-import { initShell } from '../main.js';
+import { initShell, initScrollReveal } from '../main.js';
 import { icon } from '../components/icons.js';
 import { productCardHTML, bindProductCardEvents } from '../components/productCard.js';
 import { refreshCartDrawer } from '../components/cartDrawer.js';
@@ -171,8 +171,8 @@ async function loadCategories() {
   const el = document.getElementById('categoryGrid');
   try {
   const list = await fetchCategories();
-  el.innerHTML = list.map((c) => `
-    <a class="category-card" href="shop.html?category=${encodeURIComponent(c.slug)}">
+  el.innerHTML = list.map((c, index) => `
+    <a class="category-card reveal" style="--card-order:${Math.min(index, 7)}" href="shop.html?category=${encodeURIComponent(c.slug)}">
       <img src="${escapeHtml(c.image)}" alt="${escapeHtml(c.name)}" loading="lazy" />
       <span class="category-card__label">
         <span>${escapeHtml(c.name)}</span>
@@ -180,6 +180,7 @@ async function loadCategories() {
       </span>
     </a>
   `).join('');
+  initScrollReveal(el);
   } catch { el.innerHTML = serviceUnavailable(); }
 }
 

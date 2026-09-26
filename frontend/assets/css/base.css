@@ -197,8 +197,8 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--color-ink); wi
 @media (prefers-reduced-motion: reduce) { .skeleton { animation: none; opacity: 0.6; } }
 
 /* ---- Scroll reveal ---- */
-.reveal { opacity: 0; transform: translateY(18px); transition: opacity var(--dur-slow) var(--ease-editorial), transform var(--dur-slow) var(--ease-editorial); }
-.reveal.is-visible { opacity: 1; transform: translateY(0); }
+.reveal { opacity: 0; transform: translateY(22px) scale(0.985); transition: opacity 650ms var(--ease-editorial), transform 650ms var(--ease-editorial); }
+.reveal.is-visible { opacity: 1; transform: translateY(0) scale(1); }
 @media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } }
 
 /* ---- Error-prevention feedback ---- */
