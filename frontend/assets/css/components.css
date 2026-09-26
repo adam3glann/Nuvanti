@@ -2187,20 +2187,24 @@
   }
 }
 @media (prefers-reduced-motion: reduce) and (min-width: 900px) {
-  .hero-slide__img { transform: translateY(-50%) !important; }
+  .hero-slide__img { transform: none !important; }
 }
 
-/* Keep every desktop slide photo full-height, right-aligned, and uncropped. */
+/* Use the original full-bleed desktop hero treatment. */
 @media (min-width: 900px) {
   .hero-slide__img,
   .hero-slide[data-active="true"] .hero-slide__img {
-    inset: 0 0 0 auto;
-    width: auto;
+    inset: 0;
+    width: 100%;
     height: 100%;
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
-    object-position: right center;
-    transform: none;
+    object-fit: cover;
+    object-position: center;
   }
+}
+
+/* Keep white slide copy legible without the heavy dark wash on the left. */
+.hero-slide__scrim {
+  background:
+    linear-gradient(90deg, rgba(14, 20, 17, 0.28) 0%, rgba(14, 20, 17, 0.12) 38%, transparent 68%),
+    linear-gradient(0deg, rgba(14, 20, 17, 0.12), transparent 34%);
 }
