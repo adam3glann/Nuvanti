@@ -34,15 +34,14 @@ function render() {
       <div><p>These slides appear in the shop homepage carousel. Lower positions appear first; turn off “Show slide” to hide one without deleting it.</p><p class="hint">Upload requires Cloudinary. You can also use an existing path under <span class="mono">frontend/assets/</span> or paste a public HTTPS image URL.</p></div>
       <button class="btn btn-primary" id="addSlideBtn" type="button">Add slide</button>
     </div>
-    <div class="slides-global-color"><div><strong>Default text color on every slide</strong><span>Applying this replaces individual colors and turns off headline gradients.</span></div><input id="allSlidesTextColor" type="color" value="${allTextColor}" aria-label="Default text color on every slide" /><button class="btn btn-outline btn-sm" id="applyAllSlidesTextColor" type="button">Apply to all slides</button></div>
+    <div class="slides-global-color"><div><strong>Default text color on every slide</strong><span>Applying this replaces individual colors and turns off slide gradients.</span></div><input id="allSlidesTextColor" type="color" value="${allTextColor}" aria-label="Default text color on every slide" /><button class="btn btn-outline btn-sm" id="applyAllSlidesTextColor" type="button">Apply to all slides</button></div>
     <div class="slides-list">${slides.length ? slides.map(renderSlide).join('') : '<div class="admin-empty"><h3>No slides</h3><p>Add a slide to show the homepage carousel.</p></div>'}</div>`;
 }
 
 function renderSlide(slide) {
   const image = safePreviewUrl(slide.imageUrl) ? slide.imageUrl : '';
   const textColor = safeColor(slide.textColor) ? slide.textColor : '#f5f2eb';
-  const titleGradientStart = safeColor(slide.titleGradientStart) ? slide.titleGradientStart : '#83a88a';
-  const titleGradientEnd = safeColor(slide.titleGradientEnd) ? slide.titleGradientEnd : '#f5f2eb';
+  const gradients = normalizeTextGradients(slide.textGradients);
   return `<form class="card slide-card" data-slide-id="${escapeHtml(slide.id)}">
     <div class="slide-card__head">
       <img class="slide-preview" src="${escapeHtml(image)}" alt="" data-preview />
@@ -57,11 +56,17 @@ function renderSlide(slide) {
       <div class="field"><label>Headline</label><input name="title" value="${escapeHtml(slide.title)}" maxlength="160" minlength="3" required /></div>
       <div class="field"><label>Description</label><textarea name="description" rows="3" maxlength="500">${escapeHtml(slide.description)}</textarea></div>
       <section class="slide-text-colors" aria-label="Slide text colors"><h3>Text colors</h3><p class="hint">Choose one color for all text, or enable individual colors below to customize particular text.</p>
-        <label class="slide-gradient-toggle"><input type="checkbox" name="titleGradientEnabled" ${slide.titleGradientEnabled !== false ? 'checked' : ''} /> Use a gradient on this headline</label>
-        <p class="hint">The gradient replaces a custom solid headline color while it is turned on.</p>
+        <label class="slide-gradient-toggle"><input type="checkbox" name="textGradientAllEnabled" ${gradients.all.enabled ? 'checked' : ''} /> Apply a gradient to all text on this slide</label>
         <div class="field-row slide-gradient-pickers">
-          ${renderGradientColor(slide.id, 'titleGradientStart', 'Headline gradient start', titleGradientStart)}
-          ${renderGradientColor(slide.id, 'titleGradientEnd', 'Headline gradient end', titleGradientEnd)}
+          ${renderGradientColor(slide.id, 'textGradientAllStart', 'All-text gradient start', gradients.all.start)}
+          ${renderGradientColor(slide.id, 'textGradientAllEnd', 'All-text gradient end', gradients.all.end)}
+        </div>
+        <p class="hint">Each text part can follow the all-text gradient, use its own two-color gradient, or stay a solid color.</p>
+        <div class="field-row slide-gradient-grid">
+          ${renderGradientTarget(slide.id, 'eyebrow', 'Eyebrow', gradients.eyebrow)}
+          ${renderGradientTarget(slide.id, 'title', 'Headline', gradients.title)}
+          ${renderGradientTarget(slide.id, 'description', 'Description', gradients.description)}
+          ${renderGradientTarget(slide.id, 'button', 'Button text', gradients.button)}
         </div>
         <div class="field-row slide-color-grid">
           ${renderColorControl(slide.id, 'textColor', 'All text on this slide', textColor)}
@@ -98,6 +103,33 @@ function renderGradientColor(slideId, name, label, value) {
   return `<div class="field slide-color-control"><label for="${inputId}">${label}</label><input id="${inputId}" name="${name}" type="color" value="${value}" /></div>`;
 }
 
+function renderGradientTarget(slideId, key, label, gradient) {
+  return `<div class="slide-gradient-target"><div class="field"><label for="slide-${slideId}-${key}-mode">${label} gradient</label><select id="slide-${slideId}-${key}-mode" name="textGradient${key[0].toUpperCase()}${key.slice(1)}Mode"><option value="inherit" ${gradient.mode === 'inherit' ? 'selected' : ''}>Follow all text</option><option value="gradient" ${gradient.mode === 'gradient' ? 'selected' : ''}>Custom gradient</option><option value="solid" ${gradient.mode === 'solid' ? 'selected' : ''}>Solid color</option></select></div><div class="slide-gradient-target__colors">${renderGradientColor(slideId, `textGradient${key[0].toUpperCase()}${key.slice(1)}Start`, `${label} gradient start`, gradient.start)}${renderGradientColor(slideId, `textGradient${key[0].toUpperCase()}${key.slice(1)}End`, `${label} gradient end`, gradient.end)}</div></div>`;
+}
+
+function normalizeTextGradients(value = {}) {
+  const defaults = {
+    all: { enabled: true, start: '#83a88a', end: '#f5f2eb' },
+    eyebrow: { mode: 'inherit', start: '#83a88a', end: '#f5f2eb' },
+    title: { mode: 'inherit', start: '#83a88a', end: '#f5f2eb' },
+    description: { mode: 'inherit', start: '#83a88a', end: '#f5f2eb' },
+    button: { mode: 'inherit', start: '#83a88a', end: '#f5f2eb' },
+  };
+  const result = {};
+  for (const [key, fallback] of Object.entries(defaults)) {
+    const current = value?.[key] || {};
+    result[key] = {
+      ...fallback,
+      ...current,
+      start: safeColor(current.start) ? current.start : fallback.start,
+      end: safeColor(current.end) ? current.end : fallback.end,
+    };
+    if (key === 'all') result[key].enabled = current.enabled !== false;
+    else if (!['inherit', 'gradient', 'solid'].includes(current.mode)) result[key].mode = fallback.mode;
+  }
+  return result;
+}
+
 function renderOverrideColor(slideId, label, name, value, fallback) {
   const enabled = safeColor(value);
   const inputId = `slide-${slideId}-${name}`;
@@ -112,7 +144,10 @@ root?.addEventListener('click', async (event) => {
     button.textContent = 'Applying…';
     try {
       const result = await applyHomepageTextColor(textColor);
-      slides = slides.map((slide) => ({ ...slide, textColor: result.textColor, eyebrowColor: null, titleColor: null, descriptionColor: null, buttonTextColor: null, titleGradientEnabled: false }));
+      slides = slides.map((slide) => ({
+        ...slide, textColor: result.textColor, eyebrowColor: null, titleColor: null, descriptionColor: null, buttonTextColor: null,
+        textGradients: Object.fromEntries(Object.entries(normalizeTextGradients(slide.textGradients)).map(([key, gradient]) => [key, key === 'all' ? { ...gradient, enabled: false } : { ...gradient, mode: 'solid' }])),
+      }));
       render();
       showAdminToast(`Text color applied to ${result.updated} slide${result.updated === 1 ? '' : 's'}.`, 'success');
     } catch (error) {
@@ -193,9 +228,13 @@ root?.addEventListener('submit', async (event) => {
     titleColor: form.elements.namedItem('useTitleColor').checked ? value('titleColor') : null,
     descriptionColor: form.elements.namedItem('useDescriptionColor').checked ? value('descriptionColor') : null,
     buttonTextColor: form.elements.namedItem('useButtonTextColor').checked ? value('buttonTextColor') : null,
-    titleGradientEnabled: form.elements.namedItem('titleGradientEnabled').checked,
-    titleGradientStart: value('titleGradientStart'),
-    titleGradientEnd: value('titleGradientEnd'),
+    textGradients: {
+      all: { enabled: form.elements.namedItem('textGradientAllEnabled').checked, start: value('textGradientAllStart'), end: value('textGradientAllEnd') },
+      eyebrow: readGradient('Eyebrow'),
+      title: readGradient('Title'),
+      description: readGradient('Description'),
+      button: readGradient('Button'),
+    },
     position: Number(value('position')), durationSeconds: Number(value('durationSeconds')), isActive: form.elements.namedItem('isActive').checked,
   };
   const button = form.querySelector('[type="submit"]');
@@ -207,6 +246,14 @@ root?.addEventListener('submit', async (event) => {
     render();
     showAdminToast('Homepage slide saved.', 'success');
   } catch (error) { showAdminToast(error.message, 'error'); button.disabled = false; button.textContent = 'Save slide'; }
+
+  function readGradient(name) {
+    return {
+      mode: value(`textGradient${name}Mode`),
+      start: value(`textGradient${name}Start`),
+      end: value(`textGradient${name}End`),
+    };
+  }
 });
 
 function safePreviewUrl(value) {

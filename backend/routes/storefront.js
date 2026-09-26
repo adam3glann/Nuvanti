@@ -45,8 +45,7 @@ router.get('/homepage-slides', async (req, res) => {
     secondary_href AS "secondaryHref", position, duration_seconds AS "durationSeconds",
     text_color AS "textColor", eyebrow_color AS "eyebrowColor", title_color AS "titleColor",
     description_color AS "descriptionColor", button_text_color AS "buttonTextColor",
-    title_gradient_enabled AS "titleGradientEnabled", title_gradient_start AS "titleGradientStart",
-    title_gradient_end AS "titleGradientEnd"
+    text_gradients AS "textGradients"
     FROM homepage_slides WHERE is_active = true ORDER BY position, id`);
   res.set('Cache-Control', 'no-store');
   res.json(rows);

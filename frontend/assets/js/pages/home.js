@@ -72,12 +72,12 @@ function renderHero(slides) {
         <img class="hero-slide__img" src="${escapeHtml(s.imageUrl)}" alt="" ${i === 0 ? 'fetchpriority="high"' : 'loading="lazy"'} />
         <div class="hero-slide__scrim"></div>
         <div class="hero-slide__content">
-          ${s.eyebrow ? `<p class="label hero-slide__eyebrow">${escapeHtml(s.eyebrow)}</p>` : ''}
-          <h1 class="hero-slide__title font-display" data-gradient="${s.titleGradientEnabled !== false}">${escapeHtml(s.title)}</h1>
-          ${s.description ? `<p class="hero-slide__desc">${escapeHtml(s.description)}</p>` : ''}
+          ${s.eyebrow ? `<p class="label hero-slide__eyebrow" ${textGradientAttributes(s, 'eyebrow')}>${escapeHtml(s.eyebrow)}</p>` : ''}
+          <h1 class="hero-slide__title font-display" ${textGradientAttributes(s, 'title')}>${escapeHtml(s.title)}</h1>
+          ${s.description ? `<p class="hero-slide__desc" ${textGradientAttributes(s, 'description')}>${escapeHtml(s.description)}</p>` : ''}
           <div class="hero-slide__ctas">
-            <a href="${escapeHtml(s.ctaHref)}" class="btn btn-primary">${escapeHtml(s.ctaLabel)}</a>
-            ${s.secondaryLabel ? `<a href="${escapeHtml(s.secondaryHref)}" class="btn btn-ink-outline">${escapeHtml(s.secondaryLabel)}</a>` : ''}
+            <a href="${escapeHtml(s.ctaHref)}" class="btn btn-primary"><span ${textGradientAttributes(s, 'button')}>${escapeHtml(s.ctaLabel)}</span></a>
+            ${s.secondaryLabel ? `<a href="${escapeHtml(s.secondaryHref)}" class="btn btn-ink-outline"><span ${textGradientAttributes(s, 'button')}>${escapeHtml(s.secondaryLabel)}</span></a>` : ''}
           </div>
         </div>
       </div>
@@ -94,16 +94,27 @@ function renderHero(slides) {
 
 function slideTextStyle(slide) {
   const vars = [
-    ['text', slide.textColor],
-    ['eyebrow', slide.eyebrowColor],
-    ['title', slide.titleColor],
-    ['description', slide.descriptionColor],
-    ['button-text', slide.buttonTextColor],
-    ['title-gradient-start', slide.titleGradientStart],
-    ['title-gradient-end', slide.titleGradientEnd],
+    ['--slide-text-color', slide.textColor],
+    ['--slide-eyebrow-color', slide.eyebrowColor],
+    ['--slide-title-color', slide.titleColor],
+    ['--slide-description-color', slide.descriptionColor],
+    ['--slide-button-text-color', slide.buttonTextColor],
   ];
   return vars.filter(([, color]) => /^#[0-9a-fA-F]{6}$/.test(color || ''))
-    .map(([name, color]) => `--slide-${name}-color:${color};`).join('');
+    .map(([name, color]) => `${name}:${color};`).join('');
+}
+
+function textGradientAttributes(slide, part) {
+  const defaults = { start: '#83a88a', end: '#f5f2eb' };
+  const config = slide.textGradients || {};
+  const all = config.all || { enabled: true, ...defaults };
+  const specific = config[part] || { mode: 'inherit', ...defaults };
+  const enabled = part === 'all' ? all.enabled !== false
+    : specific.mode === 'gradient' || (specific.mode !== 'solid' && all.enabled !== false);
+  const colors = specific.mode === 'gradient' ? specific : all;
+  const start = /^#[0-9a-fA-F]{6}$/.test(colors.start || '') ? colors.start : defaults.start;
+  const end = /^#[0-9a-fA-F]{6}$/.test(colors.end || '') ? colors.end : defaults.end;
+  return `data-text-gradient="${enabled}" style="--text-gradient-start:${start};--text-gradient-end:${end}"`;
 }
 
 function initHeroSlider() {

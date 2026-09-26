@@ -40,6 +40,14 @@ const slideLink = z.string().trim().min(1).max(500).refine((value) => {
   return /^(?!\/\/)[\w./?%&=+#-]+$/.test(value) && !value.toLowerCase().startsWith('javascript:');
 }, 'Use an internal page link or an HTTPS URL.');
 const slideColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+const gradientPair = z.object({ start: slideColor.default('#83a88a'), end: slideColor.default('#f5f2eb') });
+const slideTextGradients = z.object({
+  all: gradientPair.extend({ enabled: z.boolean().default(true) }).default({}),
+  eyebrow: gradientPair.extend({ mode: z.enum(['inherit', 'gradient', 'solid']).default('inherit') }).default({}),
+  title: gradientPair.extend({ mode: z.enum(['inherit', 'gradient', 'solid']).default('inherit') }).default({}),
+  description: gradientPair.extend({ mode: z.enum(['inherit', 'gradient', 'solid']).default('inherit') }).default({}),
+  button: gradientPair.extend({ mode: z.enum(['inherit', 'gradient', 'solid']).default('inherit') }).default({}),
+}).default({});
 const homepageSlideInput = z.object({
   imageUrl: slideAsset,
   eyebrow: z.string().trim().max(80).default(''),
@@ -56,12 +64,10 @@ const homepageSlideInput = z.object({
   titleColor: slideColor.nullable().default(null),
   descriptionColor: slideColor.nullable().default(null),
   buttonTextColor: slideColor.nullable().default(null),
-  titleGradientEnabled: z.boolean().default(true),
-  titleGradientStart: slideColor.default('#83a88a'),
-  titleGradientEnd: slideColor.default('#f5f2eb'),
+  textGradients: slideTextGradients,
   isActive: z.boolean().default(true),
 }).refine((slide) => !slide.secondaryLabel || slide.secondaryHref, { message: 'Add a link for the secondary button.' });
-const homepageSlideColumns = 'id::text, image_url AS "imageUrl", eyebrow, title, description, cta_label AS "ctaLabel", cta_href AS "ctaHref", secondary_label AS "secondaryLabel", secondary_href AS "secondaryHref", position, duration_seconds AS "durationSeconds", text_color AS "textColor", eyebrow_color AS "eyebrowColor", title_color AS "titleColor", description_color AS "descriptionColor", button_text_color AS "buttonTextColor", title_gradient_enabled AS "titleGradientEnabled", title_gradient_start AS "titleGradientStart", title_gradient_end AS "titleGradientEnd", is_active AS "isActive"';
+const homepageSlideColumns = 'id::text, image_url AS "imageUrl", eyebrow, title, description, cta_label AS "ctaLabel", cta_href AS "ctaHref", secondary_label AS "secondaryLabel", secondary_href AS "secondaryHref", position, duration_seconds AS "durationSeconds", text_color AS "textColor", eyebrow_color AS "eyebrowColor", title_color AS "titleColor", description_color AS "descriptionColor", button_text_color AS "buttonTextColor", text_gradients AS "textGradients", is_active AS "isActive"';
 router.get('/store-presence', asyncRoute(async (req, res) => {
   const { rows } = await query(`SELECT count(DISTINCT visitor_id)::int AS "activeVisitors"
     FROM storefront_presence WHERE last_seen_at >= NOW() - INTERVAL '70 seconds'`);
@@ -73,18 +79,21 @@ router.get('/homepage-slides', requirePermission('content.manage'), async (req, 
 });
 router.patch('/homepage-slides/text-color', requirePermission('content.manage'), async (req, res) => {
   const { textColor } = z.object({ textColor: slideColor }).parse(req.body);
+  const textGradients = slideTextGradients.parse({
+    all: { enabled: false }, eyebrow: { mode: 'solid' }, title: { mode: 'solid' },
+    description: { mode: 'solid' }, button: { mode: 'solid' },
+  });
   const { rowCount } = await query(`UPDATE homepage_slides SET text_color = $1,
     eyebrow_color = NULL, title_color = NULL, description_color = NULL, button_text_color = NULL,
-    title_gradient_enabled = false,
-    updated_at = NOW()`, [textColor]);
+    text_gradients = $2::jsonb, updated_at = NOW()`, [textColor, JSON.stringify(textGradients)]);
   await logAudit({ req, action: 'homepage_slide.text_color_applied', targetType: 'homepage_slides', targetId: 'all', metadata: { textColor, count: rowCount } });
   res.json({ updated: rowCount, textColor });
 });
 router.post('/homepage-slides', requirePermission('content.manage'), async (req, res) => {
   const slide = homepageSlideInput.parse(req.body);
-  const { rows } = await query(`INSERT INTO homepage_slides (image_url, eyebrow, title, description, cta_label, cta_href, secondary_label, secondary_href, position, duration_seconds, text_color, eyebrow_color, title_color, description_color, button_text_color, title_gradient_enabled, title_gradient_start, title_gradient_end, is_active)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING ${homepageSlideColumns}`,
-  [slide.imageUrl, slide.eyebrow, slide.title, slide.description, slide.ctaLabel, slide.ctaHref, slide.secondaryLabel, slide.secondaryHref, slide.position, slide.durationSeconds, slide.textColor, slide.eyebrowColor, slide.titleColor, slide.descriptionColor, slide.buttonTextColor, slide.titleGradientEnabled, slide.titleGradientStart, slide.titleGradientEnd, slide.isActive]);
+  const { rows } = await query(`INSERT INTO homepage_slides (image_url, eyebrow, title, description, cta_label, cta_href, secondary_label, secondary_href, position, duration_seconds, text_color, eyebrow_color, title_color, description_color, button_text_color, text_gradients, is_active)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb,$17) RETURNING ${homepageSlideColumns}`,
+  [slide.imageUrl, slide.eyebrow, slide.title, slide.description, slide.ctaLabel, slide.ctaHref, slide.secondaryLabel, slide.secondaryHref, slide.position, slide.durationSeconds, slide.textColor, slide.eyebrowColor, slide.titleColor, slide.descriptionColor, slide.buttonTextColor, JSON.stringify(slide.textGradients), slide.isActive]);
   await logAudit({ req, action: 'homepage_slide.created', targetType: 'homepage_slide', targetId: rows[0].id, metadata: { title: slide.title } });
   res.status(201).json(rows[0]);
 });
@@ -92,9 +101,9 @@ router.patch('/homepage-slides/:id', requirePermission('content.manage'), async 
   const current = await query(`SELECT ${homepageSlideColumns} FROM homepage_slides WHERE id = $1`, [req.params.id]);
   if (!current.rows[0]) return res.status(404).json({ error: 'Homepage slide not found.' });
   const slide = homepageSlideInput.parse({ ...current.rows[0], ...req.body });
-  const { rows } = await query(`UPDATE homepage_slides SET image_url=$1, eyebrow=$2, title=$3, description=$4, cta_label=$5, cta_href=$6, secondary_label=$7, secondary_href=$8, position=$9, duration_seconds=$10, text_color=$11, eyebrow_color=$12, title_color=$13, description_color=$14, button_text_color=$15, title_gradient_enabled=$16, title_gradient_start=$17, title_gradient_end=$18, is_active=$19, updated_at=NOW()
-    WHERE id=$20 RETURNING ${homepageSlideColumns}`,
-  [slide.imageUrl, slide.eyebrow, slide.title, slide.description, slide.ctaLabel, slide.ctaHref, slide.secondaryLabel, slide.secondaryHref, slide.position, slide.durationSeconds, slide.textColor, slide.eyebrowColor, slide.titleColor, slide.descriptionColor, slide.buttonTextColor, slide.titleGradientEnabled, slide.titleGradientStart, slide.titleGradientEnd, slide.isActive, req.params.id]);
+  const { rows } = await query(`UPDATE homepage_slides SET image_url=$1, eyebrow=$2, title=$3, description=$4, cta_label=$5, cta_href=$6, secondary_label=$7, secondary_href=$8, position=$9, duration_seconds=$10, text_color=$11, eyebrow_color=$12, title_color=$13, description_color=$14, button_text_color=$15, text_gradients=$16::jsonb, is_active=$17, updated_at=NOW()
+    WHERE id=$18 RETURNING ${homepageSlideColumns}`,
+  [slide.imageUrl, slide.eyebrow, slide.title, slide.description, slide.ctaLabel, slide.ctaHref, slide.secondaryLabel, slide.secondaryHref, slide.position, slide.durationSeconds, slide.textColor, slide.eyebrowColor, slide.titleColor, slide.descriptionColor, slide.buttonTextColor, JSON.stringify(slide.textGradients), slide.isActive, req.params.id]);
   await logAudit({ req, action: 'homepage_slide.updated', targetType: 'homepage_slide', targetId: rows[0].id, metadata: { title: slide.title } });
   res.json(rows[0]);
 });
