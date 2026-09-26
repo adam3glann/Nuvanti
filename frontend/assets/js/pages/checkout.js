@@ -9,6 +9,7 @@ import { checkDiscount, getSavedDiscountCode, saveDiscountCode, clearDiscountCod
 import { loadStoreSettings } from '../services/storeSettingsService.js';
 import { fetchProductBySlug } from '../services/productService.js';
 import { fetchAddresses } from '../services/addressService.js';
+import { API_ORIGIN } from '../config.js';
 
 initShell({ currentPage: 'shop' });
 
@@ -46,7 +47,7 @@ async function initializeCheckout() {
     if (cartChanges.priceChanged) showToast('Bag prices were updated to today’s catalog.');
     [currentUser, storeSettings] = await Promise.all([getCurrentUser(), loadStoreSettings()]);
     try {
-      const paymentResponse = await fetch(`${window.location.origin}/api/payments/config`, { credentials: 'include' });
+      const paymentResponse = await fetch(`${API_ORIGIN}/api/payments/config`, { credentials: 'include' });
       onlinePaymentEnabled = paymentResponse.ok && (await paymentResponse.json()).onlinePaymentEnabled === true;
     } catch { onlinePaymentEnabled = false; }
   } catch {

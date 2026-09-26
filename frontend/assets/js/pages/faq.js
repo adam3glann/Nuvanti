@@ -18,8 +18,8 @@ const FAQS = {
     { q: 'Can I get a refund?', a: 'Refunds are not available. You can check your order while the courier is at your door — if it fits, keep it. If not, return it immediately to the courier, as returns aren\'t accepted afterward. In case of a manufacturing defect, report it within 48 hours with photos or video and you may receive a replacement or refund.' },
   ],
   payments: [
-    { q: 'What payment methods do you accept?', a: 'Cash on Delivery is currently available for orders shipped within Egypt. Online card payment is not yet available.' },
-    { q: 'Do you collect card details?', a: 'No. Online card payment is not connected, and the store does not collect card details.' },
+    { q: 'What payment methods do you accept?', a: 'Cash on Delivery is available for orders shipped within Egypt. If online payment is enabled at checkout, you can also pay securely through our payment provider.' },
+    { q: 'Do you collect card details?', a: 'No. Card details are entered on the payment provider’s secure checkout and are not collected or stored by Nuvanti.' },
   ],
   products: [
     { q: 'What are your products made from?', a: 'Each product page lists exact materials. We favor heavier-weight cottons and blends built to hold shape over time.' },
