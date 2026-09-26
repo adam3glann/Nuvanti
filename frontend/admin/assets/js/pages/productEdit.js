@@ -249,16 +249,23 @@ function renderColorImageSets(colors, colorImages) {
       const files = [...(input.files || [])];
       if (!files.length) return;
       const remaining = 12 - (colorImages[color] || []).length;
-      if (files.length > remaining) showAdminToast(`You can add ${remaining} more photo${remaining === 1 ? '' : 's'} for ${color}.`, 'error');
-      for (const file of files.slice(0, remaining)) {
+      const selected = files.slice(0, remaining);
+      if (!selected.length) return showAdminToast(`This color already has 12 photos.`, 'error');
+      if (files.length > remaining) showAdminToast(`Only the first ${remaining} selected photo${remaining === 1 ? '' : 's'} will be added for ${color}.`, 'info');
+      button.disabled = true;
+      let added = 0;
+      for (const [index, file] of selected.entries()) {
         try {
-          showAdminToast(`Uploading ${color} photo…`, 'info');
-          const image = await uploadAdminProductImage(file);
+          button.textContent = `Preparing ${index + 1}/${selected.length}…`;
+          const image = await uploadAdminProductImage(file, { onProgress: ({ phase, percent }) => {
+            button.textContent = phase === 'optimizing' ? `Optimizing ${index + 1}/${selected.length}…` : `Uploading ${index + 1}/${selected.length} · ${percent}%`;
+          } });
           colorImages[color] = [...(colorImages[color] || []), image.url];
-        } catch (error) { showAdminToast(error.message || `Could not upload the ${color} photo.`, 'error'); break; }
+          added += 1;
+        } catch (error) { showAdminToast(`${file.name}: ${error.message || `Could not upload the ${color} photo.`}`, 'error'); }
       }
       renderColorImageSets(colors, colorImages);
-      if (colorImages[color]?.length) showAdminToast(`${color} photos uploaded. Save the product to publish them.`, 'success');
+      if (added) showAdminToast(`${added} ${color} photo${added === 1 ? '' : 's'} uploaded. Save the product to publish them.`, 'success');
     });
     input.click();
   }));
@@ -290,14 +297,30 @@ function renderImages(images) {
       <img src="${esc(imageSrc(img))}" alt="" />
       <button class="image-tile__remove" data-remove-image="${i}" aria-label="Remove image">${icon('x')}</button>
     </div>
-  `).join('') + `<button class="image-tile-add" id="addImageBtn">${icon('upload')}<span>Upload</span></button>`;
+  `).join('') + `<button class="image-tile-add" id="addImageBtn">${icon('upload')}<span>Upload photos</span></button>`;
 
   document.getElementById('addImageBtn').addEventListener('click', () => {
-    const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/jpeg,image/png,image/webp,image/gif';
+    const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/jpeg,image/png,image/webp,image/gif'; input.multiple = true;
     input.addEventListener('change', async () => {
-      const file = input.files?.[0]; if (!file) return;
-      try { showAdminToast('Uploading image…', 'info'); const image = await uploadAdminProductImage(file); images.push(image.url); renderImages(images); showAdminToast('Image uploaded. Save the product to publish it.', 'success'); }
-      catch (error) { showAdminToast(error.message, 'error'); }
+      const files = [...(input.files || [])]; if (!files.length) return;
+      const selected = files.slice(0, Math.max(0, 12 - images.length));
+      if (!selected.length) return showAdminToast('A product can have up to 12 gallery photos.', 'error');
+      if (selected.length < files.length) showAdminToast('A product can have up to 12 gallery photos. Extra selections were skipped.', 'info');
+      const uploadButton = document.getElementById('addImageBtn');
+      uploadButton.disabled = true;
+      let added = 0;
+      for (const [index, file] of selected.entries()) {
+        try {
+          uploadButton.querySelector('span').textContent = `Preparing ${index + 1}/${selected.length}…`;
+          const image = await uploadAdminProductImage(file, { onProgress: ({ phase, percent }) => {
+            uploadButton.querySelector('span').textContent = phase === 'optimizing' ? `Optimizing ${index + 1}/${selected.length}…` : `Uploading ${index + 1}/${selected.length} · ${percent}%`;
+          } });
+          images.push(image.url);
+          added += 1;
+        } catch (error) { showAdminToast(`${file.name}: ${error.message || 'Image upload failed.'}`, 'error'); }
+      }
+      renderImages(images);
+      if (added) showAdminToast(`${added} photo${added === 1 ? '' : 's'} uploaded. Save the product to publish them.`, 'success');
     });
     input.click();
   });

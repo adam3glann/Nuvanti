@@ -48,6 +48,7 @@ let selectedSize = null;
 let selectedQuantity = 1;
 
 let galleryIndex = 0;
+let galleryMode = 'all';
 
 /* =========================================================
    INIT
@@ -78,6 +79,7 @@ async function init() {
   selectedSize = product.sizes?.length ? null : 'One Size';
   selectedQuantity = 1;
   galleryIndex = 0;
+  galleryMode = 'all';
 
   document.title = `${product.name} — Nuvanti`;
 
@@ -169,6 +171,7 @@ function renderGallery() {
   if (!gallery) return;
 
   const images = currentProductImages();
+  const allImages = allProductImageEntries();
 
   /*
    * If product has no images, show a clean fallback.
@@ -219,7 +222,7 @@ function renderGallery() {
     </div>
 
     ${
-      images.length > 1
+      allImages.length > 1
         ? `
           <div
             class="gallery__thumbs"
@@ -227,23 +230,24 @@ function renderGallery() {
             aria-label="Product images"
           >
 
-            ${images
+            ${allImages
               .map(
-                (img, index) => `
+                (entry, index) => `
 
               <button
                 type="button"
                 class="gallery__thumb"
                 role="tab"
-                aria-selected="${index === galleryIndex}"
+                aria-selected="${entry.src === images[galleryIndex]}"
                 data-index="${index}"
-                data-src="${escapeAttribute(img)}"
-                data-active="${index === galleryIndex}"
+                data-src="${escapeAttribute(entry.src)}"
+                data-colors="${escapeAttribute(JSON.stringify(entry.colors))}"
+                data-active="${entry.src === images[galleryIndex]}"
                 aria-label="View image ${index + 1}"
               >
 
                 <img
-                  src="${escapeAttribute(img)}"
+                  src="${escapeAttribute(entry.src)}"
                   alt=""
                   loading="${index === 0 ? "eager" : "lazy"}"
                   decoding="async"
@@ -267,7 +271,7 @@ function renderGallery() {
      PRELOAD REMAINING IMAGES
      --------------------------------------------------------- */
 
-  preloadImages(images);
+  preloadImages(allImages.map((entry) => entry.src));
 
   /* ---------------------------------------------------------
      THUMBNAIL EVENTS
@@ -275,9 +279,22 @@ function renderGallery() {
 
   gallery.querySelectorAll(".gallery__thumb").forEach((button) => {
     button.addEventListener("click", () => {
-      const index = Number(button.dataset.index);
-
-      setGalleryImage(index);
+      const src = button.dataset.src;
+      let colors = [];
+      try { colors = JSON.parse(button.dataset.colors || '[]').filter((color) => typeof color === 'string'); } catch {}
+      if (colors.length) {
+        selectedColor = colors.includes(selectedColor) ? selectedColor : colors[0];
+        galleryMode = 'color';
+        renderInfo();
+        const colorImages = currentProductImages();
+        galleryIndex = Math.max(0, colorImages.indexOf(src));
+      } else {
+        galleryMode = 'all';
+        const globalImages = currentProductImages();
+        galleryIndex = Math.max(0, globalImages.indexOf(src));
+      }
+      renderGallery();
+      reattachAccordionOpen();
     });
   });
 
@@ -352,11 +369,28 @@ function renderGallery() {
 }
 
 function currentProductImages() {
-  const selectedImages = selectedColor && product?.colorImages?.[selectedColor];
-  const images = Array.isArray(selectedImages) && selectedImages.length
-    ? selectedImages
-    : product?.images;
-  return Array.isArray(images) ? images.filter(Boolean) : [];
+  if (galleryMode === 'color' && selectedColor) {
+    const selectedImages = product?.colorImages?.[selectedColor];
+    if (Array.isArray(selectedImages) && selectedImages.some(Boolean)) return [...new Set(selectedImages.filter(Boolean))];
+  }
+  return allProductImageEntries().map((entry) => entry.src);
+}
+
+function allProductImageEntries() {
+  const entries = new Map();
+  for (const src of Array.isArray(product?.images) ? product.images : []) {
+    if (src && !entries.has(src)) entries.set(src, { src, colors: [] });
+  }
+  for (const [color, images] of Object.entries(product?.colorImages || {})) {
+    if (!Array.isArray(images)) continue;
+    for (const src of images) {
+      if (!src) continue;
+      const entry = entries.get(src) || { src, colors: [] };
+      if (!entry.colors.includes(color)) entry.colors.push(color);
+      entries.set(src, entry);
+    }
+  }
+  return [...entries.values()];
 }
 
 /* =========================================================
@@ -400,9 +434,7 @@ function setGalleryImage(index) {
    */
 
   document.querySelectorAll(".gallery__thumb").forEach((button) => {
-    const buttonIndex = Number(button.dataset.index);
-
-    const active = buttonIndex === galleryIndex;
+    const active = button.dataset.src === images[galleryIndex];
 
     button.dataset.active = String(active);
 
@@ -415,7 +447,9 @@ function setGalleryImage(index) {
    ========================================================= */
 
 function preloadImages(images) {
-  images.slice(1).forEach((src) => {
+  // Warm only the next few images. Preloading every color's full-resolution
+  // gallery at once wastes bandwidth, especially on mobile connections.
+  images.slice(1, 4).forEach((src) => {
     const img = new Image();
 
     img.decoding = "async";
@@ -912,6 +946,7 @@ function bindInfoEvents() {
       selectedColor = button.dataset.color;
 
       galleryIndex = 0;
+      galleryMode = 'color';
 
       renderGallery();
 

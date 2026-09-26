@@ -2,7 +2,7 @@ import { API_ORIGIN } from '../config.js';
 
 const visitorStorageKey = 'nuvanti_store_presence_v1';
 const visitorIdleMs = 30 * 60 * 1000;
-const heartbeatMs = 25 * 1000;
+const heartbeatMs = 20 * 1000;
 const endpoint = `${API_ORIGIN}/api/storefront/presence`;
 
 export function startStorePresence() {
@@ -22,7 +22,6 @@ export function startStorePresence() {
   };
 
   const heartbeat = () => {
-    if (document.visibilityState !== 'visible') return;
     present = true;
     post('heartbeat');
   };
@@ -37,9 +36,10 @@ export function startStorePresence() {
 
   heartbeat();
   const timer = window.setInterval(heartbeat, heartbeatMs);
+  // Keep a store tab counted while it is in the background. The browser may
+  // throttle these pings; the server's short expiry removes crashed/closed tabs.
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') heartbeat();
-    else leave();
   });
   window.addEventListener('pagehide', leave);
   window.addEventListener('pageshow', heartbeat);

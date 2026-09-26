@@ -242,9 +242,11 @@ root?.addEventListener('change', async (event) => {
   if (!file || !card) return;
   const button = card.querySelector('[data-upload]');
   button.disabled = true;
-  button.textContent = 'Uploading…';
+  button.textContent = 'Preparing…';
   try {
-    const result = await uploadHomepageSlideImage(file);
+    const result = await uploadHomepageSlideImage(file, { onProgress: ({ phase, percent }) => {
+      button.textContent = phase === 'optimizing' ? 'Optimizing…' : `Uploading ${percent}%`;
+    } });
     card.querySelector('[name="imageUrl"]').value = result.url;
     card.querySelector('[data-preview]').src = result.url;
     showAdminToast('Image uploaded. Save the slide to publish it.', 'success');

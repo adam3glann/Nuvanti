@@ -1,27 +1,13 @@
 import { API_ORIGIN as API } from '../config.js';
+import { uploadAdminImage } from './imageUploadService.js';
 async function request(path, options = {}) { const response = await fetch(`${API}${path}`, { credentials: 'include', headers: { 'Content-Type': 'application/json' }, ...options }); if (response.status === 204) return true; const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(body.error || 'Unable to update the catalog.'); return body; }
 export const fetchCategories = () => request('/api/admin/categories');
 export const toggleCategoryStatus = async (id) => { const category = (await fetchCategories()).find((item) => item.id === String(id)); return request(`/api/admin/categories/${id}`, { method: 'PATCH', body: JSON.stringify({ isActive: !category?.isActive }) }); };
 export const deleteCategory = (id) => request(`/api/admin/categories/${id}`, { method: 'DELETE' });
 export const createCategory = (data) => request('/api/admin/categories', { method: 'POST', body: JSON.stringify(data) });
 export const editCategory = (id, data) => request(`/api/admin/categories/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(data) });
-export async function uploadCategoryImage(file) {
-  const form = new FormData();
-  form.append('image', file);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 60_000);
-  let response;
-  try {
-    response = await fetch(`${API}/api/admin/uploads/category-image`, { method: 'POST', credentials: 'include', body: form, signal: controller.signal });
-  } catch (error) {
-    if (error.name === 'AbortError') throw new Error('Image upload timed out. Check the Cloudinary settings and try again.');
-    throw new Error('Could not reach the image upload service. Check your connection and try again.');
-  } finally {
-    clearTimeout(timeout);
-  }
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.error || 'Category cover upload failed.');
-  return body;
+export async function uploadCategoryImage(file, options = {}) {
+  return uploadAdminImage(file, { endpoint: '/api/admin/uploads/category-image', ...options });
 }
 export const fetchCollections = () => request('/api/admin/collections');
 export const toggleCollectionStatus = async (id) => { const collection = (await fetchCollections()).find((item) => item.id === String(id)); return request(`/api/admin/collections/${id}`, { method: 'PATCH', body: JSON.stringify({ isActive: !collection?.isActive }) }); };

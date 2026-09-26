@@ -19,7 +19,7 @@ router.post('/presence', presenceLimiter, asyncRoute(async (req, res) => {
   if (action === 'leave') {
     await query('DELETE FROM storefront_presence WHERE visitor_id = $1 AND tab_id = $2', [visitorId, tabId]);
   } else {
-    await query(`DELETE FROM storefront_presence WHERE last_seen_at < NOW() - INTERVAL '90 seconds'`);
+    await query(`DELETE FROM storefront_presence WHERE last_seen_at < NOW() - INTERVAL '2 minutes'`);
     await query(`INSERT INTO storefront_presence (visitor_id, tab_id, last_seen_at) VALUES ($1, $2, NOW())
       ON CONFLICT (visitor_id, tab_id) DO UPDATE SET last_seen_at = NOW()`, [visitorId, tabId]);
   }

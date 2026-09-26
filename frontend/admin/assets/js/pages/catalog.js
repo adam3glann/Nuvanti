@@ -161,9 +161,11 @@ function openCategoryEditor(category = null) {
     saveButton.disabled = true;
     fileInput.disabled = true;
     imageUrl.disabled = true;
-    uploadStatus.textContent = 'Uploading image securely to Cloudinary…';
+    uploadStatus.textContent = 'Preparing image…';
     try {
-      const uploaded = await uploadCategoryImage(file);
+      const uploaded = await uploadCategoryImage(file, { onProgress: ({ phase, percent }) => {
+        uploadStatus.textContent = phase === 'optimizing' ? 'Optimizing image for a faster upload…' : `Uploading image securely to Cloudinary… ${percent}%`;
+      } });
       imageUrl.value = uploaded.url;
       previewImage(uploaded.url);
       uploadStatus.textContent = 'Upload complete. Save Changes to publish this cover.';

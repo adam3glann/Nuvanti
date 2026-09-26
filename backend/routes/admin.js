@@ -79,7 +79,7 @@ const homepageSlideInput = z.object({
 const homepageSlideColumns = 'id::text, image_url AS "imageUrl", eyebrow, title, description, cta_label AS "ctaLabel", cta_href AS "ctaHref", secondary_label AS "secondaryLabel", secondary_href AS "secondaryHref", position, duration_seconds AS "durationSeconds", text_color AS "textColor", eyebrow_color AS "eyebrowColor", title_color AS "titleColor", description_color AS "descriptionColor", button_text_color AS "buttonTextColor", text_gradients AS "textGradients", text_fonts AS "textFonts", is_active AS "isActive"';
 router.get('/store-presence', asyncRoute(async (req, res) => {
   const { rows } = await query(`SELECT count(DISTINCT visitor_id)::int AS "activeVisitors"
-    FROM storefront_presence WHERE last_seen_at >= NOW() - INTERVAL '70 seconds'`);
+    FROM storefront_presence WHERE last_seen_at >= NOW() - INTERVAL '90 seconds'`);
   res.set('Cache-Control', 'no-store').json(rows[0] || { activeVisitors: 0 });
 }));
 router.get('/homepage-slides', requirePermission('content.manage'), async (req, res) => {
