@@ -9,12 +9,14 @@ Use this checklist before opening the store to real customers. Application code 
 - [ ] Railway `STORE_ORIGIN` exactly matches the live storefront origin; `COOKIE_DOMAIN` is blank. The `frontend/admin/` directory is not deployed as public static content.
 - [ ] Production variables from [DEPLOYMENT-POSTGRES.md](DEPLOYMENT-POSTGRES.md) are set. `JWT_SECRET` and `MFA_ENCRYPTION_KEY` are unique, random, and private. Keep the MFA key stable after enrollment.
 - [ ] Supabase PostgreSQL is reachable with TLS certificate verification enabled. Confirm migrations are applied and the initial active super-admin can sign in.
+- [ ] Verify the application database role in Supabase. The Railway startup command runs migrations and the application with the configured `DATABASE_URL`; do not claim least-privilege separation unless the role grants have been reviewed and a separate migration role is in place.
 - [ ] Remove the one-time `NUVANTI_BOOTSTRAP_ADMIN_*` variables after the initial super-admin and catalog are set up.
 - [ ] Database backup schedule and retention are enabled for the selected Supabase plan; complete and document a restore rehearsal before launch.
+- [ ] Enable GitHub secret scanning and push protection where available. Remove any key files from the current Git tree; if a private key was ever pushed, revoke it immediately and replace it. Removing a file in a new commit does not erase prior Git history.
 
 ## Account security and email
 
-- [ ] Enable 2FA for each staff account and store its recovery codes in a private password manager. Confirm that login requires a fresh authenticator code.
+- [ ] MFA is supported but currently optional per staff account. Enable it for every staff user in Admin → Security, store recovery codes in a private password manager, and confirm each login requires a fresh authenticator code.
 - [ ] Configure SMTP or Resend and a valid `MAIL_FROM`. In Admin → Settings → Email, send a test message and confirm it arrives.
 - [ ] Create a fresh customer account and confirm the verification email arrives. Confirm the link verifies the account and checkout rejects unverified accounts through the API.
 - [ ] Verify password reset, administrator setup, order confirmation, order status, and newsletter confirmation/unsubscribe emails. Check provider logs and spam folders if a message is missing.
@@ -36,5 +38,6 @@ Use this checklist before opening the store to real customers. Application code 
 - [ ] Confirm production Paymob merchant approval, accepted payment methods, fees, settlement timing, and support contacts before collecting live payments.
 - [ ] Keep Cash on Delivery available while Paymob remains unconfigured; the online payment choice stays hidden until Paymob settings are complete.
 - [ ] Review Railway, Cloudflare, Supabase, email, Cloudinary, and Paymob usage, billing, and alerting. Assign an owner to respond to failed deployments, mail, and payment callbacks.
+- [ ] Confirm the GitHub dependency security workflow passes for both npm lockfiles. It also runs weekly; resolve reported advisories and review dependency updates before deployment.
 
 Do not announce launch until the required items above are checked and the full customer order path has been completed successfully in production or a production-like environment.
