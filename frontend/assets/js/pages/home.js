@@ -123,7 +123,10 @@ function initHeroSlider() {
   function stopAutoplay() { clearTimeout(timer); }
   function startAutoplay() {
     stopAutoplay();
-    if (document.hidden || motionPreference.matches) return;
+    // Reduced-motion affects the transition styling, not whether the slides
+    // advance. Keeping autoplay enabled also avoids desktop OS preferences
+    // accidentally freezing the hero while touch devices keep cycling.
+    if (document.hidden) return;
     const durationMs = Math.min(30, Math.max(3, Number(slides[current].dataset.duration) || 5)) * 1000;
     timer = setTimeout(() => {
       next();
