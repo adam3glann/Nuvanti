@@ -168,9 +168,7 @@ function renderGallery() {
 
   if (!gallery) return;
 
-  const images = Array.isArray(product.images)
-    ? product.images.filter(Boolean)
-    : [];
+  const images = currentProductImages();
 
   /*
    * If product has no images, show a clean fallback.
@@ -353,14 +351,20 @@ function renderGallery() {
   }
 }
 
+function currentProductImages() {
+  const selectedImages = selectedColor && product?.colorImages?.[selectedColor];
+  const images = Array.isArray(selectedImages) && selectedImages.length
+    ? selectedImages
+    : product?.images;
+  return Array.isArray(images) ? images.filter(Boolean) : [];
+}
+
 /* =========================================================
    SET GALLERY IMAGE
    ========================================================= */
 
 function setGalleryImage(index) {
-  if (!product?.images?.length) return;
-
-  const images = product.images.filter(Boolean);
+  const images = currentProductImages();
 
   if (!images.length) return;
 
@@ -425,7 +429,7 @@ function preloadImages(images) {
    ========================================================= */
 
 function openLightbox(startIndex = 0) {
-  const images = product?.images?.filter(Boolean) || [];
+  const images = currentProductImages();
 
   if (!images.length) return;
 
@@ -905,6 +909,10 @@ function bindInfoEvents() {
       if (!button) return;
 
       selectedColor = button.dataset.color;
+
+      galleryIndex = 0;
+
+      renderGallery();
 
       renderInfo();
 

@@ -35,7 +35,7 @@ async function init() {
 function blankProduct() {
   return {
     id: null, name: '', slug: '', description: '', price: 0, compareAtPrice: null, cost: null,
-    sku: '', category: '', collection: '', material: '', colors: [], sizes: [], images: [],
+    sku: '', category: '', collection: '', material: '', colors: [], sizes: [], images: [], colorImages: {},
     inventory: {}, badges: [], status: 'draft', featured: false, bestseller: false, newArrival: false,
     seoTitle: '', seoDescription: '',
   };
@@ -72,6 +72,14 @@ function renderForm(product, cats, cols) {
           <div class="card-pad">
             <div class="image-grid" id="imageGrid"></div>
             <p class="hint" style="margin-top:.75rem">Upload product photos to secure Cloudinary storage. The first image is the primary storefront image.</p>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:1.25rem">
+          <div class="card-head"><h2>Photos by Color</h2></div>
+          <div class="card-pad">
+            <p class="hint" style="margin-bottom:.85rem">Add photos for each color. When a shopper selects that color, its photos appear in the product gallery. Colors without photos use the main Images gallery.</p>
+            <div id="colorImageSets"></div>
           </div>
         </div>
 
@@ -139,7 +147,9 @@ function renderForm(product, cats, cols) {
   renderImages(product.images || []);
   renderVariants(product);
   const colorSwatches = { ...(product.colorSwatches || {}) };
+  const colorImages = Object.fromEntries(Object.entries(product.colorImages || {}).map(([color, images]) => [color, Array.isArray(images) ? [...images] : []]));
   renderColorPalette(splitList(val('fColors')), colorSwatches);
+  renderColorImageSets(splitList(val('fColors')), colorImages);
 
   for (const field of ['fPrice', 'fCompare', 'fCost']) {
     const input = document.getElementById(field);
@@ -164,6 +174,7 @@ function renderForm(product, cats, cols) {
       const colors = splitList(val('fColors'));
       renderVariants({ ...product, colors, sizes: splitList(val('fSizes')), inventory: stock });
       renderColorPalette(colors, colorSwatches);
+      renderColorImageSets(colors, colorImages);
     });
   }
 
@@ -195,6 +206,7 @@ function renderForm(product, cats, cols) {
       seoTitle: val('fSeoTitle'), seoDescription: val('fSeoDesc'),
       images: product.images || [],
       colors,
+      colorImages: Object.fromEntries(colors.filter((color) => colorImages[color]?.length).map((color) => [color, colorImages[color]])),
       colorSwatches: Object.fromEntries(colors.map((color) => [color, validHex(colorSwatches[color]) || defaultColorHex(color)])),
       sizes,
       inventory: readInventory(stockProduct),
@@ -212,6 +224,49 @@ function renderForm(product, cats, cols) {
       button.textContent = isNew ? 'Create Product' : 'Save Changes';
     }
   });
+}
+
+function renderColorImageSets(colors, colorImages) {
+  const root = document.getElementById('colorImageSets');
+  if (!colors.length) {
+    root.innerHTML = '<small class="hint">Add color names above to create a photo set for each color.</small>';
+    return;
+  }
+  root.innerHTML = colors.map((color, index) => {
+    const images = colorImages[color] || [];
+    return `<section style="padding:.75rem 0;border-bottom:1px solid var(--a-border,#e4e7ec)">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin-bottom:.6rem"><strong>${esc(color)}</strong><button class="btn btn-outline btn-sm" type="button" data-upload-color="${index}" ${images.length >= 12 ? 'disabled' : ''}>${icon('upload')} Add photos (${images.length}/12)</button></div>
+      <div style="display:flex;gap:.5rem;overflow-x:auto">${images.map((img, imageIndex) => `<div style="position:relative;flex:0 0 76px;height:96px"><img src="${esc(imageSrc(img))}" alt="${esc(color)} product photo" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:6px" /><button type="button" data-remove-color-image="${index}" data-image-index="${imageIndex}" aria-label="Remove ${esc(color)} photo ${imageIndex + 1}" style="position:absolute;top:3px;right:3px">${icon('x')}</button></div>`).join('')}</div>
+      ${images.length ? '' : '<small class="hint">No color-specific photos yet; the main gallery will be used.</small>'}
+    </section>`;
+  }).join('');
+
+  root.querySelectorAll('[data-upload-color]').forEach((button) => button.addEventListener('click', () => {
+    const color = colors[Number(button.dataset.uploadColor)];
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = 'image/jpeg,image/png,image/webp,image/gif'; input.multiple = true;
+    input.addEventListener('change', async () => {
+      const files = [...(input.files || [])];
+      if (!files.length) return;
+      const remaining = 12 - (colorImages[color] || []).length;
+      if (files.length > remaining) showAdminToast(`You can add ${remaining} more photo${remaining === 1 ? '' : 's'} for ${color}.`, 'error');
+      for (const file of files.slice(0, remaining)) {
+        try {
+          showAdminToast(`Uploading ${color} photo…`, 'info');
+          const image = await uploadAdminProductImage(file);
+          colorImages[color] = [...(colorImages[color] || []), image.url];
+        } catch (error) { showAdminToast(error.message || `Could not upload the ${color} photo.`, 'error'); break; }
+      }
+      renderColorImageSets(colors, colorImages);
+      if (colorImages[color]?.length) showAdminToast(`${color} photos uploaded. Save the product to publish them.`, 'success');
+    });
+    input.click();
+  }));
+  root.querySelectorAll('[data-remove-color-image]').forEach((button) => button.addEventListener('click', () => {
+    const color = colors[Number(button.dataset.removeColorImage)];
+    colorImages[color]?.splice(Number(button.dataset.imageIndex), 1);
+    renderColorImageSets(colors, colorImages);
+  }));
 }
 
 function readInventory(product) {
@@ -232,7 +287,7 @@ function renderImages(images) {
   el.innerHTML = images.map((img, i) => `
     <div class="image-tile" data-primary="${i === 0}">
       ${i === 0 ? '<span class="image-tile__primary">Primary</span>' : ''}
-      <img src="${imageSrc(img)}" alt="" />
+      <img src="${esc(imageSrc(img))}" alt="" />
       <button class="image-tile__remove" data-remove-image="${i}" aria-label="Remove image">${icon('x')}</button>
     </div>
   `).join('') + `<button class="image-tile-add" id="addImageBtn">${icon('upload')}<span>Upload</span></button>`;
