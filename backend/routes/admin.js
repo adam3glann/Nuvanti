@@ -203,21 +203,21 @@ router.get('/financial-summary', requirePermission('analytics.view'), asyncRoute
   });
 }));
 router.get('/products', requirePermission('products.view'), async (req, res) => { const { rows } = await query(`SELECT ${columns} FROM products ORDER BY updated_at DESC`); res.json(rows.map(toAdminProduct)); });
-const PAYMENT_METHOD_LABELS = { cod: 'Cash on Delivery' };
+const PAYMENT_METHOD_LABELS = { cod: 'Cash on Delivery', paymob: 'Online payment (Paymob)' };
 router.get('/orders', requirePermission('orders.view'), asyncRoute(async (req, res) => {
   const limit = req.query.limit === undefined ? 100 : z.coerce.number().int().min(1).max(100).parse(req.query.limit);
-  const { rows } = await query(`SELECT o.id, o.status, o.total_cents AS "totalCents", o.subtotal_cents AS "subtotalCents", o.shipping_cents AS "shippingCents", o.delivery, o.payment_method AS "paymentMethod", o.created_at AS "createdAt", o.shipping_address AS "shippingAddress", u.email, u.name,
+  const { rows } = await query(`SELECT o.id, o.status, o.payment_status AS "paymentStatus", o.payment_transaction_id AS "paymentTransactionId", o.total_cents AS "totalCents", o.subtotal_cents AS "subtotalCents", o.shipping_cents AS "shippingCents", o.delivery, o.payment_method AS "paymentMethod", o.created_at AS "createdAt", o.shipping_address AS "shippingAddress", u.email, u.name,
     coalesce(json_agg(json_build_object('productId', i.product_id, 'name', i.product_name, 'price', i.unit_price_cents::numeric / 100, 'quantity', i.quantity, 'color', i.color, 'size', i.size, 'image', i.image_url)) FILTER (WHERE i.id IS NOT NULL), '[]') AS items
     FROM orders o JOIN users u ON u.id = o.user_id LEFT JOIN order_items i ON i.order_id = o.id GROUP BY o.id, u.email, u.name ORDER BY o.created_at DESC LIMIT $1`, [limit]);
   res.json(rows.map((row) => ({
-    id: `NV-${row.id}`, dbId: String(row.id), status: row.status, paymentStatus: ['paid', 'fulfilled'].includes(row.status) ? 'paid' : 'pending',
+    id: `NV-${row.id}`, dbId: String(row.id), status: row.status, paymentStatus: row.paymentStatus || (['paid', 'fulfilled'].includes(row.status) ? 'paid' : 'pending'),
     total: Number(row.totalCents) / 100, totalCents: Number(row.totalCents),
     subtotal: Number(row.subtotalCents) / 100, shipping: Number(row.shippingCents) / 100,
     delivery: row.delivery, paymentMethod: PAYMENT_METHOD_LABELS[row.paymentMethod] || row.paymentMethod,
     createdAt: row.createdAt,
     customer: { name: row.name, email: row.email, phone: row.shippingAddress?.phone || '—' },
     shippingAddress: { ...row.shippingAddress, method: row.delivery === 'express' ? 'Express' : 'Standard' },
-    trackingNumber: null, transactionRef: null,
+    trackingNumber: null, transactionRef: row.paymentTransactionId || null,
     items: row.items, notes: [],
   })));
 }));

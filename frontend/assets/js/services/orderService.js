@@ -1,9 +1,9 @@
 import { API_ORIGIN as API } from '../config.js';
 const STORAGE_KEY = 'nuvanti_last_order_v1';
-export async function createOrder({ lines, customer, shipping, delivery, discountCode }) {
+export async function createOrder({ lines, customer, shipping, delivery, discountCode, paymentMethod = 'cod' }) {
   let response;
   try {
-    response = await fetch(`${API}/api/orders`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: lines.map((line) => ({ productId: Number(line.productId), quantity: line.quantity, color: line.color, size: line.size, image: line.image })), shipping: { name: customer.name, phone: customer.phone, address1: shipping.address, city: shipping.city, country: shipping.country, postalCode: shipping.postal || 'N/A' }, delivery, discountCode: discountCode || undefined }) });
+    response = await fetch(`${API}/api/orders`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: lines.map((line) => ({ productId: Number(line.productId), quantity: line.quantity, color: line.color, size: line.size, image: line.image })), shipping: { name: customer.name, phone: customer.phone, address1: shipping.address, city: shipping.city, country: shipping.country, postalCode: shipping.postal || 'N/A' }, delivery, paymentMethod, discountCode: discountCode || undefined }) });
   } catch {
     throw new Error('We could not confirm whether your order was placed. Check My Orders before retrying so you do not create a duplicate.');
   }
@@ -15,11 +15,18 @@ export async function createOrder({ lines, customer, shipping, delivery, discoun
   const subtotal = Number(body.order.subtotalCents) / 100;
   const discountAmount = (body.order.discountCents || 0) / 100;
   const shippingCost = Number(body.order.shippingCents) / 100;
-  const order = { emailDelivery: body.order.emailDelivery || { sent: false, configured: false }, orderNumber: `NV-${body.order.id}`, createdAt: body.order.createdAt, trackingUrl: body.order.trackingUrl, lines: orderLines, customer, shipping, delivery, subtotal, shippingCost, discountCode: body.order.discountCode || null, discountAmount, total: Number(body.order.totalCents) / 100, estimatedDelivery: delivery === 'express' ? '1–2 business days' : '4–7 business days' };
+  const order = { id: String(body.order.id), paymentMethod: body.order.paymentMethod || paymentMethod, paymentStatus: 'pending', paymentUrl: body.order.paymentUrl || null, emailDelivery: body.order.emailDelivery || { sent: false, configured: false }, orderNumber: `NV-${body.order.id}`, createdAt: body.order.createdAt, trackingUrl: body.order.trackingUrl, lines: orderLines, customer, shipping, delivery, subtotal, shippingCost, discountCode: body.order.discountCode || null, discountAmount, total: Number(body.order.totalCents) / 100, estimatedDelivery: delivery === 'express' ? '1–2 business days' : '4–7 business days' };
   sessionStorage.setItem(STORAGE_KEY, JSON.stringify(order));
   return order;
 }
 export function getLastOrder() { try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY)); } catch { return null; } }
+
+export async function fetchOrderPaymentStatus(orderId) {
+  const response = await fetch(`${API}/api/payments/${encodeURIComponent(orderId)}/status`, { credentials: 'include' });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.error || 'Unable to check payment status.');
+  return body;
+}
 
 export async function fetchMyOrders() {
   const response = await fetch(`${API}/api/orders/mine`, { credentials: 'include' });

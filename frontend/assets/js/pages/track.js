@@ -59,6 +59,7 @@ function renderOrder(order) {
       <div class="order-detail-row"><span>Placed</span><span>${new Date(order.createdAt).toLocaleDateString()}</span></div>
       ${order.city ? `<div class="order-detail-row"><span>Shipping To</span><span>${escapeHtml(order.city)}, ${escapeHtml(order.country)}</span></div>` : ''}
       <div class="order-detail-row"><span>Delivery</span><span>${order.delivery === 'express' ? 'Express (1–2 days)' : 'Standard (4–7 days)'}</span></div>
+      ${order.paymentMethod === 'paymob' ? `<div class="order-detail-row"><span>Payment</span><span>${order.paymentStatus === 'paid' ? 'Paid online' : order.paymentStatus === 'failed' ? 'Payment not completed' : 'Awaiting payment confirmation'}</span></div>` : ''}
     </div>
 
     ${cancelled

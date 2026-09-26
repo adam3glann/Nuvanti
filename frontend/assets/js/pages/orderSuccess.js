@@ -1,7 +1,7 @@
 import { initShell } from '../main.js';
 import { icon } from '../components/icons.js';
 import { formatPrice } from '../components/productCard.js';
-import { getLastOrder } from '../services/orderService.js';
+import { fetchOrderPaymentStatus, getLastOrder } from '../services/orderService.js';
 
 initShell({ currentPage: 'shop' });
 
@@ -16,11 +16,12 @@ if (!order) {
       <a href="shop.html" class="btn btn-primary">Start Shopping</a>
     </div>`;
 } else {
+  const onlinePending = order.paymentMethod === 'paymob' && order.paymentStatus !== 'paid';
   root.innerHTML = `
     <div class="order-success">
       <div class="order-success__icon">${icon('check')}</div>
-      <h1>Thank you for your order.</h1>
-      <p class="text-muted">Your order is saved in My Account → Orders. ${order.emailDelivery?.sent ? `Confirmation accepted by the email provider for ${escapeHtml(order.customer.email)}. Shipping updates will go to the same address.` : `Order placed, but the confirmation email could not be sent to ${escapeHtml(order.customer.email)}. Check Admin Settings → Email and Railway mail variables.`}</p>
+      <h1>${onlinePending ? 'Checking your payment' : 'Thank you for your order.'}</h1>
+      <p class="text-muted" id="paymentResultMessage">${onlinePending ? 'Your order is saved. We are waiting for the payment provider to confirm your payment. This page will update shortly.' : `Your order is saved in My Account → Orders. ${order.emailDelivery?.sent ? `Confirmation accepted by the email provider for ${escapeHtml(order.customer.email)}. Shipping updates will go to the same address.` : `Order placed, but the confirmation email could not be sent to ${escapeHtml(order.customer.email)}. Check Admin Settings → Email and Railway mail variables.`}`}</p>
 
       <div class="order-detail-card">
         <div class="order-detail-row"><span>Order Number</span><strong>${escapeHtml(order.orderNumber)}</strong></div>
@@ -43,6 +44,27 @@ if (!order) {
       </div>
     </div>
   `;
+  if (onlinePending) refreshPaymentStatus(order);
+}
+
+async function refreshPaymentStatus(order) {
+  const message = document.getElementById('paymentResultMessage');
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    try {
+      const status = await fetchOrderPaymentStatus(order.id);
+      if (status.paymentStatus === 'paid') {
+        message.textContent = `Payment confirmed for order ${order.orderNumber}. A receipt will be sent to ${order.customer.email}.`;
+        document.querySelector('.order-success h1').textContent = 'Payment confirmed';
+        return;
+      }
+      if (status.paymentStatus === 'failed') {
+        message.textContent = `The payment was not completed. Your order ${order.orderNumber} remains unpaid. You can try again from My Account → Orders or contact the store.`;
+        document.querySelector('.order-success h1').textContent = 'Payment not completed';
+        return;
+      }
+    } catch { /* Keep the accurate pending message if the status check is unavailable. */ }
+    await new Promise((resolve) => setTimeout(resolve, 2500));
+  }
 }
 
 function escapeHtml(value) {

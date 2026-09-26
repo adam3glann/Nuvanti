@@ -195,7 +195,7 @@ async function renderDashboard(session, tab) {
             <p class="text-muted" style="font-size:var(--fs-small)">${new Date(o.createdAt).toLocaleDateString()} · ${o.itemCount} item(s)</p>
           </div>
           <span>${formatPrice(o.totalCents / 100)}</span>
-          <span class="badge badge--outline">${STATUS_LABELS[o.status] || o.status}</span>
+          <span class="badge badge--outline">${o.paymentMethod === 'paymob' && o.paymentStatus === 'failed' ? 'Payment failed' : STATUS_LABELS[o.status] || o.status}</span>
         </a>
       `).join('') : `<div class="state-block"><h3>No orders yet</h3><p>Your order history will appear here once you place your first order.</p><a href="shop.html" class="btn btn-primary">Shop Now</a></div>`;
     } catch (error) {

@@ -20,6 +20,7 @@ let discountInfo = null;
 let storeSettings = null;
 let currentUser = null;
 let savedAddress = null;
+let onlinePaymentEnabled = false;
 
 let lines = getCart();
 if (lines.length === 0) {
@@ -44,6 +45,10 @@ async function initializeCheckout() {
     }
     if (cartChanges.priceChanged) showToast('Bag prices were updated to today’s catalog.');
     [currentUser, storeSettings] = await Promise.all([getCurrentUser(), loadStoreSettings()]);
+    try {
+      const paymentResponse = await fetch(`${window.location.origin}/api/payments/config`, { credentials: 'include' });
+      onlinePaymentEnabled = paymentResponse.ok && (await paymentResponse.json()).onlinePaymentEnabled === true;
+    } catch { onlinePaymentEnabled = false; }
   } catch {
     form.innerHTML = '<div class="state-block"><h3>Checkout is temporarily unavailable</h3><p>We could not verify your account or current delivery prices. Your bag is saved—please try again shortly.</p></div>';
     summary.innerHTML = '';
@@ -125,11 +130,14 @@ function render() {
         <input type="radio" name="payment" value="cod" checked style="margin-top:.2rem" />
         <div><strong>Cash on Delivery</strong><p class="text-muted" style="font-size:var(--fs-small)">Pay when your order arrives</p></div>
       </label>
-      <p class="text-muted" style="font-size:var(--fs-small);margin-top:1rem">Online card payment will be available after a secure payment provider is connected.</p>
+      ${onlinePaymentEnabled ? `<label class="payment-option" data-value="paymob" style="margin-top:.75rem">
+        <input type="radio" name="payment" value="paymob" style="margin-top:.2rem" />
+        <div><strong>Pay online securely</strong><p class="text-muted" style="font-size:var(--fs-small)">Card and other methods enabled by the payment provider</p></div>
+      </label>` : `<p class="text-muted" style="font-size:var(--fs-small);margin-top:1rem">Online payment is being set up. Cash on Delivery is available.</p>`}
     </section>
 
     <button class="btn btn-primary btn-block" id="placeOrderBtn" type="submit">Place Cash on Delivery Order</button>
-    <p class="text-muted" style="font-size:var(--fs-micro);text-align:center;margin-top:1rem">
+    <p class="text-muted" id="paymentNote" style="font-size:var(--fs-micro);text-align:center;margin-top:1rem">
       Payment is due to the delivery courier when your order arrives. No card details are collected.
     </p>
   `;
@@ -138,6 +146,12 @@ function render() {
     delivery = e.target.value;
     document.querySelectorAll('.delivery-option').forEach((el) => (el.dataset.active = String(el.dataset.value === delivery)));
     renderSummary();
+  }));
+  document.querySelectorAll('input[name="payment"]').forEach((radio) => radio.addEventListener('change', (event) => {
+    const online = event.target.value === 'paymob';
+    document.querySelectorAll('.payment-option').forEach((element) => { element.dataset.active = String(element.dataset.value === event.target.value); });
+    document.getElementById('placeOrderBtn').textContent = online ? 'Continue to Secure Payment' : 'Place Cash on Delivery Order';
+    document.getElementById('paymentNote').textContent = online ? 'You will complete payment on the payment provider’s secure checkout. We never collect card details.' : 'Payment is due to the delivery courier when your order arrives. No card details are collected.';
   }));
   renderSummary();
 
@@ -227,12 +241,15 @@ async function onSubmit(e) {
   };
 
   const button = document.getElementById('placeOrderBtn');
+  const paymentMethod = document.querySelector('input[name="payment"]:checked')?.value || 'cod';
   button.disabled = true; button.textContent = 'Placing order…';
-  try { await createOrder({ lines, customer, shipping, delivery, discountCode: discountInfo?.code }); }
-  catch (error) { showToast(error.message); button.disabled = false; button.textContent = 'Place Cash on Delivery Order'; return; }
+  let placedOrder;
+  try { placedOrder = await createOrder({ lines, customer, shipping, delivery, paymentMethod, discountCode: discountInfo?.code }); }
+  catch (error) { showToast(error.message); button.disabled = false; button.textContent = paymentMethod === 'paymob' ? 'Continue to Secure Payment' : 'Place Cash on Delivery Order'; return; }
   clearCart();
   clearDiscountCode();
   refreshCartDrawer();
+  if (paymentMethod === 'paymob' && placedOrder.paymentUrl) { window.location.assign(placedOrder.paymentUrl); return; }
   window.location.href = 'order-success.html';
 }
 

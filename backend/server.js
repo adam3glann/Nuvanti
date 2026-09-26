@@ -16,6 +16,7 @@ import contactRouter from "./routes/contact.js";
 import authRouter from "./routes/auth.js";
 import adminRouter from "./routes/admin.js";
 import uploadsRouter from "./routes/uploads.js";
+import paymentsRouter from "./routes/payments.js";
 import { requireAdminPage, requireAuth, requireRole } from "./lib/auth.js";
 import { errorHandler, notFound, sameOrigin } from "./middleware/security.js";
 import { query } from "./lib/db.js";
@@ -169,6 +170,9 @@ app.use(
     legacyHeaders: false,
   }),
 );
+// Signed gateway callbacks are verified by their HMAC and cannot carry a
+// browser Origin header, so mount their handler before same-origin checks.
+app.use("/api/payments", paymentsRouter);
 app.use(sameOrigin({ storeOrigin, storeOrigins, storePreviewOrigin, adminOrigin }));
 app.use(
   "/api/auth",
