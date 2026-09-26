@@ -73,7 +73,7 @@ function renderHero(slides) {
         <div class="hero-slide__scrim"></div>
         <div class="hero-slide__content">
           ${s.eyebrow ? `<p class="label hero-slide__eyebrow">${escapeHtml(s.eyebrow)}</p>` : ''}
-          <h1 class="hero-slide__title font-display">${escapeHtml(s.title)}</h1>
+          <h1 class="hero-slide__title font-display" data-gradient="${s.titleGradientEnabled !== false}">${escapeHtml(s.title)}</h1>
           ${s.description ? `<p class="hero-slide__desc">${escapeHtml(s.description)}</p>` : ''}
           <div class="hero-slide__ctas">
             <a href="${escapeHtml(s.ctaHref)}" class="btn btn-primary">${escapeHtml(s.ctaLabel)}</a>
@@ -99,6 +99,8 @@ function slideTextStyle(slide) {
     ['title', slide.titleColor],
     ['description', slide.descriptionColor],
     ['button-text', slide.buttonTextColor],
+    ['title-gradient-start', slide.titleGradientStart],
+    ['title-gradient-end', slide.titleGradientEnd],
   ];
   return vars.filter(([, color]) => /^#[0-9a-fA-F]{6}$/.test(color || ''))
     .map(([name, color]) => `--slide-${name}-color:${color};`).join('');

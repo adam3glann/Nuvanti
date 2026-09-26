@@ -2225,3 +2225,12 @@
 .hero-slide .hero-slide__ctas .btn {
   color: var(--slide-button-text-color, var(--slide-text-color, var(--color-text-inverse)));
 }
+.hero-slide .hero-slide__title[data-gradient="true"] {
+  background-image: linear-gradient(110deg,
+    var(--slide-title-gradient-start, #83a88a) 0%,
+    var(--slide-title-gradient-end, #f5f2eb) 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}

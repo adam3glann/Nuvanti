@@ -59,6 +59,9 @@
 .slide-color-control input[type="color"]:disabled { opacity:.42; cursor:not-allowed; }
 .slide-color-toggle { display:flex; align-items:center; gap:.45rem; min-height:1.2rem; font-size:.75rem !important; cursor:pointer; }
 .slide-color-toggle input[type="checkbox"] { margin:0; }
+.slide-gradient-toggle { display:flex; align-items:center; gap:.5rem; margin:.75rem 0; font-size:.8rem; font-weight:600; cursor:pointer; }
+.slide-gradient-toggle input { margin:0; }
+.slide-gradient-pickers { grid-template-columns:repeat(auto-fit,minmax(170px,220px)); gap:.5rem 1rem; }
 @media (max-width:720px) {
   .slides-toolbar,.slide-card__head,.slide-card__foot { align-items:stretch; flex-direction:column; }
   .slides-global-color { align-items:flex-start; flex-wrap:wrap; }
