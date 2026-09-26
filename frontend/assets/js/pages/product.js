@@ -49,6 +49,7 @@ let selectedQuantity = 1;
 
 let galleryIndex = 0;
 let galleryMode = 'all';
+let lightboxIndex = 0;
 
 /* =========================================================
    INIT
@@ -467,7 +468,7 @@ function openLightbox(startIndex = 0) {
 
   if (!images.length) return;
 
-  let index = ((startIndex % images.length) + images.length) % images.length;
+  lightboxIndex = ((startIndex % images.length) + images.length) % images.length;
 
   let box = document.getElementById("productLightbox");
 
@@ -525,11 +526,11 @@ function openLightbox(startIndex = 0) {
        CLOSE
        ------------------------------------------------------- */
 
-    box.querySelector(".lightbox__close").addEventListener("click", close);
+    box.querySelector(".lightbox__close").addEventListener("click", closeLightbox);
 
     box.addEventListener("click", (event) => {
       if (event.target === box) {
-        close();
+        closeLightbox();
       }
     });
 
@@ -542,7 +543,7 @@ function openLightbox(startIndex = 0) {
       .addEventListener("click", (event) => {
         event.stopPropagation();
 
-        navigate(-1);
+        navigateLightbox(-1);
       });
 
     box
@@ -550,7 +551,7 @@ function openLightbox(startIndex = 0) {
       .addEventListener("click", (event) => {
         event.stopPropagation();
 
-        navigate(1);
+        navigateLightbox(1);
       });
 
     /* -------------------------------------------------------
@@ -563,15 +564,15 @@ function openLightbox(startIndex = 0) {
       }
 
       if (event.key === "Escape") {
-        close();
+        closeLightbox();
       }
 
       if (event.key === "ArrowLeft") {
-        navigate(-1);
+        navigateLightbox(-1);
       }
 
       if (event.key === "ArrowRight") {
-        navigate(1);
+        navigateLightbox(1);
       }
     });
 
@@ -603,46 +604,51 @@ function openLightbox(startIndex = 0) {
         }
 
         if (difference < 0) {
-          navigate(1);
+          navigateLightbox(1);
         } else {
-          navigate(-1);
+          navigateLightbox(-1);
         }
       },
       { passive: true },
     );
   }
 
-  const image = box.querySelector("#lightboxImg");
-
-  function render() {
-    image.style.opacity = "0";
-
-    image.src = images[index];
-
-    image.alt = `${product.name} — Image ${index + 1}`;
-
-    image.onload = () => {
-      image.style.opacity = "1";
-    };
-  }
-
-  function navigate(direction) {
-    index = (index + direction + images.length) % images.length;
-
-    render();
-  }
-
-  function close() {
-    box.dataset.open = "false";
-
-    document.body.style.overflow = "";
-  }
-
-  render();
+  renderLightbox();
 
   box.dataset.open = "true";
 
   document.body.style.overflow = "hidden";
+}
+
+function renderLightbox() {
+  const box = document.getElementById("productLightbox");
+  const images = currentProductImages();
+  const image = box?.querySelector("#lightboxImg");
+  if (!box || !image || !images.length) return;
+
+  lightboxIndex = ((lightboxIndex % images.length) + images.length) % images.length;
+  const src = images[lightboxIndex];
+  image.style.opacity = "0";
+  image.onload = () => {
+    if (image.getAttribute('src') === src) image.style.opacity = "1";
+  };
+  image.src = src;
+  image.alt = `${product.name} — Image ${lightboxIndex + 1}`;
+}
+
+function navigateLightbox(direction) {
+  const images = currentProductImages();
+  if (!images.length) return;
+  lightboxIndex = (lightboxIndex + direction + images.length) % images.length;
+  renderLightbox();
+}
+
+function closeLightbox() {
+  const box = document.getElementById("productLightbox");
+  if (!box) return;
+  box.dataset.open = "false";
+  document.body.style.overflow = "";
+  setGalleryImage(lightboxIndex);
 }
 
 /* =========================================================
