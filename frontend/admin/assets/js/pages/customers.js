@@ -24,7 +24,7 @@ async function load() {
     <tr>
       <td><a href="customer-detail.html?id=${encodeURIComponent(c.id)}" style="font-weight:600;color:var(--a-text)">${escapeHtml(c.name)}</a></td>
       <td>${escapeHtml(c.email)}${Number(c.matchingEmailAccounts) > 1 ? '<br /><span class="status-badge status-warning" title="Another customer account uses this email address">Possible duplicate email</span>' : ''}</td>
-      <td>—</td>
+      <td>${c.phone ? `<a href="tel:${encodeURIComponent(c.phone)}">${escapeHtml(c.phone)}</a>` : '—'}</td>
       <td>${c.orderCount}</td>
       <td>${formatPrice(c.totalSpent)}</td>
       <td>${c.lastOrder ? formatDate(c.lastOrder) : '—'}</td>

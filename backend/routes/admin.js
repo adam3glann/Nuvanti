@@ -442,6 +442,10 @@ router.delete('/messages/:id', requirePermission('customers.edit'), async (req, 
 // --- Customers (real users with role = 'customer') ---
 router.get('/customers', requirePermission('customers.view'), async (req, res) => {
   const { rows } = await query(`SELECT u.id::text, u.name, u.email, u.is_active AS "isActive", u.created_at AS "createdAt",
+    coalesce(
+      (SELECT nullif(btrim(o.shipping_address->>'phone'), '') FROM orders o WHERE o.user_id = u.id AND nullif(btrim(o.shipping_address->>'phone'), '') IS NOT NULL ORDER BY o.created_at DESC LIMIT 1),
+      (SELECT nullif(btrim(a.phone), '') FROM addresses a WHERE a.user_id = u.id ORDER BY a.is_default DESC, a.created_at DESC LIMIT 1)
+    ) AS phone,
     count(o.id) FILTER (WHERE o.status <> 'cancelled')::int AS "orderCount",
     max(o.created_at) FILTER (WHERE o.status <> 'cancelled') AS "lastOrder",
     coalesce(sum(o.total_cents) FILTER (WHERE o.payment_status = 'paid' AND o.status <> 'cancelled'), 0)::bigint AS "totalSpentCents",

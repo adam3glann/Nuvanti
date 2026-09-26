@@ -64,8 +64,7 @@ function render(customer) {
             <div><span style="color:var(--a-muted)">Customer since</span><br />${formatDate(customer.createdAt)}</div>
           </div>
         </div>
-        <div class="card" style="margin-bottom:1.25rem"><div class="card-head"><h2>Saved addresses</h2></div><div class="card-pad" style="font-size:.85rem">${savedAddresses}</div></div>
-        <div class="card" style="margin-bottom:1.25rem"><div class="card-head"><h2>Delivery details from orders</h2></div><div class="card-pad" style="font-size:.85rem">${deliveryAddresses}</div></div>
+        <div class="card" style="margin-bottom:1.25rem"><div class="card-head"><h2>Delivery addresses</h2></div><div class="card-pad" style="font-size:.85rem">${deliveryAddresses}${customer.addresses.length ? `<details style="margin-top:.75rem"><summary style="cursor:pointer;color:var(--a-muted)">Saved address book (${customer.addresses.length})</summary>${savedAddresses}</details>` : ''}</div></div>
         ${canDisable ? `<div class="card"><div class="card-head"><h2>Account access</h2></div><div class="card-pad"><button class="btn btn-outline" id="toggleStatusBtn" style="width:100%">${customer.status === 'active' ? 'Disable account' : 'Enable account'}</button></div></div>` : ''}
       </div>
       <div class="card"><div class="card-head"><h2>Order history</h2></div><div class="table-wrap"><table class="admin-table"><thead><tr><th>Order</th><th>Date</th><th>Units</th><th>Delivery location</th><th>Total</th><th>Status</th></tr></thead><tbody>${orders}</tbody></table></div></div>
