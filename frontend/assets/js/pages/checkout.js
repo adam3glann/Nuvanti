@@ -246,7 +246,23 @@ async function onSubmit(e) {
   button.disabled = true; button.textContent = 'Placing order…';
   let placedOrder;
   try { placedOrder = await createOrder({ lines, customer, shipping, delivery, paymentMethod, discountCode: discountInfo?.code }); }
-  catch (error) { showToast(error.message); button.disabled = false; button.textContent = paymentMethod === 'paymob' ? 'Continue to Secure Payment' : 'Place Cash on Delivery Order'; return; }
+  catch (error) {
+    if (error.status === 409) {
+      try {
+        const currentProducts = await Promise.all([...new Set(getCart().map((line) => line.slug))].map(fetchProductBySlug));
+        const changes = syncCartWithProducts(currentProducts);
+        if (changes.adjusted.length || changes.removed.length) {
+          sessionStorage.setItem('nuvanti_cart_notice', 'Stock changed while you were checking out. Your bag was adjusted to the pieces still available; review it before placing the order.');
+          window.location.href = 'cart.html';
+          return;
+        }
+      } catch { /* Keep the server's stock message visible if refresh fails. */ }
+    }
+    showToast(error.message);
+    button.disabled = false;
+    button.textContent = paymentMethod === 'paymob' ? 'Continue to Secure Payment' : 'Place Cash on Delivery Order';
+    return;
+  }
   clearCart();
   clearDiscountCode();
   refreshCartDrawer();

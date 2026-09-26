@@ -8,7 +8,11 @@ export async function createOrder({ lines, customer, shipping, delivery, discoun
     throw new Error('We could not confirm whether your order was placed. Check My Orders before retrying so you do not create a duplicate.');
   }
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.error || 'Unable to place this order. Please sign in and try again.');
+  if (!response.ok) {
+    const error = new Error(body.error || 'Unable to place this order. Please sign in and try again.');
+    error.status = response.status;
+    throw error;
+  }
   // Use the prices and totals calculated inside the server transaction. Cart
   // data is local to this browser and may be stale after an admin price edit.
   const orderLines = (body.items || []).map((item) => ({ ...item, price: Number(item.priceCents) / 100 }));

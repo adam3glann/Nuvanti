@@ -87,7 +87,7 @@ function renderForm(product, cats, cols) {
           <div class="card-head"><h2>Variants</h2></div>
           <div class="table-wrap">
             <table class="admin-table variant-table">
-              <thead><tr><th>Color</th><th>Size</th><th>SKU</th><th>Stock</th></tr></thead>
+              <thead><tr><th>Color</th><th>Size</th><th>SKU</th><th>Stock left</th></tr></thead>
               <tbody id="variantBody"></tbody>
             </table>
           </div>
@@ -319,9 +319,9 @@ function renderVariants(product) {
     <tr>
       <td>${r.color}</td><td>${r.size}</td>
       <td class="mono">${r.sku}</td>
-      <td><input type="number" min="0" value="${r.stock}" data-stock-size="${esc(r.size)}" style="width:80px" /></td>
+      <td><div class="variant-stock-control"><input class="variant-stock-input" type="number" min="0" step="1" value="${Math.max(0, Number(r.stock) || 0)}" data-stock-size="${esc(r.size)}" aria-label="Available stock in size ${esc(r.size)}" /><span class="variant-stock-count variant-stock-count--${stockState(r.stock)}" data-stock-label="${esc(r.size)}">${stockLabel(r.stock)}</span></div></td>
     </tr>
-  `).join('') + `<tr><td colspan="3" style="color:var(--a-muted)">Stock is tracked per size — editing one color's row updates that size for all colors.</td></tr>`
+  `).join('') + `<tr><td colspan="4" class="variant-stock-note">Stock is tracked per size and shared across colors. Updating a size changes the count shown for every color in that size.</td></tr>`
     : `<tr><td colspan="4" style="color:var(--a-muted)">No variants yet — add colors and sizes to generate variant rows.</td></tr>`;
 
   // Stock is stored per size (not per color), so keep every row for the
@@ -332,8 +332,23 @@ function renderVariants(product) {
       document.querySelectorAll(`[data-stock-size="${cssEscape(size)}"]`).forEach((other) => {
         if (other !== input) other.value = input.value;
       });
+      const stock = Math.max(0, Number(input.value) || 0);
+      document.querySelectorAll(`[data-stock-label="${cssEscape(size)}"]`).forEach((label) => {
+        label.textContent = stockLabel(stock);
+        label.className = `variant-stock-count variant-stock-count--${stockState(stock)}`;
+      });
     });
   });
+}
+
+function stockState(value) {
+  const stock = Math.max(0, Number(value) || 0);
+  return stock === 0 ? 'out' : stock <= 4 ? 'low' : 'in';
+}
+
+function stockLabel(value) {
+  const stock = Math.max(0, Number(value) || 0);
+  return `${stock} ${stock === 1 ? 'piece' : 'pieces'} left`;
 }
 
 function renderColorPalette(colors, swatches) {

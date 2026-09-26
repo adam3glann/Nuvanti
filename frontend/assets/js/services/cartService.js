@@ -9,6 +9,7 @@ export function configureFreeShippingThreshold(value) {
 }
 
 let listeners = [];
+let latestCatalog = new Map();
 
 function read() {
   try {
@@ -59,9 +60,11 @@ export function getCart() {
 
 export function syncCartWithProducts(products) {
   const catalog = new Map((products || []).filter(Boolean).map((product) => [String(product.id), product]));
+  latestCatalog = catalog;
   const removed = [];
   const adjusted = [];
   let priceChanged = false;
+  const remainingByVariant = new Map();
   const lines = read().flatMap((line) => {
     const product = catalog.get(String(line.productId));
     if (!product) { removed.push(line.name); return []; }
@@ -72,10 +75,15 @@ export function syncCartWithProducts(products) {
     }
     const stock = Number(product.inventory?.[line.size] ?? product.inventory?.['One Size'] ?? 0);
     if (!Number.isFinite(stock) || stock <= 0) { removed.push(line.name); return []; }
-    if (line.quantity > stock) {
+    const variantKey = `${line.productId}__${line.size}`;
+    const remaining = remainingByVariant.has(variantKey) ? remainingByVariant.get(variantKey) : Math.floor(stock);
+    const allowed = Math.min(10, remaining);
+    if (line.quantity > allowed) {
       adjusted.push(line.name);
-      line.quantity = Math.min(10, Math.floor(stock));
+      line.quantity = allowed;
     }
+    remainingByVariant.set(variantKey, remaining - line.quantity);
+    if (line.quantity <= 0) { removed.push(line.name); return []; }
     const nextPrice = Number(product.price);
     if (Number.isFinite(nextPrice) && nextPrice !== line.price) priceChanged = true;
     line.price = Number.isFinite(nextPrice) ? nextPrice : line.price;
@@ -87,6 +95,35 @@ export function syncCartWithProducts(products) {
   return { removed, adjusted, priceChanged };
 }
 
+// Stock is tracked per size (shared across colors). The server remains the
+// source of truth; this helper uses the latest catalog loaded by cart/checkout
+// pages to keep local controls within the current known stock.
+export function variantStockRemaining(product, size) {
+  const productId = String(product?.id || '');
+  const stockProduct = product || latestCatalog.get(productId);
+  const stock = Math.max(0, Math.floor(Number(stockProduct?.inventory?.[size] ?? stockProduct?.inventory?.['One Size'] ?? 0)));
+  const inBag = read().filter((line) => String(line.productId) === productId && line.size === size).reduce((sum, line) => sum + line.quantity, 0);
+  return Math.max(0, stock - inBag);
+}
+
+export function variantStock(productId, size) {
+  const product = latestCatalog.get(String(productId));
+  if (!product) return null;
+  const stock = Number(product.inventory?.[size] ?? product.inventory?.['One Size'] ?? 0);
+  return Number.isFinite(stock) ? Math.max(0, Math.floor(stock)) : 0;
+}
+
+export function canIncreaseQuantity(lineId) {
+  const lines = read();
+  const line = lines.find((item) => item.lineId === lineId);
+  if (!line) return false;
+  const product = latestCatalog.get(String(line.productId));
+  if (!product) return line.quantity < 10;
+  const stock = Math.floor(Number(product.inventory?.[line.size] ?? product.inventory?.['One Size'] ?? 0));
+  const totalInBag = lines.filter((item) => item.productId === line.productId && item.size === line.size).reduce((sum, item) => sum + item.quantity, 0);
+  return line.quantity < 10 && totalInBag < stock;
+}
+
 export function addToCart({ product, size, color, quantity = 1 }) {
   if (!product || !Number.isSafeInteger(Number(product.id)) || Number(product.id) < 1) return read();
   const lines = read();
@@ -94,13 +131,18 @@ export function addToCart({ product, size, color, quantity = 1 }) {
   const safeColor = String(color || 'Default').slice(0, 60);
   const lineId = `${Number(product.id)}__${safeSize}__${safeColor}`;
   const existing = lines.find((l) => l.lineId === lineId);
+  const stock = Math.max(0, Math.floor(Number(product.inventory?.[safeSize] ?? product.inventory?.['One Size'] ?? 0)));
+  const inBagForSize = lines.filter((line) => line.productId === Number(product.id) && line.size === safeSize).reduce((sum, line) => sum + line.quantity, 0);
+  const remaining = Math.max(0, stock - inBagForSize);
+  if (remaining <= 0) return lines;
+  const toAdd = Math.min(10, remaining, Math.max(1, Math.floor(Number(quantity) || 1)));
   if (existing) {
-    existing.quantity = Math.min(10, existing.quantity + Math.max(1, Number(quantity) || 1));
+    existing.quantity = Math.min(10, existing.quantity + toAdd);
   } else {
     lines.push({
       lineId, productId: Number(product.id), slug: product.slug, name: product.name,
-      image: product.images?.[0], price: Number(product.price), size: safeSize, color: safeColor,
-      quantity: Math.min(10, Math.max(1, Math.floor(Number(quantity) || 1))),
+      image: product.colorImages?.[safeColor]?.[0] || product.images?.[0], price: Number(product.price), size: safeSize, color: safeColor,
+      quantity: toAdd,
     });
   }
   const normalized = lines.map(normalizeLine).filter(Boolean);
@@ -113,7 +155,13 @@ export function updateQuantity(lineId, quantity) {
   if (quantity <= 0) {
     lines = lines.filter((l) => l.lineId !== lineId);
   } else {
-    lines = lines.map((l) => (l.lineId === lineId ? { ...l, quantity: Math.min(10, Math.floor(quantity)) } : l));
+    const target = lines.find((line) => line.lineId === lineId);
+    if (!target) return lines;
+    const product = latestCatalog.get(String(target?.productId));
+    const stock = product ? Math.floor(Number(product.inventory?.[target.size] ?? product.inventory?.['One Size'] ?? 0)) : 10;
+    const otherLines = lines.filter((line) => line.lineId !== lineId && line.productId === target?.productId && line.size === target?.size).reduce((sum, line) => sum + line.quantity, 0);
+    const allowed = Math.max(0, Math.min(10, stock - otherLines));
+    lines = lines.flatMap((line) => line.lineId !== lineId ? [line] : allowed > 0 ? [{ ...line, quantity: Math.min(allowed, Math.floor(quantity)) }] : []);
   }
   write(lines);
   return lines;

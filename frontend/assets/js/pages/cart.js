@@ -2,7 +2,7 @@ import { initShell } from '../main.js';
 import { icon } from '../components/icons.js';
 import { formatPrice, escapeHtml } from '../components/productCard.js';
 import { refreshCartDrawer } from '../components/cartDrawer.js';
-import { getCart, updateQuantity, removeFromCart, cartSubtotal, configureFreeShippingThreshold, syncCartWithProducts } from '../services/cartService.js';
+import { getCart, updateQuantity, removeFromCart, cartSubtotal, configureFreeShippingThreshold, syncCartWithProducts, canIncreaseQuantity, variantStock } from '../services/cartService.js';
 import { loadStoreSettings } from '../services/storeSettingsService.js';
 import { fetchProductBySlug } from '../services/productService.js';
 import { checkDiscount, getSavedDiscountCode, saveDiscountCode, clearDiscountCode } from '../services/discountService.js';
@@ -78,6 +78,7 @@ function render() {
           <div>
             <p style="font-weight:600">${escapeHtml(l.name)}</p>
             <p class="text-muted" style="font-size:var(--fs-small);margin-top:.25rem">${escapeHtml(l.color)} · Size ${escapeHtml(l.size)}</p>
+            ${variantStock(l.productId, l.size) === null ? '' : `<p class="text-muted" style="font-size:var(--fs-micro);margin-top:.2rem">${variantStock(l.productId, l.size)} total available in this size</p>`}
           </div>
           <p style="font-weight:600">${formatPrice(l.price * l.quantity)}</p>
         </div>
@@ -85,7 +86,7 @@ function render() {
           <div class="qty-stepper">
             <button data-dec="${escapeHtml(l.lineId)}" aria-label="Decrease quantity">${icon('minus')}</button>
             <span>${Number(l.quantity)}</span>
-            <button data-inc="${escapeHtml(l.lineId)}" aria-label="Increase quantity">${icon('plus')}</button>
+            <button data-inc="${escapeHtml(l.lineId)}" aria-label="Increase quantity" ${canIncreaseQuantity(l.lineId) ? '' : 'disabled'}>${icon('plus')}</button>
           </div>
           <button class="icon-btn" data-remove="${escapeHtml(l.lineId)}" aria-label="Remove item">${icon('trash')}</button>
         </div>

@@ -24,7 +24,7 @@ import {
   isInStock,
 } from "../data/products.js";
 
-import { addToCart } from "../services/cartService.js";
+import { addToCart, variantStockRemaining } from "../services/cartService.js";
 
 import { toggleWishlist, isWishlisted } from "../services/wishlistService.js";
 
@@ -75,7 +75,7 @@ async function init() {
   }
 
   selectedColor = product.colors?.[0] || null;
-  selectedSize = null;
+  selectedSize = product.sizes?.length ? null : 'One Size';
   selectedQuantity = 1;
   galleryIndex = 0;
 
@@ -889,6 +889,7 @@ function renderInfo() {
   `;
 
   bindInfoEvents();
+  updateStockLine();
 }
 
 /* =========================================================
@@ -961,12 +962,15 @@ function bindInfoEvents() {
       selectedQuantity = Math.max(1, selectedQuantity - 1);
 
       quantityValue.textContent = selectedQuantity;
+      updateStockLine();
     });
 
     quantityInc.addEventListener("click", () => {
-      selectedQuantity = Math.min(10, selectedQuantity + 1);
+      const maxQuantity = selectedSize ? Math.min(10, variantStockRemaining(product, selectedSize)) : 10;
+      selectedQuantity = Math.min(maxQuantity, selectedQuantity + 1);
 
       quantityValue.textContent = selectedQuantity;
+      updateStockLine();
     });
   }
 
@@ -1001,6 +1005,8 @@ function bindInfoEvents() {
           quantity: selectedQuantity,
         });
 
+        updateStockLine();
+
         addButton.textContent = "Added ✓";
 
         addButton.classList.add("btn-success");
@@ -1013,6 +1019,8 @@ function bindInfoEvents() {
           addButton.classList.remove("btn-success");
 
           addButton.disabled = false;
+
+          updateStockLine();
 
           openCartDrawer();
         }, 700);
@@ -1208,6 +1216,29 @@ function updateStockLine() {
 
   if (!element) return;
 
+  const remaining = selectedSize ? variantStockRemaining(product, selectedSize) : null;
+  const maxQuantity = selectedSize ? Math.min(10, remaining) : 10;
+  selectedQuantity = Math.max(1, Math.min(selectedQuantity, maxQuantity || 1));
+  const quantityValue = document.getElementById('qtyValue');
+  const quantityInc = document.getElementById('qtyInc');
+  const quantityDec = document.getElementById('qtyDec');
+  const addButton = document.getElementById('addToCartBtn');
+  const buyNowButton = document.getElementById('buyNowBtn');
+  if (quantityValue) quantityValue.textContent = selectedQuantity;
+  if (quantityInc) quantityInc.disabled = !selectedSize || selectedQuantity >= maxQuantity;
+  if (quantityDec) quantityDec.disabled = selectedQuantity <= 1;
+  if (selectedSize && remaining === 0) {
+    if (addButton) addButton.disabled = true;
+    if (buyNowButton) buyNowButton.disabled = true;
+  } else {
+    if (addButton) addButton.disabled = false;
+    if (buyNowButton) buyNowButton.disabled = !isInStock(product);
+  }
+
+  if (!selectedSize && product.sizes?.length) {
+    element.innerHTML = '<span class="stock-dot"></span>Choose a size to see how many are available';
+    return;
+  }
   if (stock === 0) {
     element.innerHTML = `
 
@@ -1215,18 +1246,20 @@ function updateStockLine() {
       Out of stock in this size
 
     `;
-  } else if (stock <= 4) {
+  } else if (remaining === 0) {
+    element.innerHTML = '<span class="stock-dot stock-dot--out"></span>All available pieces of this size are already in your bag';
+  } else if (remaining <= 4) {
     element.innerHTML = `
 
       <span class="stock-dot stock-dot--low"></span>
-      Only ${stock} left in size ${escapeHtml(selectedSize)}
+      Only ${remaining} left in size ${escapeHtml(selectedSize)}
 
     `;
   } else {
     element.innerHTML = `
 
       <span class="stock-dot"></span>
-      In stock — ships within 2 business days
+      ${remaining} available in size ${escapeHtml(selectedSize)} — ships within 2 business days
 
     `;
   }
