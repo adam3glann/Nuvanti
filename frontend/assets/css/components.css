@@ -2114,6 +2114,37 @@
 
 .product-card.reveal, .category-card.reveal { transition-delay: calc(var(--card-order, 0) * 45ms); }
 
+/* Keep slide changes cinematic but cheap: animate only opacity and transforms. */
+.hero-slide {
+  transform: translate3d(1.25rem, 0, 0) scale(.99);
+  transition: opacity 850ms cubic-bezier(.22, .61, .36, 1),
+    transform 850ms cubic-bezier(.22, .61, .36, 1),
+    visibility 850ms;
+}
+.hero-slide[data-active="true"] {
+  transform: translate3d(0, 0, 0) scale(1);
+}
+.hero-slider[data-direction="next"] .hero-slide:not([data-active="true"]) {
+  transform: translate3d(-1.25rem, 0, 0) scale(.99);
+}
+.hero-slider[data-direction="previous"] .hero-slide:not([data-active="true"]) {
+  transform: translate3d(1.25rem, 0, 0) scale(.99);
+}
+.hero-slider[data-direction="next"] .hero-slide[data-active="true"] .hero-slide__img {
+  animation: hero-image-from-right 900ms cubic-bezier(.2, .7, .2, 1) both;
+}
+.hero-slider[data-direction="previous"] .hero-slide[data-active="true"] .hero-slide__img {
+  animation: hero-image-from-left 900ms cubic-bezier(.2, .7, .2, 1) both;
+}
+@keyframes hero-image-from-right {
+  from { transform: translate3d(2.2%, 0, 0) scale(1.045); }
+  to { transform: translate3d(0, 0, 0) scale(1); }
+}
+@keyframes hero-image-from-left {
+  from { transform: translate3d(-2.2%, 0, 0) scale(1.045); }
+  to { transform: translate3d(0, 0, 0) scale(1); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hero-slide,
   .hero-slide__img,

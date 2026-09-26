@@ -98,11 +98,15 @@ function initHeroSlider() {
   const dots = [...slider.querySelectorAll('.hero-dot')];
   if (slides.length < 2) return;
 
+  const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
   let current = 0;
   let timer;
 
-  function goTo(index) {
-    current = (index + slides.length) % slides.length;
+  function goTo(index, direction) {
+    const nextIndex = (index + slides.length) % slides.length;
+    if (nextIndex === current) return;
+    slider.dataset.direction = direction || (nextIndex > current ? 'next' : 'previous');
+    current = nextIndex;
     slides.forEach((slide, i) => {
       const active = i === current;
       slide.dataset.active = String(active);
@@ -114,12 +118,12 @@ function initHeroSlider() {
       dot.setAttribute('aria-pressed', String(active));
     });
   }
-  function next() { goTo(current + 1); }
-  function prev() { goTo(current - 1); }
+  function next() { goTo(current + 1, 'next'); }
+  function prev() { goTo(current - 1, 'previous'); }
   function stopAutoplay() { clearTimeout(timer); }
   function startAutoplay() {
     stopAutoplay();
-    if (document.hidden) return;
+    if (document.hidden || motionPreference.matches || slider.matches(':hover') || slider.contains(document.activeElement)) return;
     const durationMs = Math.min(30, Math.max(3, Number(slides[current].dataset.duration) || 5)) * 1000;
     timer = setTimeout(() => {
       next();
@@ -135,6 +139,13 @@ function initHeroSlider() {
   document.getElementById('heroPrev').addEventListener('click', () => manualGo(prev));
   dots.forEach((dot) => dot.addEventListener('click', () => manualGo(() => goTo(Number(dot.dataset.goto)))));
   document.addEventListener('visibilitychange', startAutoplay);
+  motionPreference.addEventListener?.('change', startAutoplay);
+  slider.addEventListener('mouseenter', stopAutoplay);
+  slider.addEventListener('mouseleave', startAutoplay);
+  slider.addEventListener('focusin', stopAutoplay);
+  slider.addEventListener('focusout', (event) => {
+    if (!slider.contains(event.relatedTarget)) startAutoplay();
+  });
 
   slider.setAttribute('tabindex', '0');
   slider.addEventListener('keydown', (event) => {
