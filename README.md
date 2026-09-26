@@ -68,11 +68,13 @@ The live visitor count is an approximate count of active browser sessions: multi
 | Area | Technologies |
 | --- | --- |
 | Storefront and admin UI | HTML, CSS, JavaScript ES modules |
-| API and protected admin gateway | Node.js, Express |
-| Database | PostgreSQL, `pg`, SQL migrations |
-| Input validation and security | Zod, Helmet, rate limits, signed HTTP-only cookies, role and permission checks |
-| Production hosting | Cloudflare Pages, Railway, Supabase |
-| Optional providers | Paymob, Cloudinary, SMTP/Resend |
+| Runtime and API | Node.js 20+ (Railway currently runs Node 24), Express 4 |
+| Database | PostgreSQL, `pg` (node-postgres), versioned SQL migrations, TLS certificate verification in production |
+| Authentication | bcrypt-compatible `bcryptjs` (work factor 12), signed JWT sessions stored/revoked in PostgreSQL, HTTP-only cookies with `Secure` in production and `SameSite=Lax` |
+| Admin identity and access | TOTP authenticator MFA with one-time recovery codes (optional per staff account), server-side RBAC and per-action permissions |
+| API protections | Zod validation, Helmet security headers and CSP, allowlisted CORS, Origin validation as a CSRF defense, request-size limits and rate limiting |
+| Production hosting | Cloudflare Pages and Functions, Railway, Supabase PostgreSQL |
+| Optional providers | Paymob hosted checkout with signed server-side callback verification, Cloudinary, SMTP/Resend |
 
 ## Run locally
 
@@ -101,7 +103,7 @@ ADMIN_APP_URL=http://localhost:4001
 API_PUBLIC_URL=http://localhost:4000
 ```
 
-The values above are for local development only. Use unique production secrets and HTTPS origins in Railway.
+These are placeholders for local development, not usable credentials. Replace each placeholder with your own local-only value; never commit a real password or secret. Production secrets belong in Railway Variables and production origins must use HTTPS.
 
 ### 2. Install, migrate, and initialize
 
