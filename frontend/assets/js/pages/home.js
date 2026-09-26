@@ -96,16 +96,6 @@ function initHeroSlider() {
   const slider = document.getElementById('heroSlider');
   const slides = [...slider.querySelectorAll('.hero-slide')];
   const dots = [...slider.querySelectorAll('.hero-dot')];
-  slides.forEach((slide) => {
-    const image = slide.querySelector('.hero-slide__img');
-    const setImageShape = () => {
-      if (image.naturalWidth && image.naturalHeight) {
-        slide.dataset.imageShape = image.naturalWidth / image.naturalHeight < 1.2 ? 'portrait' : 'landscape';
-      }
-    };
-    image.addEventListener('load', setImageShape, { once: true });
-    setImageShape();
-  });
   if (slides.length < 2) return;
 
   const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
