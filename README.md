@@ -93,8 +93,8 @@ cp backend/.env.example backend/.env
 Edit `backend/.env` and set at least:
 
 ```env
-DATABASE_URL=postgresql://nuvanti:your-local-password@localhost:5432/nuvanti
-JWT_SECRET=replace-this-with-a-unique-secret-of-at-least-32-characters
+DATABASE_URL=postgresql://<local-user>:<local-password>@localhost:5432/<database>
+JWT_SECRET=<unique-local-secret>
 STORE_ORIGIN=http://localhost:8080
 ADMIN_ORIGIN=http://localhost:4001
 ADMIN_APP_URL=http://localhost:4001
@@ -110,10 +110,9 @@ cd backend
 npm ci
 npm run migrate
 npm run seed:catalog
-npm run seed:admin -- owner@example.com "choose-a-private-password-of-12-or-more-characters" "Store Owner"
 ```
 
-`seed:catalog` imports the starter catalog. Run it only when you intend to seed or refresh the local catalog. `seed:admin` creates or resets the specified super-admin account, so use it only with a local development database.
+`seed:catalog` imports the starter catalog. Run it only when you intend to seed or refresh the local catalog. Administrator provisioning instructions and credentials are intentionally omitted from this public README; use the private owner setup process. Never put an administrator password in a command, README, source file, screenshot, or Git history.
 
 ### 3. Start the backend
 
@@ -169,11 +168,11 @@ For the full security model and operational boundaries, see [backend/README.md](
 
 ### Administrator access handoff
 
-Treat administrator credentials as private secrets. **Do not give a client your own super-admin login or reuse one password for multiple people.** Create a separate named account for each client or staff member in **Admin Users**, and grant only the role they need. New accounts should be activated through the one-time setup email. Require authenticator MFA for every staff account and store recovery codes somewhere private.
+Treat administrator credentials as private secrets. **Do not give a client your own super-admin login or reuse one password for multiple people.** Provision a separate named account for each client or staff member through the protected admin process and grant only the role they need. Require authenticator MFA for every staff account and store recovery codes somewhere private.
 
-If a temporary password is unavoidable, generate a unique one, deliver it through a password manager or another private channel, and have the recipient change it immediately. Never put a real password in this README, a Git commit, a source file, a screenshot, or a support message. Disable former staff accounts and revoke their sessions when access is no longer needed.
+Never put a real password in this README, a Git commit, a source file, a screenshot, or a support message. Disable former staff accounts and revoke their sessions when access is no longer needed.
 
-After the first production administrator is created, remove `NUVANTI_BOOTSTRAP_ADMIN_EMAIL`, `NUVANTI_BOOTSTRAP_ADMIN_PASSWORD`, and `NUVANTI_BOOTSTRAP_ADMIN_NAME` from Railway. Keep production credentials in Railway Variables or the relevant provider’s secret manager; `.env.example` is only a template. If a password, API key, database URL, MFA key, or SSH private key is exposed, replace/revoke it at its provider immediately. Removing it from the latest commit does not remove it from Git history.
+After the first production administrator is created, remove all one-time administrator bootstrap variables from Railway. Keep production credentials in Railway Variables or the relevant provider’s secret manager; `.env.example` is only a template. If a password, API key, database URL, MFA key, or SSH private key is exposed, replace/revoke it at its provider immediately. Removing it from the latest commit does not remove it from Git history.
 
 Security controls reduce risk but cannot guarantee that a site is impossible to compromise. Keep dependencies and the runtime updated, use individual staff accounts and MFA, review audit logs, and follow the deployment checklist before accepting real orders.
 

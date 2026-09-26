@@ -13,11 +13,12 @@ cd backend
 npm install
 npm run migrate
 npm run seed:catalog
-npm run seed:admin -- owner@example.com use-a-long-unique-password "Owner Name"
 npm start
 ```
 
 Public API: `http://localhost:4000` · protected admin: `http://localhost:4001/login.html`.
+
+Administrator provisioning and password setup instructions are intentionally not included in this public guide. Use the private owner setup process; never place administrator credentials in shell commands, documentation, screenshots, or Git.
 
 ## Live catalog connection
 
@@ -39,13 +40,9 @@ Find them in Cloudinary's Dashboard → API Keys. Keep the API secret in `.env` 
 
 There are five roles: `customer`, and four staff-tier roles — `staff`, `manager`, `admin`, `super_admin` — each with a fixed set of permissions enforced in `backend/lib/permissions.js` (mirrored in the admin UI's `components/permissions.js` for hiding controls, but the backend check is the real boundary). Only a `super_admin` can create, disable, or delete other administrator accounts, and the backend refuses to let the last active `super_admin` be disabled or deleted.
 
-## Adding administrators
+## Account recovery
 
-There is no "set a password for someone else" flow. From **Admin Users** (super_admin only), creating an account emails the person a setup link — the account starts with an unusable random password and can only be activated by setting a real one through that link (same delivery path as the password-reset email below; in development without SMTP configured, the link is printed to the backend terminal instead).
-
-## Reset a password (any account)
-
-Both the storefront (**My Account → Forgot password**) and the admin login page have a complete **Forgot password** flow. Either accepts an email, sends a one-time link (customers land back on the store, staff-tier accounts land on the admin login page), then lets the user choose a new password. Links expire after 30 minutes and are invalidated after use. Signed-in staff-tier users can also change their own password directly from **Security** without going through email.
+Account recovery is handled through the relevant sign-in page. Do not publish recovery tokens, passwords, or private administrator onboarding details. Each staff member should use their own account, and MFA should be enabled for every staff account.
 
 ## Order confirmations & tracking
 

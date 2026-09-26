@@ -33,9 +33,6 @@ or paste them into chat.
 | `ADMIN_ORIGIN` | Optional; otherwise derived from Railway's public domain after it is generated |
 | `ADMIN_APP_URL` | Optional; defaults to `ADMIN_ORIGIN` |
 | `API_PUBLIC_URL` | Optional; defaults to Railway's public domain when available |
-| `NUVANTI_BOOTSTRAP_ADMIN_EMAIL` | Your administrator email |
-| `NUVANTI_BOOTSTRAP_ADMIN_PASSWORD` | A private password of at least 12 characters |
-| `NUVANTI_BOOTSTRAP_ADMIN_NAME` | Your administrator display name |
 | `MFA_ENCRYPTION_KEY` | Unique random value of at least 32 characters. Set before enrolling staff and never rotate after enrollment. |
 | `SMTP_HOST` | `smtp.gmail.com` |
 | `SMTP_PORT` | `465` |
@@ -52,7 +49,7 @@ or paste them into chat.
 | `PAYMOB_PAYMENT_METHODS` | Optional; comma-separated integration IDs matching the same Paymob test/live mode |
 | `PAYMOB_HMAC_SECRET` | Optional; Paymob callback signature secret |
 
-After the initial administrator exists and the initial catalog is initialized, remove `NUVANTI_BOOTSTRAP_ADMIN_EMAIL`, `NUVANTI_BOOTSTRAP_ADMIN_PASSWORD`, and `NUVANTI_BOOTSTRAP_ADMIN_NAME` from Railway. The bootstrap command leaves the existing catalog and active super-admin unchanged on subsequent deploys.
+Initial administrator provisioning uses one-time private Railway variables only when no active super administrator exists. Follow the private owner setup process for their names and values. Remove all bootstrap variables from Railway as soon as initial setup is complete. The bootstrap command leaves the existing catalog and active super-admin unchanged on subsequent deploys.
 
 In Cloudflare Pages, set the project root to `frontend/`. The proxy defaults to `https://nuvanti-production.up.railway.app`; if the Railway domain changes, set the Pages environment variable `NUVANTI_API_ORIGIN` to the new HTTPS origin and redeploy Pages. In Railway, set `STORE_ORIGIN` to the exact storefront origin and leave `COOKIE_DOMAIN` blank. The storefront uses same-origin API requests so session cookies remain first-party on phones.
 
