@@ -6,12 +6,16 @@ import { confirmDialog } from '../components/confirmDialog.js';
 import { hasPermission } from '../components/permissions.js';
 import { fetchAdminCustomer, toggleCustomerStatus } from '../services/customerService.js';
 
-const session = initAdminShell({ page: 'customers', title: 'Customer Details' });
-if (session) init();
 const id = new URLSearchParams(location.search).get('id');
+const session = initAdminShell({ page: 'customers', title: 'Customer Details' });
 const canDisable = session && hasPermission(session.role, 'customers.disable');
+if (session) init();
 
 async function init() {
+  if (!id) {
+    document.getElementById('custRoot').innerHTML = '<div class="admin-empty"><h3>No customer selected</h3><p>Return to the customer list and open a customer again.</p><a href="customers.html" class="btn btn-primary">Back to Customers</a></div>';
+    return;
+  }
   try {
     const customer = await fetchAdminCustomer(id);
     if (!customer) {

@@ -14,7 +14,13 @@ const MANAGEABLE_ROLES = ['staff', 'manager', 'admin', 'super_admin'];
 const productFields = z.object({ slug: z.string().regex(/^[a-z0-9-]+$/).max(160), name: z.string().min(2).max(160), description: z.string().max(5000).optional(), price: z.coerce.number().min(0).max(21474836.47).optional(), priceCents: z.coerce.number().int().min(0).max(2147483647).optional(), cost: z.number().min(0).max(21474836.47).nullable().optional(), category: z.string().min(1).max(80), collection: z.string().max(80).nullable().optional(), images: z.array(z.string()).max(12).optional(), colors: z.array(z.string().max(40)).max(20).optional(), colorSwatches: z.record(z.string().max(40), z.string().regex(/^#[0-9a-fA-F]{6}$/)).optional(), sizes: z.array(z.string().max(20)).max(20).optional(), inventory: z.union([z.coerce.number().int().min(0), z.record(z.coerce.number().int().min(0))]).optional(), status: z.enum(['active', 'draft']).optional(), isActive: z.boolean().optional(), badges: z.array(z.string().max(30)).optional(), featured: z.boolean().optional(), bestseller: z.boolean().optional(), newArrival: z.boolean().optional(), sku: z.string().max(100).optional(), compareAtPrice: z.coerce.number().min(0).max(21474836.47).nullable().optional() });
 const productInput = productFields.refine((value) => value.price !== undefined || value.priceCents !== undefined, { message: 'Price is required.' });
 const columns = 'id, slug, name, description, price_cents, category, collection, images, colors, sizes, inventory, is_active, metadata';
-const categoryInput = z.object({ name: z.string().min(2).max(80), slug: z.string().regex(/^[a-z0-9-]+$/).max(80), description: z.string().max(1000).optional() });
+const categoryImage = z.string().trim().max(1000).refine((value) => {
+  if (/^https:\/\//i.test(value)) {
+    try { return new URL(value).protocol === 'https:'; } catch { return false; }
+  }
+  return /^\/?assets\/[\w./-]+(?:\?[\w%=&.-]*)?$/.test(value) && !value.includes('..');
+}, 'Use an HTTPS image URL or an image path under assets.');
+const categoryInput = z.object({ name: z.string().trim().min(2).max(80), slug: z.string().trim().regex(/^[a-z0-9-]+$/).max(80), description: z.string().max(1000).optional(), imageUrl: categoryImage.nullable().optional() });
 const collectionInput = z.object({ name: z.string().min(2).max(80), slug: z.string().regex(/^[a-z0-9-]+$/).max(80) });
 const slideAsset = z.string().trim().min(1).max(1000).refine((value) => {
   if (/^https:\/\//i.test(value)) {
@@ -260,9 +266,42 @@ router.patch('/orders/:id', requirePermission('orders.edit'), async (req, res) =
       .catch((error) => console.error('Order status email failed:', error));
   }
 });
-router.get('/categories', requirePermission('products.view'), async (req, res) => { const { rows } = await query(`SELECT c.id::text, c.name, c.slug, c.description, c.is_active AS "isActive", count(p.id)::int AS "productCount" FROM categories c LEFT JOIN products p ON p.category = c.slug GROUP BY c.id ORDER BY c.name`); res.json(rows.map((c) => ({ ...c, status: c.isActive ? 'active' : 'disabled' }))); });
-router.post('/categories', requirePermission('products.create'), async (req, res) => { const c = categoryInput.parse(req.body); const { rows } = await query('INSERT INTO categories (name, slug, description) VALUES ($1, $2, $3) RETURNING id::text, name, slug, description, is_active AS "isActive"', [c.name, c.slug, c.description || '']); await logAudit({ req, action: 'category.created', targetType: 'category', targetId: rows[0].id, metadata: { name: c.name, slug: c.slug } }); res.status(201).json({ ...rows[0], productCount: 0, status: 'active' }); });
-router.patch('/categories/:id', requirePermission('products.edit'), async (req, res) => { const isActive = z.boolean().parse(req.body?.isActive); const { rows } = await query('UPDATE categories SET is_active = $1 WHERE id = $2 RETURNING id::text, is_active AS "isActive"', [isActive, req.params.id]); if (!rows[0]) return res.status(404).json({ error: 'Category not found.' }); res.json(rows[0]); });
+router.get('/categories', requirePermission('products.view'), async (req, res) => { const { rows } = await query(`SELECT c.id::text, c.name, c.slug, c.description, c.image_url AS "imageUrl", c.is_active AS "isActive", count(p.id)::int AS "productCount" FROM categories c LEFT JOIN products p ON p.category = c.slug GROUP BY c.id ORDER BY c.name`); res.json(rows.map((c) => ({ ...c, status: c.isActive ? 'active' : 'disabled' }))); });
+router.post('/categories', requirePermission('products.create'), async (req, res) => {
+  const c = categoryInput.parse(req.body);
+  try {
+    const { rows } = await query('INSERT INTO categories (name, slug, description, image_url) VALUES ($1, $2, $3, $4) RETURNING id::text, name, slug, description, image_url AS "imageUrl", is_active AS "isActive"', [c.name, c.slug, c.description || '', c.imageUrl || null]);
+    await logAudit({ req, action: 'category.created', targetType: 'category', targetId: rows[0].id, metadata: { name: c.name, slug: c.slug, hasImage: Boolean(c.imageUrl) } });
+    res.status(201).json({ ...rows[0], productCount: 0, status: 'active' });
+  } catch (error) {
+    if (error.code === '23505') return res.status(409).json({ error: 'A category with that slug already exists.' });
+    throw error;
+  }
+});
+router.patch('/categories/:id', requirePermission('products.edit'), async (req, res) => {
+  const patch = categoryInput.partial().extend({ isActive: z.boolean().optional() }).parse(req.body);
+  if (patch.slug !== undefined) {
+    const current = await query('SELECT slug FROM categories WHERE id = $1', [req.params.id]);
+    if (!current.rows[0]) return res.status(404).json({ error: 'Category not found.' });
+    if (patch.slug !== current.rows[0].slug) return res.status(400).json({ error: 'A category slug cannot be changed because products are linked to it.' });
+  }
+  const columns = { name: 'name', slug: 'slug', description: 'description', imageUrl: 'image_url', isActive: 'is_active' };
+  const values = [];
+  const assignments = [];
+  for (const [key, column] of Object.entries(columns)) {
+    if (patch[key] !== undefined) {
+      values.push(patch[key]);
+      assignments.push(`${column} = $${values.length}`);
+    }
+  }
+  if (!assignments.length) return res.status(400).json({ error: 'Provide a category field to update.' });
+  values.push(req.params.id);
+  const { rows } = await query(`UPDATE categories SET ${assignments.join(', ')} WHERE id = $${values.length}
+    RETURNING id::text, name, slug, description, image_url AS "imageUrl", is_active AS "isActive"`, values);
+  if (!rows[0]) return res.status(404).json({ error: 'Category not found.' });
+  await logAudit({ req, action: 'category.updated', targetType: 'category', targetId: rows[0].id, metadata: { name: rows[0].name, hasImage: Boolean(rows[0].imageUrl) } });
+  res.json({ ...rows[0], status: rows[0].isActive ? 'active' : 'disabled' });
+});
 router.delete('/categories/:id', requirePermission('products.delete'), async (req, res) => { const result = await query('DELETE FROM categories WHERE id = $1', [req.params.id]); if (!result.rowCount) return res.status(404).json({ error: 'Category not found.' }); await logAudit({ req, action: 'category.deleted', targetType: 'category', targetId: req.params.id }); res.status(204).end(); });
 router.get('/collections', requirePermission('products.view'), async (req, res) => { const { rows } = await query(`SELECT c.id::text, c.name, c.slug, c.is_active AS "isActive", count(p.id)::int AS "productCount" FROM collections c LEFT JOIN products p ON p.collection = c.slug GROUP BY c.id ORDER BY c.name`); res.json(rows.map((c) => ({ ...c, status: c.isActive ? 'published' : 'draft' }))); });
 router.post('/collections', requirePermission('products.create'), async (req, res) => { const c = collectionInput.parse(req.body); const { rows } = await query('INSERT INTO collections (name, slug) VALUES ($1, $2) RETURNING id::text, name, slug, is_active AS "isActive"', [c.name, c.slug]); await logAudit({ req, action: 'collection.created', targetType: 'collection', targetId: rows[0].id, metadata: { name: c.name, slug: c.slug } }); res.status(201).json({ ...rows[0], productCount: 0, status: 'published' }); });

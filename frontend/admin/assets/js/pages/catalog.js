@@ -4,8 +4,9 @@ import { icon } from '../components/icons.js';
 import { showAdminToast } from '../components/toast.js';
 import { confirmDialog } from '../components/confirmDialog.js';
 import { createAdminModal } from '../components/modal.js';
+import { escapeHtml, storeAssetSrc } from '../components/utils.js';
 import {
-  fetchCategories, toggleCategoryStatus, deleteCategory, createCategory,
+  fetchCategories, toggleCategoryStatus, deleteCategory, createCategory, editCategory, uploadCategoryImage,
   fetchCollections, toggleCollectionStatus, deleteCollection, createCollection,
 } from '../services/categoryService.js';
 
@@ -27,7 +28,7 @@ if (session) init();
 
 function init() {
   renderTabs();
-  document.getElementById('newBtn').addEventListener('click', () => (tab === 'categories' ? openNewCategory() : openNewCollection()));
+  document.getElementById('newBtn').addEventListener('click', () => (tab === 'categories' ? openCategoryEditor() : openNewCollection()));
   render();
 }
 
@@ -52,21 +53,23 @@ async function render() {
   try {
     await renderTable(body, headRow);
   } catch (error) {
-    body.innerHTML = `<tr><td colspan="5"><div class="admin-empty"><h3>Couldn't load this data</h3><p>${error.message}</p></div></td></tr>`;
+    body.innerHTML = `<tr><td colspan="${tab === 'categories' ? 6 : 5}"><div class="admin-empty"><h3>Couldn't load this data</h3><p>${escapeHtml(error.message)}</p></div></td></tr>`;
   }
 }
 
 async function renderTable(body, headRow) {
   if (tab === 'categories') {
-    headRow.innerHTML = '<th>Name</th><th>Slug</th><th>Products</th><th>Status</th><th></th>';
+    headRow.innerHTML = '<th>Cover</th><th>Name</th><th>Slug</th><th>Products</th><th>Status</th><th></th>';
     const cats = await fetchCategories();
     body.innerHTML = cats.map((c) => `
       <tr>
-        <td style="font-weight:600">${c.name}</td>
-        <td class="mono">${c.slug}</td>
+        <td>${c.imageUrl ? `<img src="${escapeHtml(storeAssetSrc(c.imageUrl))}" alt="" width="48" height="48" style="object-fit:cover;border-radius:6px" />` : '<span style="color:var(--a-muted)">No cover</span>'}</td>
+        <td style="font-weight:600">${escapeHtml(c.name)}</td>
+        <td class="mono">${escapeHtml(c.slug)}</td>
         <td>${c.productCount}</td>
         <td>${statusBadge(c.status === 'active' ? 'active' : 'disabled')}</td>
         <td style="text-align:right">
+          <button class="btn btn-outline btn-sm" data-edit="${escapeHtml(c.id)}">Edit</button>
           <button class="btn btn-outline btn-sm" data-toggle="${c.id}">${c.status === 'active' ? 'Disable' : 'Enable'}</button>
           <button class="icon-btn" data-delete="${c.id}" aria-label="Delete">${icon('trash')}</button>
         </td>
@@ -91,6 +94,13 @@ async function renderTable(body, headRow) {
 }
 
 function bindRows(kind) {
+  if (kind === 'category') document.querySelectorAll('[data-edit]').forEach((btn) => btn.addEventListener('click', async () => {
+    try {
+      const category = (await fetchCategories()).find((item) => item.id === btn.dataset.edit);
+      if (!category) return showAdminToast('Category not found. Refresh the page and try again.', 'error');
+      openCategoryEditor(category);
+    } catch (error) { showAdminToast(error.message, 'error'); }
+  }));
   document.querySelectorAll('[data-toggle]').forEach((btn) => btn.addEventListener('click', async () => {
     try {
       kind === 'category' ? await toggleCategoryStatus(btn.dataset.toggle) : await toggleCollectionStatus(btn.dataset.toggle);
@@ -108,27 +118,55 @@ function bindRows(kind) {
   }));
 }
 
-function openNewCategory() {
+function openCategoryEditor(category = null) {
+  const editing = Boolean(category);
   const modal = createAdminModal({
-    title: 'New Category',
+    title: editing ? 'Edit Category' : 'New Category',
     bodyHTML: `
-      <div class="field"><label>Name</label><input id="mName" /></div>
-      <div class="field"><label>Slug</label><input id="mSlug" /></div>
-      <div class="field"><label>Description</label><textarea id="mDesc" rows="3"></textarea></div>
+      <div class="field"><label for="mName">Name</label><input id="mName" maxlength="80" value="${escapeHtml(category?.name || '')}" /></div>
+      <div class="field"><label for="mSlug">Slug</label><input id="mSlug" maxlength="80" value="${escapeHtml(category?.slug || '')}" ${editing ? 'readonly' : ''} /></div>
+      <div class="field"><label for="mDesc">Description</label><textarea id="mDesc" rows="3" maxlength="1000">${escapeHtml(category?.description || '')}</textarea></div>
+      <div class="field"><label for="mCoverFile">Cover photo</label><input id="mCoverFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" /><span class="hint">JPEG, PNG, WebP, or GIF up to 5 MB. Uploaded securely to Cloudinary.</span></div>
+      <div class="field"><label for="mImageUrl">Image URL</label><input id="mImageUrl" type="url" maxlength="1000" placeholder="Upload a cover or paste an HTTPS image URL" value="${escapeHtml(category?.imageUrl || '')}" /></div>
+      <img id="mCoverPreview" src="${category?.imageUrl ? escapeHtml(storeAssetSrc(category.imageUrl)) : ''}" alt="Cover preview" ${category?.imageUrl ? '' : 'hidden'} style="max-width:100%;max-height:220px;object-fit:cover;border-radius:8px" />
     `,
-    footHTML: `<button class="btn btn-outline" id="mCancel">Cancel</button><button class="btn btn-primary" id="mSave">Create</button>`,
+    footHTML: `<button class="btn btn-outline" id="mCancel">Cancel</button><button class="btn btn-primary" id="mSave">${editing ? 'Save Changes' : 'Create Category'}</button>`,
   });
   modal.root.querySelector('#mCancel').addEventListener('click', modal.close);
+  const imageUrl = modal.root.querySelector('#mImageUrl');
+  const preview = modal.root.querySelector('#mCoverPreview');
+  const fileInput = modal.root.querySelector('#mCoverFile');
+  const saveButton = modal.root.querySelector('#mSave');
+  const previewImage = (url) => {
+    const value = url.trim();
+    preview.hidden = !value;
+    preview.src = value ? storeAssetSrc(value) : '';
+  };
+  imageUrl.addEventListener('input', () => previewImage(imageUrl.value));
+  fileInput.addEventListener('change', async () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    saveButton.disabled = true;
+    try {
+      const uploaded = await uploadCategoryImage(file);
+      imageUrl.value = uploaded.url;
+      previewImage(uploaded.url);
+      showAdminToast('Category cover uploaded. Save the category to publish it.', 'success');
+    } catch (error) { showAdminToast(error.message, 'error'); }
+    finally { saveButton.disabled = false; }
+  });
   modal.root.querySelector('#mSave').addEventListener('click', async () => {
     const name = modal.root.querySelector('#mName').value.trim();
-    if (!name) return;
+    if (name.length < 2) return showAdminToast('Category name must have at least 2 characters.', 'error');
     const rawSlug = modal.root.querySelector('#mSlug').value.trim();
     const slug = slugify(rawSlug || name);
     if (!slug) return showAdminToast('Enter a name or slug using letters and numbers.', 'error');
     try {
-      await createCategory({ name, slug, description: modal.root.querySelector('#mDesc').value });
+      const data = { name, slug, description: modal.root.querySelector('#mDesc').value.trim(), imageUrl: imageUrl.value.trim() || null };
+      if (editing) await editCategory(category.id, data);
+      else await createCategory(data);
       modal.close();
-      showAdminToast('Category created.', 'success');
+      showAdminToast(editing ? 'Category updated.' : 'Category created.', 'success');
       render();
     } catch (error) { showAdminToast(error.message, 'error'); }
   });

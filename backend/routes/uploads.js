@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import rateLimit from 'express-rate-limit';
-import { uploadProductImage } from '../lib/cloudinary.js';
+import { uploadCategoryImage, uploadProductImage } from '../lib/cloudinary.js';
 
 const router = Router();
 const uploadLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: 'draft-7', legacyHeaders: false });
@@ -18,20 +18,23 @@ function hasSupportedImageSignature(buffer) {
   return buffer.length >= 6 && ['GIF87a', 'GIF89a'].includes(buffer.toString('ascii', 0, 6));
 }
 
-router.post('/product-image', uploadLimiter, (req, res, next) => {
+function parseUploadedImage(req, res, next) {
   upload.single('image')(req, res, (error) => {
     if (!error) return next();
     if (error.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'Images must be 5 MB or smaller.' });
     return res.status(400).json({ error: 'Upload a valid JPEG, PNG, WebP, or GIF image.' });
   });
-}, async (req, res, next) => {
-  try {
-    if (!req.file || !hasSupportedImageSignature(req.file.buffer)) {
-      return res.status(400).json({ error: 'Upload a valid JPEG, PNG, WebP, or GIF image under 5 MB.' });
-    }
-    const image = await uploadProductImage(req.file.buffer);
-    res.status(201).json(image);
-  } catch (error) {
+}
+
+function imageUploadHandler(upload) {
+  return async (req, res) => {
+    try {
+      if (!req.file || !hasSupportedImageSignature(req.file.buffer)) {
+        return res.status(400).json({ error: 'Upload a valid JPEG, PNG, WebP, or GIF image under 5 MB.' });
+      }
+      const image = await upload(req.file.buffer);
+      res.status(201).json(image);
+    } catch (error) {
     // Cloudinary SDK errors otherwise become an unhelpful generic 500. Log
     // provider details server-side (never the API credentials) and return a
     // specific, safe action the admin can take.
@@ -58,7 +61,11 @@ router.post('/product-image', uploadLimiter, (req, res, next) => {
     if (providerStatus === 400) {
       return res.status(400).json({ error: 'Cloudinary rejected this image or its upload settings. Use a JPEG, PNG, WebP, or GIF under 5 MB and check the Cloudinary account settings.' });
     }
-    return res.status(502).json({ error: 'Cloudinary upload failed. Check the Railway backend logs for the provider error.' });
-  }
-});
+      return res.status(502).json({ error: 'Cloudinary upload failed. Check the Railway backend logs for the provider error.' });
+    }
+  };
+}
+
+router.post('/product-image', uploadLimiter, parseUploadedImage, imageUploadHandler(uploadProductImage));
+router.post('/category-image', uploadLimiter, parseUploadedImage, imageUploadHandler(uploadCategoryImage));
 export default router;
