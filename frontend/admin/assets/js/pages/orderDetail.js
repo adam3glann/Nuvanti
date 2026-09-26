@@ -18,7 +18,7 @@ async function init() {
   try {
     order = await fetchAdminOrder(id);
   } catch (error) {
-    document.getElementById('orderRoot').innerHTML = `<div class="admin-empty"><h3>Couldn't load this order</h3><p>${error.message}</p></div>`;
+    document.getElementById('orderRoot').innerHTML = `<div class="admin-empty"><h3>Couldn't load this order</h3><p>${escapeHtml(error.message)}</p></div>`;
     return;
   }
   if (!order) {
@@ -44,7 +44,7 @@ function render(order) {
                 ${order.items.map((it) => `
                   <tr>
                     <td><div style="display:flex;align-items:center;gap:.6rem"><img src="${storeAssetSrc(it.image)}" width="34" height="42" style="object-fit:cover;border-radius:3px" alt="" /><span>${escapeHtml(it.name)}</span></div></td>
-                    <td>${[it.color, it.size].filter(Boolean).join(' / ') || '—'}</td><td>${it.quantity}</td>
+                    <td>${[it.color, it.size].filter(Boolean).map(escapeHtml).join(' / ') || '—'}</td><td>${it.quantity}</td>
                     <td>${formatPrice(it.price)}</td><td>${formatPrice(it.price * it.quantity)}</td>
                   </tr>`).join('')}
               </tbody>

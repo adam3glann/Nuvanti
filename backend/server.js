@@ -22,6 +22,7 @@ import { errorHandler, notFound, sameOrigin } from "./middleware/security.js";
 import { query } from "./lib/db.js";
 import { emailDeliveryStatus } from "./lib/mail.js";
 import { hasPermission } from "./lib/permissions.js";
+import { expireAbandonedPaymobOrders } from './lib/orderLifecycle.js';
 
 const app = express();
 const STAFF_ROLES = ["staff", "manager", "admin", "super_admin"];
@@ -294,6 +295,13 @@ adminApp.use((err, req, res, next) =>
 if (trustProxy) adminApp.set("trust proxy", trustProxy);
 
 await query("SELECT 1");
+if (isProduction) {
+  const sweepExpiredPaymobOrders = () => expireAbandonedPaymobOrders()
+    .catch((error) => console.error('Unable to release expired unpaid Paymob orders:', error));
+  const paymobExpiryTimer = setInterval(sweepExpiredPaymobOrders, 60 * 1000);
+  paymobExpiryTimer.unref();
+  sweepExpiredPaymobOrders();
+}
 if (process.env.NODE_ENV === "production") {
   // Railway exposes one service port for both the API and protected admin.
   // The storefront is hosted separately; every non-API request to this

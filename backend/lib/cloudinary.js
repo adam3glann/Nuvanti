@@ -10,11 +10,12 @@ function uploadImage(buffer, folder) {
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream({ folder, resource_type: 'image', transformation: [{ quality: 'auto', fetch_format: 'auto' }] }, (error, result) => {
       if (error) {
-        console.error('[cloudinary] Upload failed. Full error object:', error);
-        console.error('[cloudinary] Config in use — cloud_name:', process.env.CLOUDINARY_CLOUD_NAME, '| api_key set:', Boolean(process.env.CLOUDINARY_API_KEY), '| api_secret set:', Boolean(process.env.CLOUDINARY_API_SECRET));
-        if (error.http_code === 403 || error.http_code === 401) {
-          console.error('[cloudinary] Received an auth-related status code from Cloudinary. Verify that CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET are correct and match the same Cloudinary account, and that the API key has not been disabled or regenerated.');
-        }
+        console.error('[cloudinary] Upload failed:', {
+          name: error?.name,
+          code: error?.code,
+          httpCode: error?.http_code,
+          message: String(error?.message || 'Unknown upload error').slice(0, 300),
+        });
         reject(error);
         return;
       }

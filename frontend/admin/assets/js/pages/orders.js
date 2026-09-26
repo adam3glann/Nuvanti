@@ -27,7 +27,7 @@ async function load() {
   try {
     ({ items, total } = await fetchAdminOrders(state));
   } catch (error) {
-    tbody.innerHTML = `<tr><td colspan="7"><div class="admin-empty"><h3>Couldn't load orders</h3><p>${error.message}</p></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7"><div class="admin-empty"><h3>Couldn't load orders</h3><p>${escapeHtml(error.message)}</p></div></td></tr>`;
     return;
   }
 

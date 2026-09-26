@@ -8,6 +8,7 @@ import { emailDeliveryStatus, sendOrderConfirmation } from '../lib/mail.js';
 import { sendOrderWhatsApp } from '../lib/whatsapp.js';
 import { storePublicOrigin } from '../lib/publicOrigins.js';
 import { createPaymobCheckout, paymobReady } from '../lib/paymob.js';
+import { restoreOrderInventory } from '../lib/orderLifecycle.js';
 
 const router = Router();
 const asyncRoute = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
@@ -182,18 +183,7 @@ async function cancelUnpaidOrder(orderId) {
     const { rows: orderRows } = await client.query('SELECT id, status, discount_code FROM orders WHERE id = $1 FOR UPDATE', [orderId]);
     const order = orderRows[0];
     if (!order || order.status !== 'pending') return;
-    const { rows: items } = await client.query(`SELECT product_id AS "productId", COALESCE(size, 'One Size') AS size, SUM(quantity)::int AS quantity
-      FROM order_items WHERE order_id = $1 GROUP BY product_id, COALESCE(size, 'One Size')`, [orderId]);
-    for (const item of items) {
-      const { rows: products } = await client.query(`SELECT inventory, CASE WHEN metadata->'inventory' IS NULL OR metadata->'inventory' = '{}'::jsonb
-        THEN jsonb_build_object('One Size', inventory) ELSE metadata->'inventory' END AS "stockBySize" FROM products WHERE id = $1 FOR UPDATE`, [item.productId]);
-      if (!products[0]) continue;
-      const stockBySize = products[0].stockBySize || { 'One Size': products[0].inventory };
-      stockBySize[item.size] = Math.max(0, Number(stockBySize[item.size]) || 0) + item.quantity;
-      const totalStock = Object.values(stockBySize).reduce((sum, value) => sum + Math.max(0, Number(value) || 0), 0);
-      await client.query(`UPDATE products SET inventory = $2, metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{inventory}', $3::jsonb, true), updated_at = NOW() WHERE id = $1`, [item.productId, totalStock, JSON.stringify(stockBySize)]);
-      await client.query(`INSERT INTO inventory_adjustments (product_id, size, change, reason) VALUES ($1, $2, $3, $4)`, [item.productId, item.size, item.quantity, `Payment setup failed for order NV-${orderId}`]);
-    }
+    await restoreOrderInventory(client, order.id, `Payment setup failed for order NV-${orderId}`);
     if (order.discount_code) await client.query('UPDATE discounts SET used_count = GREATEST(0, used_count - 1) WHERE code = $1', [order.discount_code]);
     await client.query("UPDATE orders SET status = 'cancelled', payment_status = 'failed', payment_updated_at = NOW() WHERE id = $1", [orderId]);
   });

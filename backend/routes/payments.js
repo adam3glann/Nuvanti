@@ -5,6 +5,7 @@ import { isConfiguredPaymobIntegration, paymobReady, verifyPaymobCallback } from
 import { requireAuth } from '../lib/auth.js';
 import { sendOrderConfirmation } from '../lib/mail.js';
 import { storePublicOrigin } from '../lib/publicOrigins.js';
+import { restoreOrderInventory } from '../lib/orderLifecycle.js';
 
 const router = Router();
 const webhookLimiter = rateLimit({ windowMs: 60 * 1000, limit: 120, standardHeaders: 'draft-7', legacyHeaders: false });
@@ -38,6 +39,10 @@ router.post('/paymob/webhook', webhookLimiter, async (req, res) => {
     const paid = obj.success === true && obj.pending === false && obj.is_voided !== true && obj.is_refunded !== true;
     const refunded = obj.is_refunded === true || obj.is_voided === true;
     if (paid) {
+      if (order.status === 'cancelled') {
+        await client.query(`UPDATE orders SET payment_status = 'paid', payment_transaction_id = $1, payment_updated_at = NOW() WHERE id = $2`, [transactionId, order.id]);
+        return { latePaid: true, orderId: order.id };
+      }
       await client.query(`UPDATE orders SET payment_status = 'paid', payment_transaction_id = $1,
         payment_updated_at = NOW(), status = CASE WHEN status = 'pending' THEN 'paid' ELSE status END WHERE id = $2`, [transactionId, order.id]);
       const { rows: items } = await client.query(`SELECT product_name AS name, unit_price_cents AS "priceCents", quantity, color, size
@@ -48,12 +53,16 @@ router.post('/paymob/webhook', webhookLimiter, async (req, res) => {
       await client.query("UPDATE orders SET payment_status = 'refunded', payment_transaction_id = $1, payment_updated_at = NOW() WHERE id = $2", [transactionId, order.id]);
       return { refunded: true, order };
     }
-    if (order.paymentStatus === 'pending') {
-      await client.query("UPDATE orders SET payment_status = 'failed', payment_transaction_id = $1, payment_updated_at = NOW() WHERE id = $2", [transactionId, order.id]);
+    if (obj.pending === true) return { pending: true };
+    if (order.paymentStatus === 'pending' && order.status === 'pending') {
+      await restoreOrderInventory(client, order.id, `Failed Paymob payment for order NV-${order.id}`);
+      if (order.discountCode) await client.query('UPDATE discounts SET used_count = GREATEST(0, used_count - 1) WHERE code = $1', [order.discountCode]);
+      await client.query("UPDATE orders SET status = 'cancelled', payment_status = 'failed', payment_transaction_id = $1, payment_updated_at = NOW() WHERE id = $2", [transactionId, order.id]);
     }
     return { failed: true };
   });
   if (result.invalid) return res.status(400).json({ error: 'Payment does not match an order.' });
+  if (result.latePaid) console.error('Paymob reported payment after order was cancelled; review and refund manually if required.', result.orderId);
   if (result.paid) {
     const order = result.order;
     const trackingUrl = `${storePublicOrigin()}/track.html?order=${order.id}&token=${encodeURIComponent(order.trackingToken)}`;
