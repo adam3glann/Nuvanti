@@ -21,14 +21,17 @@
         <div><h1>Dashboard</h1><p>An overview of Nuvanti's store performance.</p></div>
       </div>
 
-      <h2 style="margin-bottom:.75rem">Business Overview <span class="dash-period">All time · completed orders</span></h2>
+      <h2 style="margin-bottom:.4rem">Business Overview <span class="dash-period">All time · payments received</span></h2>
       <div class="stat-grid" id="businessGrid">
         <div class="stat-card"><div class="a-skeleton" style="height:52px"></div></div>
         <div class="stat-card"><div class="a-skeleton" style="height:52px"></div></div>
         <div class="stat-card"><div class="a-skeleton" style="height:52px"></div></div>
         <div class="stat-card"><div class="a-skeleton" style="height:52px"></div></div>
+        <div class="stat-card"><div class="a-skeleton" style="height:52px"></div></div>
+        <div class="stat-card"><div class="a-skeleton" style="height:52px"></div></div>
+        <div class="stat-card"><div class="a-skeleton" style="height:52px"></div></div>
       </div>
-      <p class="dash-finance-note" id="financeNote">Revenue excludes shipping and discounts are deducted. Profit uses the unit costs saved on each order.</p>
+      <p class="dash-finance-note" id="financeNote">Sales count paid orders after discounts and exclude shipping. Gross profit subtracts recorded product costs only; operating expenses are not included.</p>
 
       <div class="stat-grid" id="statGrid">
         <div class="stat-card"><div class="a-skeleton" style="height:52px"></div></div>
@@ -40,7 +43,7 @@
 
       <div class="card" style="margin-bottom:1.5rem">
         <div class="card-head">
-          <h2>Revenue Over Time</h2>
+          <h2>Paid Product Sales Over Time</h2>
           <select id="rangeSelect" style="padding:.4rem .6rem;border:1px solid var(--a-border-strong);border-radius:4px">
             <option value="7d">Last 7 days</option>
             <option value="30d" selected>Last 30 days</option>

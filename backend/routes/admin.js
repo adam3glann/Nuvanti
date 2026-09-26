@@ -124,7 +124,7 @@ router.get('/dashboard', requirePermission('analytics.view'), asyncRoute(async (
   )
   SELECT
     (SELECT count(*)::int FROM orders) AS "orders",
-    (SELECT count(*)::int FROM orders WHERE status IN ('pending', 'processing', 'shipped', 'out_for_delivery')) AS "pendingOrders",
+    (SELECT count(*)::int FROM orders WHERE status IN ('pending', 'paid', 'processing', 'shipped', 'out_for_delivery')) AS "pendingOrders",
     (SELECT count(*)::int FROM orders WHERE status = 'fulfilled') AS "fulfilledOrders",
     (SELECT count(*)::int FROM orders WHERE status = 'cancelled') AS "cancelledOrders",
     (SELECT count(*)::int FROM products WHERE is_active) AS "products",
@@ -133,9 +133,9 @@ router.get('/dashboard', requirePermission('analytics.view'), asyncRoute(async (
     (SELECT count(*)::int FROM users WHERE role = 'customer' AND is_active) AS "customers",
     (SELECT count(*)::int FROM users WHERE role = 'customer' AND is_active AND created_at >= date_trunc('month', NOW())) AS "newCustomersThisMonth",
     (SELECT coalesce(sum(GREATEST(subtotal_cents - COALESCE(discount_cents, 0), 0)), 0)::bigint
-      FROM orders WHERE status IN ('paid', 'fulfilled') AND created_at >= CURRENT_DATE) AS "revenueTodayCents",
+      FROM orders WHERE (status = 'fulfilled' OR (payment_status = 'paid' AND status <> 'cancelled')) AND payment_status <> 'refunded' AND COALESCE(payment_updated_at, created_at) >= CURRENT_DATE) AS "revenueTodayCents",
     (SELECT coalesce(sum(GREATEST(subtotal_cents - COALESCE(discount_cents, 0), 0)), 0)::bigint
-      FROM orders WHERE status IN ('paid', 'fulfilled') AND created_at >= date_trunc('month', NOW())) AS "revenueMonthCents",
+      FROM orders WHERE (status = 'fulfilled' OR (payment_status = 'paid' AND status <> 'cancelled')) AND payment_status <> 'refunded' AND COALESCE(payment_updated_at, created_at) >= date_trunc('month', NOW())) AS "revenueMonthCents",
     (SELECT coalesce(json_agg(alert), '[]'::json) FROM (
       SELECT "productName", size, stock FROM low_stock ORDER BY stock, "productName" LIMIT 5
     ) alert) AS "lowStockAlerts"`);
@@ -149,22 +149,23 @@ router.get('/analytics', requirePermission('analytics.view'), asyncRoute(async (
   )
   SELECT to_char(days.day, 'YYYY-MM-DD') AS date,
     coalesce(sum(GREATEST(o.subtotal_cents - COALESCE(o.discount_cents, 0), 0))
-      FILTER (WHERE o.status IN ('paid', 'fulfilled')), 0)::bigint AS "revenueCents",
+      FILTER (WHERE (o.status = 'fulfilled' OR (o.payment_status = 'paid' AND o.status <> 'cancelled')) AND o.payment_status <> 'refunded'), 0)::bigint AS "revenueCents",
     count(o.id)::int AS orders
-  FROM days LEFT JOIN orders o ON o.created_at >= days.day
-    AND o.created_at < days.day + interval '1 day' AND o.status IN ('paid', 'fulfilled')
+  FROM days LEFT JOIN orders o ON COALESCE(o.payment_updated_at, o.created_at) >= days.day
+    AND COALESCE(o.payment_updated_at, o.created_at) < days.day + interval '1 day'
+    AND (o.status = 'fulfilled' OR (o.payment_status = 'paid' AND o.status <> 'cancelled')) AND o.payment_status <> 'refunded'
   GROUP BY days.day ORDER BY days.day`, [days]);
   const { rows: topProducts } = await query(`SELECT i.product_name AS name, sum(i.quantity)::int AS "unitsSold",
-    sum(i.unit_price_cents * i.quantity)::bigint AS "revenueCents"
+    coalesce(sum(i.unit_price_cents::numeric * i.quantity * GREATEST(o.subtotal_cents - COALESCE(o.discount_cents, 0), 0) / NULLIF(o.subtotal_cents, 0)), 0)::bigint AS "revenueCents"
     FROM orders o JOIN order_items i ON i.order_id = o.id
-    WHERE o.status IN ('paid', 'fulfilled') AND o.created_at >= CURRENT_DATE - ($1::int - 1)
-    GROUP BY i.product_id, i.product_name ORDER BY sum(i.unit_price_cents * i.quantity) DESC LIMIT 8`, [days]);
+    WHERE (o.status = 'fulfilled' OR (o.payment_status = 'paid' AND o.status <> 'cancelled')) AND o.payment_status <> 'refunded' AND COALESCE(o.payment_updated_at, o.created_at) >= CURRENT_DATE - ($1::int - 1)
+    GROUP BY i.product_id, i.product_name ORDER BY "revenueCents" DESC LIMIT 8`, [days]);
   const { rows: topCategories } = await query(`SELECT p.category AS name,
-    sum(i.unit_price_cents * i.quantity)::bigint AS "revenueCents"
+    coalesce(sum(i.unit_price_cents::numeric * i.quantity * GREATEST(o.subtotal_cents - COALESCE(o.discount_cents, 0), 0) / NULLIF(o.subtotal_cents, 0)), 0)::bigint AS "revenueCents"
     FROM orders o JOIN order_items i ON i.order_id = o.id JOIN products p ON p.id = i.product_id
-    WHERE o.status IN ('paid', 'fulfilled') AND o.created_at >= CURRENT_DATE - ($1::int - 1)
-    GROUP BY p.category ORDER BY sum(i.unit_price_cents * i.quantity) DESC LIMIT 8`, [days]);
-  const { rows: counts } = await query(`SELECT count(*) FILTER (WHERE status = 'pending')::int AS "pendingOrders"
+    WHERE (o.status = 'fulfilled' OR (o.payment_status = 'paid' AND o.status <> 'cancelled')) AND o.payment_status <> 'refunded' AND COALESCE(o.payment_updated_at, o.created_at) >= CURRENT_DATE - ($1::int - 1)
+    GROUP BY p.category ORDER BY "revenueCents" DESC LIMIT 8`, [days]);
+  const { rows: counts } = await query(`SELECT count(*) FILTER (WHERE status IN ('pending', 'paid', 'processing', 'shipped', 'out_for_delivery'))::int AS "pendingOrders"
     FROM orders WHERE created_at >= CURRENT_DATE - ($1::int - 1)`, [days]);
   res.json({
     series: series.map((row) => ({ ...row, revenue: Number(row.revenueCents) / 100 })),
@@ -182,7 +183,7 @@ router.get('/financial-summary', requirePermission('analytics.view'), asyncRoute
       coalesce(sum(i.unit_cost_cents::bigint * i.quantity) FILTER (WHERE i.unit_cost_cents IS NOT NULL), 0)::bigint AS cost_cents
     FROM orders o
     JOIN order_items i ON i.order_id = o.id
-    WHERE o.status IN ('paid', 'fulfilled')
+    WHERE (o.status = 'fulfilled' OR (o.payment_status = 'paid' AND o.status <> 'cancelled')) AND o.payment_status <> 'refunded'
     GROUP BY o.id
   )
   SELECT coalesce(sum(net_revenue_cents), 0)::bigint AS "revenueCents",
@@ -191,11 +192,13 @@ router.get('/financial-summary', requirePermission('analytics.view'), asyncRoute
     count(*)::int AS "completedOrders",
     count(*) FILTER (WHERE line_count = costed_line_count)::int AS "costedOrders",
     (SELECT coalesce(sum(total_cents), 0)::bigint FROM orders
-      WHERE status IN ('pending', 'processing', 'shipped', 'out_for_delivery')) AS "pendingOrderValueCents",
+      WHERE status IN ('pending', 'paid', 'processing', 'shipped', 'out_for_delivery') AND payment_status = 'pending') AS "pendingOrderValueCents",
     (SELECT count(*)::int FROM orders
-      WHERE status IN ('pending', 'processing', 'shipped', 'out_for_delivery')) AS "pendingOrderCount",
+      WHERE status IN ('pending', 'paid', 'processing', 'shipped', 'out_for_delivery') AND payment_status = 'pending') AS "pendingOrderCount",
     (SELECT count(*)::int FROM order_items i JOIN orders o ON o.id = i.order_id
-      WHERE o.status IN ('paid', 'fulfilled') AND i.unit_cost_cents IS NULL) AS "uncostedLines"
+      WHERE (o.status = 'fulfilled' OR (o.payment_status = 'paid' AND o.status <> 'cancelled')) AND o.payment_status <> 'refunded' AND i.unit_cost_cents IS NULL) AS "uncostedLines",
+    coalesce((SELECT sum(i.quantity)::bigint FROM order_items i JOIN orders o ON o.id = i.order_id
+      WHERE (o.status = 'fulfilled' OR (o.payment_status = 'paid' AND o.status <> 'cancelled')) AND o.payment_status <> 'refunded'), 0)::bigint AS "unitsSold"
   FROM completed_orders`);
   const row = rows[0];
   const costedRevenueCents = Number(row.costedRevenueCents);
@@ -209,6 +212,7 @@ router.get('/financial-summary', requirePermission('analytics.view'), asyncRoute
     grossProfit: Number(row.costedOrders) ? grossProfitCents / 100 : null,
     grossMargin: costedRevenueCents > 0 ? (grossProfitCents / costedRevenueCents) * 100 : null,
     completedOrders: row.completedOrders,
+    unitsSold: Number(row.unitsSold),
     costedOrders: row.costedOrders,
     uncostedLines: row.uncostedLines,
   });

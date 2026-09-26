@@ -25,10 +25,10 @@ async function render(range) {
   if (requestId !== activeRender) return;
 
   document.getElementById('statGrid').innerHTML = `
-    <div class="stat-card"><p class="stat-card__label">Revenue</p><p class="stat-card__value">${formatPrice(summary.revenue)}</p></div>
-    <div class="stat-card"><p class="stat-card__label">Orders</p><p class="stat-card__value">${orders}</p></div>
-    <div class="stat-card"><p class="stat-card__label">Average Order Value</p><p class="stat-card__value">${formatPrice(summary.aov)}</p></div>
-    <div class="stat-card"><p class="stat-card__label">Pending Orders</p><p class="stat-card__value">${pendingOrders}</p></div>
+    <div class="stat-card"><p class="stat-card__label">Net Product Sales</p><p class="stat-card__value">${formatPrice(summary.revenue)}</p></div>
+    <div class="stat-card"><p class="stat-card__label">Paid Orders</p><p class="stat-card__value">${orders}</p></div>
+    <div class="stat-card"><p class="stat-card__label">Average Paid Order</p><p class="stat-card__value">${formatPrice(summary.aov)}</p></div>
+    <div class="stat-card"><p class="stat-card__label">Orders in Progress</p><p class="stat-card__value">${pendingOrders}</p></div>
   `;
 
   document.getElementById('revenueChart').innerHTML = lineChart(series, { width: 900, height: 240 });

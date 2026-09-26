@@ -17,15 +17,20 @@ async function render() {
 
   const financial = financialResult.status === 'fulfilled' ? financialResult.value : null;
   if (financial) {
+    const averageOrder = financial.completedOrders ? financial.revenue / financial.completedOrders : 0;
     document.getElementById('businessGrid').innerHTML = `
-      ${businessCard('Total Revenue', formatBusinessAmount(financial.revenue), `${financial.completedOrders} paid or delivered orders`, 'var(--a-primary)')}
-      ${businessCard('Pending COD', formatBusinessAmount(financial.pendingOrderValue), `${financial.pendingOrderCount} orders still in fulfillment`, 'var(--a-warning)')}
-      ${businessCard('Estimated Gross Profit', financial.grossProfit == null ? 'Add unit costs' : formatBusinessAmount(financial.grossProfit), financial.grossProfit == null ? 'No completed orders have cost data yet' : `Based on ${financial.costedOrders} fully costed orders`, 'var(--a-success)')}
-      ${businessCard('Gross Margin', financial.grossMargin == null ? '—' : `${financial.grossMargin.toFixed(1)}%`, financial.grossMargin == null ? 'Available after cost data is recorded' : 'On orders with complete cost data', 'var(--a-info)')}
-      ${businessCard('Recorded Product Costs', formatBusinessAmount(financial.costOfGoods), `${financial.costedOrders} fully costed orders`, 'var(--a-text)')}
+      ${businessCard('Paid product sales', formatBusinessAmount(financial.revenue), `${financial.completedOrders} paid orders · discounts deducted · shipping excluded`, 'var(--a-primary)')}
+      ${businessCard('Gross profit before expenses', financial.grossProfit == null ? 'Add unit costs' : formatBusinessAmount(financial.grossProfit), financial.grossProfit == null ? 'Record product costs to calculate this' : `Costed sales − product costs · ${formatBusinessAmount(financial.costedRevenue)} of sales costed`, 'var(--a-success)')}
+      ${businessCard('Product costs', formatBusinessAmount(financial.costOfGoods), `Cost of goods for ${formatBusinessAmount(financial.costedRevenue)} in costed sales`, 'var(--a-text)')}
+      ${businessCard('Gross margin', financial.grossMargin == null ? '—' : `${financial.grossMargin.toFixed(1)}%`, financial.grossMargin == null ? 'Available when product costs are recorded' : 'Gross profit ÷ costed sales · excludes expenses', 'var(--a-info)')}
+      ${businessCard('Average paid order', formatBusinessAmount(averageOrder), 'Paid product sales ÷ paid orders', 'var(--a-primary)')}
+      ${businessCard('Pieces sold', Number(financial.unitsSold || 0).toLocaleString('en-US'), 'Units in paid orders', 'var(--a-text)')}
+      ${businessCard('Payments still due', formatBusinessAmount(financial.pendingOrderValue), `${financial.pendingOrderCount} active unpaid orders · includes shipping · not sales`, 'var(--a-warning)')}
     `;
+    const coverage = financial.completedOrders ? Math.round((financial.costedOrders / financial.completedOrders) * 100) : 0;
+    document.getElementById('financeNote').textContent = `How to read this: sales = paid product totals after discounts (shipping excluded). Gross profit and margin use only orders with a recorded unit cost for every item; they do not subtract delivery, advertising, rent, or other expenses. Cost data covers ${financial.costedOrders} of ${financial.completedOrders} paid orders (${coverage}%).`;
     if (financial.uncostedLines > 0) {
-      document.getElementById('financeNote').textContent = `${financial.uncostedLines} completed order line(s) have no saved unit cost. Profit and margin only include fully costed orders. Add a Unit Cost to products for accurate reports on future orders.`;
+      document.getElementById('financeNote').textContent += ` ${financial.uncostedLines} sold item line(s) have no saved unit cost. Add Unit Cost to products so new orders are included in profit calculations.`;
     }
   } else {
     document.getElementById('businessGrid').innerHTML = '<div class="admin-empty"><p></p></div>';
@@ -36,9 +41,9 @@ async function render() {
   const dashboard = dashboardResult.status === 'fulfilled' ? dashboardResult.value : null;
   if (dashboard) {
     document.getElementById('statGrid').innerHTML = `
-      <div class="stat-card"><p class="stat-card__label">Revenue Today</p><p class="stat-card__value">${formatBusinessAmount(dashboard.revenueToday)}</p></div>
-      <div class="stat-card"><p class="stat-card__label">Revenue This Month</p><p class="stat-card__value">${formatBusinessAmount(dashboard.revenueMonth)}</p></div>
-      <div class="stat-card"><p class="stat-card__label">Total Orders</p><p class="stat-card__value">${dashboard.orders}</p><p class="stat-card__delta up">${dashboard.pendingOrders} open</p></div>
+      <div class="stat-card"><p class="stat-card__label">Paid Sales Today</p><p class="stat-card__value">${formatBusinessAmount(dashboard.revenueToday)}</p><p class="stat-card__delta">After discounts · shipping excluded</p></div>
+      <div class="stat-card"><p class="stat-card__label">Paid Sales This Month</p><p class="stat-card__value">${formatBusinessAmount(dashboard.revenueMonth)}</p><p class="stat-card__delta">After discounts · shipping excluded</p></div>
+      <div class="stat-card"><p class="stat-card__label">All Orders</p><p class="stat-card__value">${dashboard.orders}</p><p class="stat-card__delta up">${dashboard.pendingOrders} still in progress</p></div>
       <div class="stat-card"><p class="stat-card__label">Total Customers</p><p class="stat-card__value">${dashboard.customers}</p><p class="stat-card__delta">${dashboard.newCustomersThisMonth} joined this month</p></div>
       <div class="stat-card"><p class="stat-card__label">Live Store Visitors</p><p class="stat-card__value" id="dashboardPresenceCount">Loading…</p><p class="stat-card__delta">Unique browsers · updates every 15 seconds</p></div>
     `;
