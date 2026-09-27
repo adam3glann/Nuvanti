@@ -171,6 +171,10 @@ function renderGallery() {
 
   if (!gallery) return;
 
+  // Rebuilding the gallery after a thumbnail selection should not reset the
+  // horizontal strip to the beginning after the customer has scrolled it.
+  const thumbsScrollLeft = gallery.querySelector(".gallery__thumbs")?.scrollLeft ?? 0;
+
   const images = currentProductImages();
   const allImages = allProductImageEntries();
 
@@ -267,6 +271,9 @@ function renderGallery() {
     }
 
   `;
+
+  const thumbs = gallery.querySelector(".gallery__thumbs");
+  if (thumbs) thumbs.scrollLeft = thumbsScrollLeft;
 
   /* ---------------------------------------------------------
      PRELOAD REMAINING IMAGES
