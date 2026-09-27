@@ -29,6 +29,7 @@
   overflow: hidden;
   background: var(--color-border);
   touch-action: pan-y pinch-zoom;
+  cursor: zoom-in;
 }
 .gallery__main img {
   width: 100%;
@@ -36,18 +37,6 @@
   object-fit: cover;
   object-position: center top;
   transition: opacity var(--dur-fast) var(--ease-editorial), transform var(--dur-med) var(--ease-editorial);
-}
-/* Click-to-zoom is a mouse-hover affordance; only offer it on devices that actually have a mouse.
-   On touch devices the tap instead opens the full-screen lightbox (see .lightbox below), which is
-   a far clearer interaction than an unlabeled tap-to-scale toggle. */
-@media (hover: hover) and (pointer: fine) {
-  .gallery__main {
-    cursor: zoom-in;
-  }
-  .gallery__main.is-zoomed img {
-    transform: scale(1.6);
-    cursor: zoom-out;
-  }
 }
 .gallery__thumbs {
   display: flex;
@@ -87,6 +76,7 @@
   justify-content: center;
   opacity: 0;
   pointer-events: none;
+  overflow: hidden;
   transition: opacity var(--dur-med) var(--ease-editorial);
 }
 .lightbox[data-open="true"] {
@@ -94,11 +84,19 @@
   pointer-events: auto;
 }
 .lightbox img {
-  max-width: 100%;
-  max-height: 100%;
+  max-width: calc(100% - 120px);
+  max-height: calc(100% - 48px);
   width: auto;
   height: auto;
   object-fit: contain;
+  cursor: zoom-in;
+  user-select: none;
+  -webkit-user-drag: none;
+  transition: transform var(--dur-med) var(--ease-editorial), opacity var(--dur-med) var(--ease-editorial);
+}
+.lightbox img.is-zoomed {
+  transform: scale(2);
+  cursor: zoom-out;
 }
 .lightbox__close {
   position: absolute;
@@ -135,6 +133,10 @@
 }
 .lightbox__arrow--next {
   right: var(--space-4);
+}
+.lightbox__arrow:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 .product-info__eyebrow {
