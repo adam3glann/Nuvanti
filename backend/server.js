@@ -255,10 +255,10 @@ adminApp.use(cookieParser());
   );
   // Keep the raster tab and home-screen icons public for mobile browsers too.
   adminApp.get("/favicon.png", (req, res) =>
-    res.sendFile(path.join(frontendRoot, "favicon.png")),
+    res.sendFile(path.join(frontendRoot, "admin/favicon.png")),
   );
   adminApp.get("/apple-touch-icon.png", (req, res) =>
-    res.sendFile(path.join(frontendRoot, "apple-touch-icon.png")),
+    res.sendFile(path.join(frontendRoot, "admin/apple-touch-icon.png")),
   );
 adminApp.get("/login.html", (req, res) =>
   res.sendFile(path.join(frontendRoot, "admin/login.html")),
