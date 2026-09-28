@@ -40,20 +40,22 @@ function render() {
 
 function renderSlide(slide) {
   const image = safePreviewUrl(slide.imageUrl) ? slide.imageUrl : '';
+  const mobileImage = safePreviewUrl(slide.mobileImageUrl) ? slide.mobileImageUrl : '';
   const textColor = safeColor(slide.textColor) ? slide.textColor : '#f5f2eb';
   const gradients = normalizeTextGradients(slide.textGradients);
   const fonts = normalizeTextFonts(slide.textFonts);
   return `<form class="card slide-card" data-slide-id="${escapeHtml(slide.id)}">
     <div class="slide-card__head">
-      <img class="slide-preview" src="${escapeHtml(image)}" alt="" data-preview />
+      <div class="slide-previews"><label>Desktop<img class="slide-preview" src="${escapeHtml(image)}" alt="" data-preview /></label><label>Mobile<img class="slide-preview slide-preview--mobile" src="${escapeHtml(mobileImage)}" alt="" data-mobile-preview ${mobileImage ? '' : 'hidden'} /></label></div>
       <div class="slide-card__meta"><strong>Slide ${Number(slide.position) + 1}</strong><label class="slide-toggle"><input type="checkbox" name="isActive" ${slide.isActive ? 'checked' : ''} /> Show slide</label></div>
       <div class="slide-card__actions"><button class="btn btn-outline btn-sm" type="button" data-delete>Delete</button></div>
     </div>
     <div class="card-pad">
       <div class="field-row">
-        <div class="field"><label>Image path or HTTPS URL</label><input name="imageUrl" value="${escapeHtml(slide.imageUrl)}" maxlength="1000" required /><span class="hint">Example: assets/img/lifestyle/hero-polo-couple.webp</span></div>
+        <div class="field"><label>Desktop image path or HTTPS URL</label><input name="imageUrl" value="${escapeHtml(slide.imageUrl)}" maxlength="1000" required /><span class="hint">Use a wide landscape photo composed for desktop.</span></div>
         <div class="field"><label>Eyebrow</label><input name="eyebrow" value="${escapeHtml(slide.eyebrow)}" maxlength="80" /></div>
       </div>
+      <div class="field-row"><div class="field"><label>Mobile image (optional)</label><input name="mobileImageUrl" value="${escapeHtml(slide.mobileImageUrl || '')}" maxlength="1000" placeholder="Upload a portrait photo or paste an HTTPS URL" /><span class="hint">Use a separate portrait photo for phones. If blank, the desktop photo is used and may crop on narrow screens.</span></div></div>
       <div class="field"><label>Headline</label><input name="title" value="${escapeHtml(slide.title)}" maxlength="160" minlength="3" required /></div>
       <div class="field"><label>Description</label><textarea name="description" rows="3" maxlength="500">${escapeHtml(slide.description)}</textarea></div>
       <section class="slide-font-settings" aria-label="Slide fonts"><h3>Fonts</h3><p class="hint">Use one font across the slide or choose a font for each text part. These choices use built-in or already-loaded fonts.</p>
@@ -97,7 +99,7 @@ function renderSlide(slide) {
       <div class="slide-card__foot">
         <div class="field slide-position"><label>Position (0 is first)</label><input name="position" type="number" min="0" max="1000" step="1" value="${Number(slide.position)}" required /></div>
         <div class="field slide-duration"><label>Time on screen (seconds)</label><input name="durationSeconds" type="number" min="3" max="30" step="1" value="${Math.min(30, Math.max(3, Number(slide.durationSeconds) || 5))}" required /><span class="hint">3–30 seconds before the next slide.</span></div>
-        <div class="slide-upload"><input type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-file hidden /><button class="btn btn-outline btn-sm" type="button" data-upload>Upload image</button><button class="btn btn-primary" type="submit">Save slide</button></div>
+        <div class="slide-upload"><input type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-file="imageUrl" hidden /><button class="btn btn-outline btn-sm" type="button" data-upload="imageUrl">Upload desktop photo</button><input type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-file="mobileImageUrl" hidden /><button class="btn btn-outline btn-sm" type="button" data-upload="mobileImageUrl">Upload mobile photo</button><button class="btn btn-primary" type="submit">Save slide</button></div>
       </div>
     </div>
   </form>`;
@@ -199,7 +201,7 @@ root?.addEventListener('click', async (event) => {
   if (event.target.closest('#addSlideBtn')) {
     const position = slides.length ? Math.max(...slides.map((slide) => Number(slide.position))) + 1 : 0;
     try {
-      await createHomepageSlide({ imageUrl: 'assets/img/lifestyle/campaign-banner.webp', eyebrow: '', title: 'New featured story', description: '', ctaLabel: 'Shop now', ctaHref: 'shop.html', secondaryLabel: '', secondaryHref: '', position, durationSeconds: 5, isActive: true });
+      await createHomepageSlide({ imageUrl: 'assets/img/lifestyle/campaign-banner.webp', mobileImageUrl: null, eyebrow: '', title: 'New featured story', description: '', ctaLabel: 'Shop now', ctaHref: 'shop.html', secondaryLabel: '', secondaryHref: '', position, durationSeconds: 5, isActive: true });
       await loadSlides();
       showAdminToast('Slide added. Edit it and save when ready.', 'success');
     } catch (error) { showAdminToast(error.message, 'error'); }
@@ -207,7 +209,8 @@ root?.addEventListener('click', async (event) => {
   }
   const uploadButton = event.target.closest('[data-upload]');
   if (uploadButton) {
-    uploadButton.closest('.slide-card')?.querySelector('[data-file]')?.click();
+    const target = uploadButton.dataset.upload;
+    uploadButton.closest('.slide-card')?.querySelector(`[data-file="${target}"]`)?.click();
     return;
   }
   const deleteButton = event.target.closest('[data-delete]');
@@ -225,9 +228,16 @@ root?.addEventListener('click', async (event) => {
 });
 
 root?.addEventListener('input', (event) => {
-  if (event.target.name !== 'imageUrl') return;
-  const preview = event.target.closest('.slide-card')?.querySelector('[data-preview]');
-  if (preview && safePreviewUrl(event.target.value.trim())) preview.src = event.target.value.trim();
+  const previewSelector = event.target.name === 'imageUrl' ? '[data-preview]' : event.target.name === 'mobileImageUrl' ? '[data-mobile-preview]' : null;
+  if (!previewSelector) return;
+  const preview = event.target.closest('.slide-card')?.querySelector(previewSelector);
+  if (!preview) return;
+  if (safePreviewUrl(event.target.value.trim())) {
+    preview.src = event.target.value.trim();
+    preview.hidden = false;
+  } else if (event.target.name === 'mobileImageUrl') {
+    preview.hidden = true;
+  }
 });
 
 root?.addEventListener('change', async (event) => {
@@ -240,18 +250,21 @@ root?.addEventListener('change', async (event) => {
   const file = event.target.files?.[0];
   const card = event.target.closest('.slide-card');
   if (!file || !card) return;
-  const button = card.querySelector('[data-upload]');
+  const fieldName = event.target.dataset.file;
+  const button = card.querySelector(`[data-upload="${fieldName}"]`);
   button.disabled = true;
   button.textContent = 'Preparing…';
   try {
     const result = await uploadHomepageSlideImage(file, { onProgress: ({ phase, percent }) => {
       button.textContent = phase === 'optimizing' ? 'Optimizing…' : `Uploading ${percent}%`;
     } });
-    card.querySelector('[name="imageUrl"]').value = result.url;
-    card.querySelector('[data-preview]').src = result.url;
+    card.querySelector(`[name="${fieldName}"]`).value = result.url;
+    const preview = card.querySelector(fieldName === 'imageUrl' ? '[data-preview]' : '[data-mobile-preview]');
+    preview.src = result.url;
+    preview.hidden = false;
     showAdminToast('Image uploaded. Save the slide to publish it.', 'success');
   } catch (error) { showAdminToast(error.message, 'error'); }
-  finally { button.disabled = false; button.textContent = 'Upload image'; event.target.value = ''; }
+  finally { button.disabled = false; button.textContent = fieldName === 'imageUrl' ? 'Upload desktop photo' : 'Upload mobile photo'; event.target.value = ''; }
 });
 
 root?.addEventListener('submit', async (event) => {
@@ -261,7 +274,7 @@ root?.addEventListener('submit', async (event) => {
   if (!form.reportValidity()) return;
   const value = (name) => form.elements.namedItem(name).value.trim();
   const payload = {
-    imageUrl: value('imageUrl'), eyebrow: value('eyebrow'), title: value('title'),
+    imageUrl: value('imageUrl'), mobileImageUrl: value('mobileImageUrl') || null, eyebrow: value('eyebrow'), title: value('title'),
     description: value('description'), ctaLabel: value('ctaLabel'), ctaHref: value('ctaHref'),
     secondaryLabel: value('secondaryLabel'), secondaryHref: value('secondaryHref'),
     textColor: value('textColor'),

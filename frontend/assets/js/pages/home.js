@@ -49,7 +49,7 @@ async function loadHeroSlides() {
     slides = await fetchHomepageSlides();
   } catch {
     slides = HERO_SLIDES.map((slide) => ({
-      imageUrl: slide.image, eyebrow: slide.eyebrow,
+      imageUrl: slide.image, mobileImageUrl: null, eyebrow: slide.eyebrow,
       title: slide.title.replace(/<[^>]*>/g, ''), description: slide.desc,
       ctaLabel: slide.cta.label, ctaHref: slide.cta.href,
       secondaryLabel: slide.secondary?.label || '', secondaryHref: slide.secondary?.href || '',
@@ -69,7 +69,10 @@ function renderHero(slides) {
   el.innerHTML = `
     ${slides.map((s, i) => `
       <div class="hero-slide" data-active="${i === 0}" data-index="${i}" data-duration="${Math.min(30, Math.max(3, Math.floor(Number(s.durationSeconds) || 5)))}" aria-hidden="${i !== 0}" style="${slideTextStyle(s)}">
-        <img class="hero-slide__img" src="${escapeHtml(s.imageUrl)}" alt="" ${i === 0 ? 'fetchpriority="high"' : 'loading="lazy"'} />
+        <picture class="hero-slide__picture">
+          ${s.mobileImageUrl ? `<source media="(max-width: 899px)" srcset="${escapeHtml(s.mobileImageUrl)}" />` : ''}
+          <img class="hero-slide__img" src="${escapeHtml(s.imageUrl)}" alt="" ${i === 0 ? 'fetchpriority="high"' : 'loading="lazy"'} />
+        </picture>
         <div class="hero-slide__scrim"></div>
         <div class="hero-slide__content">
           ${s.eyebrow ? `<p class="label hero-slide__eyebrow" ${textGradientAttributes(s, 'eyebrow')}>${escapeHtml(s.eyebrow)}</p>` : ''}

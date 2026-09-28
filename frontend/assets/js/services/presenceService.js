@@ -2,13 +2,18 @@ import { API_ORIGIN } from '../config.js';
 
 const visitorStorageKey = 'nuvanti_store_presence_v1';
 const visitorIdleMs = 30 * 60 * 1000;
-const heartbeatMs = 20 * 1000;
+const heartbeatMs = 10 * 1000;
 const endpoint = `${API_ORIGIN}/api/storefront/presence`;
+const pageViewEndpoint = `${API_ORIGIN}/api/storefront/page-view`;
 
 export function startStorePresence() {
   const visitorId = getVisitorId();
   const tabId = createUuid();
   let present = false;
+
+  // Count one page load. This endpoint stores only an aggregate total, without
+  // recording a URL, account, IP address, or visitor identifier.
+  fetch(pageViewEndpoint, { method: 'POST', cache: 'no-store', keepalive: true }).catch(() => {});
 
   const post = (action, keepalive = false) => {
     touchVisitor(visitorId);
@@ -36,8 +41,8 @@ export function startStorePresence() {
 
   heartbeat();
   const timer = window.setInterval(heartbeat, heartbeatMs);
-  // Keep a store tab counted while it is in the background. The browser may
-  // throttle these pings; the server's short expiry removes crashed/closed tabs.
+  // Keep background tabs counted. A close event removes the tab immediately;
+  // a 35-second server expiry handles crashes and browsers that skip pagehide.
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') heartbeat();
   });

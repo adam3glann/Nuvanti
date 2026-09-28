@@ -18,11 +18,14 @@ export function watchStorePresence() {
         credentials: 'include', cache: 'no-store', headers: { Accept: 'application/json' },
       });
       const body = await response.json().catch(() => ({}));
-      if (!response.ok || !Number.isSafeInteger(body.activeVisitors)) throw new Error('Presence unavailable');
-      const text = `${body.activeVisitors} online`;
+      const totalViews = Number(body.totalViews);
+      if (!response.ok || !Number.isSafeInteger(body.activeVisitors) || !Number.isSafeInteger(totalViews)) throw new Error('Presence unavailable');
+      const text = `${body.activeVisitors} online · ${totalViews.toLocaleString()} views`;
       label.textContent = text;
       const dashboardLabel = document.getElementById('dashboardPresenceCount');
-      if (dashboardLabel) dashboardLabel.textContent = text;
+      if (dashboardLabel) dashboardLabel.textContent = `${body.activeVisitors} online`;
+      const dashboardViews = document.getElementById('dashboardStoreViews');
+      if (dashboardViews) dashboardViews.textContent = `${totalViews.toLocaleString()} total site views`;
       badge.dataset.state = 'online';
       badge.title = `Active storefront sessions · refreshed ${new Date().toLocaleTimeString()}`;
     } catch {

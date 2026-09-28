@@ -169,7 +169,7 @@ app.use(
     limit: 300,
     standardHeaders: "draft-7",
     legacyHeaders: false,
-    skip: (req) => req.path === "/api/storefront/presence",
+    skip: (req) => ["/api/storefront/presence", "/api/storefront/page-view"].includes(req.path),
   }),
 );
 // Signed gateway callbacks are verified by their HMAC and cannot carry a

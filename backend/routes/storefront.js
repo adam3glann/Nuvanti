@@ -4,7 +4,8 @@ import { z } from 'zod';
 import { query } from '../lib/db.js';
 
 const router = Router();
-const presenceLimiter = rateLimit({ windowMs: 60 * 1000, limit: 180, standardHeaders: 'draft-7', legacyHeaders: false });
+const presenceLimiter = rateLimit({ windowMs: 60 * 1000, limit: 600, standardHeaders: 'draft-7', legacyHeaders: false });
+const pageViewLimiter = rateLimit({ windowMs: 60 * 1000, limit: 120, standardHeaders: 'draft-7', legacyHeaders: false });
 const presenceInput = z.object({
   action: z.enum(['heartbeat', 'leave']),
   visitorId: z.string().uuid(),
@@ -26,6 +27,11 @@ router.post('/presence', presenceLimiter, asyncRoute(async (req, res) => {
   res.set('Cache-Control', 'no-store').status(204).end();
 }));
 
+router.post('/page-view', pageViewLimiter, asyncRoute(async (req, res) => {
+  await query(`UPDATE storefront_metrics SET total_views = total_views + 1, updated_at = NOW() WHERE id = 1`);
+  res.set('Cache-Control', 'no-store').status(204).end();
+}));
+
 router.get('/settings', async (req, res) => {
   const { rows } = await query(`SELECT store_name AS "storeName", currency,
     standard_shipping_cents AS "standardShippingCents",
@@ -40,7 +46,7 @@ router.get('/settings', async (req, res) => {
 });
 
 router.get('/homepage-slides', async (req, res) => {
-  const { rows } = await query(`SELECT image_url AS "imageUrl", eyebrow, title, description,
+  const { rows } = await query(`SELECT image_url AS "imageUrl", mobile_image_url AS "mobileImageUrl", eyebrow, title, description,
     cta_label AS "ctaLabel", cta_href AS "ctaHref", secondary_label AS "secondaryLabel",
     secondary_href AS "secondaryHref", position, duration_seconds AS "durationSeconds",
     text_color AS "textColor", eyebrow_color AS "eyebrowColor", title_color AS "titleColor",
