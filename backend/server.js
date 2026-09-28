@@ -249,6 +249,10 @@ adminApp.use((req, res, next) => {
   next();
 });
 adminApp.use(cookieParser());
+// A brand favicon is public, including on the unauthenticated login page.
+adminApp.get("/favicon.svg", (req, res) =>
+  res.sendFile(path.join(frontendRoot, "admin/favicon.svg")),
+);
 adminApp.get("/login.html", (req, res) =>
   res.sendFile(path.join(frontendRoot, "admin/login.html")),
 );
