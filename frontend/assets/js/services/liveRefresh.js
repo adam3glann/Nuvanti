@@ -21,12 +21,27 @@ export function startLiveRefresh(callback, intervalMs = 10000, { pauseWhileEditi
     }, intervalMs);
   };
 
-  document.addEventListener('visibilitychange', schedule);
-  window.addEventListener('online', schedule);
+  const refreshNow = () => {
+    clearTimeout(timer);
+    if (document.hidden || !navigator.onLine) return;
+    if (running || editing()) return schedule();
+    running = true;
+    Promise.resolve().then(callback)
+      .catch((error) => console.warn('Automatic store refresh failed:', error))
+      .finally(() => { running = false; schedule(); });
+  };
+  const handleVisibility = () => {
+    if (document.hidden) clearTimeout(timer);
+    else refreshNow();
+  };
+  document.addEventListener('visibilitychange', handleVisibility);
+  window.addEventListener('focus', refreshNow);
+  window.addEventListener('online', refreshNow);
   schedule();
   return () => {
     clearTimeout(timer);
-    document.removeEventListener('visibilitychange', schedule);
-    window.removeEventListener('online', schedule);
+    document.removeEventListener('visibilitychange', handleVisibility);
+    window.removeEventListener('focus', refreshNow);
+    window.removeEventListener('online', refreshNow);
   };
 }

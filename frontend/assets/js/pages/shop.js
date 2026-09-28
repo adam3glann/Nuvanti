@@ -51,7 +51,7 @@ async function initShop() {
   // Start after the mobile browser has completed its initial layout. This avoids
   // an iOS Safari race where the skeleton state can remain painted indefinitely.
   requestAnimationFrame(() => runFilter());
-  startLiveRefresh(refreshCatalog, 20000);
+  startLiveRefresh(refreshCatalog, 10000);
 }
 
 async function refreshCatalog() {

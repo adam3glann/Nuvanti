@@ -28,7 +28,7 @@ export function initShell({ transparentHeader = false, currentPage = '' } = {}) 
     const settings = await refreshStoreSettings();
     configureFreeShippingThreshold(settings.freeShippingThresholdCents / 100);
     refreshCartDrawer();
-  }, 30000);
+  }, 10000);
 
   window.addEventListener('load', () => initScrollReveal());
   initScrollReveal();

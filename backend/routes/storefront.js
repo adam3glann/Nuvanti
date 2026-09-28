@@ -38,7 +38,7 @@ router.get('/settings', async (req, res) => {
     express_shipping_cents AS "expressShippingCents",
     free_shipping_threshold_cents AS "freeShippingThresholdCents"
     FROM store_settings WHERE id = 1`);
-  res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=120');
+  res.set('Cache-Control', 'no-store');
   res.json(rows[0] || {
     storeName: 'Nuvanti', currency: 'EGP', standardShippingCents: 7500,
     expressShippingCents: 15000, freeShippingThresholdCents: 300000,
@@ -51,7 +51,7 @@ router.get('/homepage-slides', async (req, res) => {
     secondary_href AS "secondaryHref", position, duration_seconds AS "durationSeconds",
     text_color AS "textColor", eyebrow_color AS "eyebrowColor", title_color AS "titleColor",
     description_color AS "descriptionColor", button_text_color AS "buttonTextColor",
-    text_gradients AS "textGradients", text_fonts AS "textFonts"
+    text_gradients AS "textGradients", text_fonts AS "textFonts", updated_at AS "updatedAt"
     FROM homepage_slides WHERE is_active = true ORDER BY position, id`);
   res.set('Cache-Control', 'no-store');
   res.json(rows);

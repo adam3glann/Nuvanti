@@ -46,17 +46,22 @@ initInstagramGrid();
 document.getElementById('naPrev')?.addEventListener('click', () => document.getElementById('newArrivalsTrack')?.scrollBy({ left: -320, behavior: 'smooth' }));
 document.getElementById('naNext')?.addEventListener('click', () => document.getElementById('newArrivalsTrack')?.scrollBy({ left: 320, behavior: 'smooth' }));
 let lastHeroSlides = '';
+let hasLoadedRemoteSlides = false;
+startLiveRefresh(loadHeroSlides, 5000);
 startLiveRefresh(async () => {
-  await loadHeroSlides();
   const [products, categories] = await Promise.all([fetchProducts(), fetchCategories()]);
   await Promise.all([loadFeatured(products), loadCategories(categories), loadNewArrivals(products), loadBestsellers(products)]);
-}, 20000);
+}, 15000);
 
 async function loadHeroSlides() {
   let slides;
   try {
     slides = await fetchHomepageSlides();
+    hasLoadedRemoteSlides = true;
   } catch {
+    // Once the API has supplied the saved slides, keep showing those through
+    // a temporary network failure instead of replacing them with demo content.
+    if (hasLoadedRemoteSlides) return;
     slides = HERO_SLIDES.map((slide) => ({
       imageUrl: slide.image, mobileImageUrl: null, eyebrow: slide.eyebrow,
       title: slide.title.replace(/<[^>]*>/g, ''), description: slide.desc,
@@ -73,6 +78,8 @@ async function loadHeroSlides() {
 
 function renderHero(slides) {
   const el = document.getElementById('heroSlider');
+  const priorActive = [...el.querySelectorAll('.hero-slide')].findIndex((slide) => slide.dataset.active === 'true');
+  const activeIndex = Math.min(Math.max(priorActive, 0), Math.max(slides.length - 1, 0));
   if (!slides.length) {
     el.hidden = true;
     return;
@@ -80,10 +87,10 @@ function renderHero(slides) {
   el.hidden = false;
   el.innerHTML = `
     ${slides.map((s, i) => `
-      <div class="hero-slide" data-active="${i === 0}" data-index="${i}" data-duration="${Math.min(30, Math.max(3, Math.floor(Number(s.durationSeconds) || 5)))}" aria-hidden="${i !== 0}" style="${slideTextStyle(s)}">
+      <div class="hero-slide" data-active="${i === activeIndex}" data-index="${i}" data-duration="${Math.min(30, Math.max(3, Math.floor(Number(s.durationSeconds) || 5)))}" aria-hidden="${i !== activeIndex}" style="${slideTextStyle(s)}">
         <picture class="hero-slide__picture">
-          ${s.mobileImageUrl ? `<source media="(max-width: 899px)" srcset="${escapeHtml(s.mobileImageUrl)}" />` : ''}
-          <img class="hero-slide__img" src="${escapeHtml(s.imageUrl)}" alt="" ${i === 0 ? 'fetchpriority="high"' : 'loading="lazy"'} />
+          ${s.mobileImageUrl ? `<source media="(max-width: 899px)" srcset="${escapeHtml(revisionedImageUrl(s.mobileImageUrl, s.updatedAt))}" />` : ''}
+          <img class="hero-slide__img" src="${escapeHtml(revisionedImageUrl(s.imageUrl, s.updatedAt))}" alt="" ${i === 0 ? 'fetchpriority="high"' : 'loading="lazy"'} />
         </picture>
         <div class="hero-slide__scrim"></div>
         <div class="hero-slide__content">
@@ -100,11 +107,22 @@ function renderHero(slides) {
     <div class="hero-controls">
       <button class="hero-arrow" id="heroPrev" aria-label="Previous slide">${icon('chevronLeft')}</button>
       <div class="hero-dots" id="heroDots">
-        ${slides.map((_, i) => `<button class="hero-dot" data-active="${i === 0}" data-goto="${i}" aria-label="Go to slide ${i + 1}" aria-pressed="${i === 0}"></button>`).join('')}
+        ${slides.map((_, i) => `<button class="hero-dot" data-active="${i === activeIndex}" data-goto="${i}" aria-label="Go to slide ${i + 1}" aria-pressed="${i === activeIndex}"></button>`).join('')}
       </div>
       <button class="hero-arrow" id="heroNext" aria-label="Next slide">${icon('chevronRight')}</button>
     </div>
   `;
+}
+
+function revisionedImageUrl(imageUrl, updatedAt) {
+  if (!updatedAt) return imageUrl;
+  try {
+    const url = new URL(imageUrl, location.href);
+    url.searchParams.set('slide-revision', String(new Date(updatedAt).getTime()));
+    return /^https?:\/\//i.test(imageUrl) ? url.href : `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return imageUrl;
+  }
 }
 
 function slideTextStyle(slide) {
@@ -154,7 +172,7 @@ function initHeroSlider() {
   const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
   const controller = new AbortController();
   const { signal } = controller;
-  let current = 0;
+  let current = Math.max(0, slides.findIndex((slide) => slide.dataset.active === 'true'));
   let timer;
 
   function goTo(index, direction) {
