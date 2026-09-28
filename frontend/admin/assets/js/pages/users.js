@@ -6,6 +6,7 @@ import { typedConfirmDialog } from '../components/confirmDialog.js';
 import { createAdminModal } from '../components/modal.js';
 import { hasPermission, ROLES, ROLE_LABELS } from '../components/permissions.js';
 import { fetchAdminUsers, createAdminUser, toggleAdminUserStatus, deleteAdminUser } from '../services/adminUserService.js';
+import { startLiveRefresh } from '../services/liveRefresh.js';
 
 const session = initAdminShell({ page: 'users', title: 'Admin Users' });
 
@@ -18,6 +19,7 @@ if (session && !hasPermission(session.role, 'admins.view')) {
 function init() {
   document.getElementById('newAdminBtn').addEventListener('click', openNewAdmin);
   load();
+  startLiveRefresh(load, 15000, { pauseWhileEditing: true });
 }
 
 async function load() {

@@ -7,6 +7,7 @@ import { categories as localCategories } from '../data/categories.js';
 import { colorHex } from '../data/products.js';
 import { getPublishedProducts } from '../data/productStore.js';
 import { LOCAL_DEVELOPMENT } from '../config.js';
+import { startLiveRefresh } from '../services/liveRefresh.js';
 
 let allProducts = getPublishedProducts();
 let categories = [...localCategories];
@@ -50,6 +51,23 @@ async function initShop() {
   // Start after the mobile browser has completed its initial layout. This avoids
   // an iOS Safari race where the skeleton state can remain painted indefinitely.
   requestAnimationFrame(() => runFilter());
+  startLiveRefresh(refreshCatalog, 20000);
+}
+
+async function refreshCatalog() {
+  const [productsResult, categoriesResult] = await Promise.allSettled([fetchProducts(), fetchCategories()]);
+  const nextProducts = productsResult.status === 'fulfilled' ? productsResult.value : allProducts;
+  const nextCategories = categoriesResult.status === 'fulfilled' ? categoriesResult.value : categories;
+  if (JSON.stringify(nextProducts) === JSON.stringify(allProducts)
+      && JSON.stringify(nextCategories) === JSON.stringify(categories)) return;
+  allProducts = nextProducts;
+  categories = nextCategories;
+  allSizes = [...new Set(allProducts.flatMap((p) => p.sizes || []))];
+  allColors = [...new Set(allProducts.flatMap((p) => p.colors || []))];
+  allColorSwatches = Object.assign({}, ...allProducts.map((p) => p.colorSwatches || {}));
+  renderFilters();
+  syncFilterUI();
+  await runFilter(false, true);
 }
 
 function renderFilters() {
@@ -183,10 +201,10 @@ function initViewToggle() {
 
 let cache = [];
 let activeRequest = 0;
-async function runFilter(append = false) {
+async function runFilter(append = false, quiet = false) {
   const requestId = ++activeRequest;
   const resultsEl = document.getElementById('productResults');
-  if (!append) {
+  if (!append && !quiet) {
     resultsEl.innerHTML = Array.from({ length: 8 }).map(() => '<div class="skeleton" style="aspect-ratio:4/5"></div>').join('');
   }
   try {

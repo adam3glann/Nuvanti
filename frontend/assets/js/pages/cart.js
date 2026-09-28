@@ -3,7 +3,8 @@ import { icon } from '../components/icons.js';
 import { formatPrice, escapeHtml } from '../components/productCard.js';
 import { refreshCartDrawer } from '../components/cartDrawer.js';
 import { getCart, updateQuantity, removeFromCart, cartSubtotal, configureFreeShippingThreshold, syncCartWithProducts, canIncreaseQuantity, variantStock } from '../services/cartService.js';
-import { loadStoreSettings } from '../services/storeSettingsService.js';
+import { loadStoreSettings, refreshStoreSettings } from '../services/storeSettingsService.js';
+import { startLiveRefresh } from '../services/liveRefresh.js';
 import { fetchProductBySlug } from '../services/productService.js';
 import { checkDiscount, getSavedDiscountCode, saveDiscountCode, clearDiscountCode } from '../services/discountService.js';
 
@@ -31,6 +32,21 @@ async function initializeCart() {
     configureFreeShippingThreshold(storeSettings.freeShippingThresholdCents / 100);
     await restoreSavedDiscount();
     render();
+    startLiveRefresh(async () => {
+      const latestProducts = await Promise.all([...new Set(getCart().map((line) => line.slug))].map(fetchProductBySlug));
+      const changes = syncCartWithProducts(latestProducts);
+      if (changes.removed.length || changes.adjusted.length || changes.priceChanged) {
+        catalogNotice = 'Your bag was updated to match the latest products, prices, and available stock.';
+      }
+      render();
+    }, 15000, { pauseWhileEditing: true });
+    startLiveRefresh(async () => {
+      const latest = await refreshStoreSettings();
+      if (JSON.stringify(latest) === JSON.stringify(storeSettings)) return;
+      storeSettings = latest;
+      configureFreeShippingThreshold(storeSettings.freeShippingThresholdCents / 100);
+      render();
+    }, 30000, { pauseWhileEditing: true });
   } catch {
     document.getElementById('cartList').innerHTML = '<div class="state-block"><h3>Bag pricing is temporarily unavailable</h3><p>Your items are saved. Please try again shortly before checkout.</p></div>';
     document.getElementById('cartSummary').innerHTML = '';

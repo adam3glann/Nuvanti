@@ -4,6 +4,7 @@ import { statusBadge } from '../components/statusBadge.js';
 import { showAdminToast } from '../components/toast.js';
 import { createAdminDrawer } from '../components/modal.js';
 import { fetchInventory, rowStatus, adjustStock, inventoryStats } from '../services/inventoryService.js';
+import { startLiveRefresh } from '../services/liveRefresh.js';
 
 const state = { query: '', status: '', page: 1, perPage: 12 };
 
@@ -23,6 +24,14 @@ async function init() {
   document.getElementById('exportBtn').addEventListener('click', exportInventory);
 
   load();
+  startLiveRefresh(async () => {
+    await load();
+    const nextStats = await inventoryStats();
+    document.getElementById('statGrid').innerHTML = `
+      <div class="stat-card"><p class="stat-card__label">Tracked SKUs</p><p class="stat-card__value">${nextStats.total}</p></div>
+      <div class="stat-card"><p class="stat-card__label">Low Stock</p><p class="stat-card__value" style="color:var(--a-warning)">${nextStats.low}</p></div>
+      <div class="stat-card"><p class="stat-card__label">Out of Stock</p><p class="stat-card__value" style="color:var(--a-danger)">${nextStats.out}</p></div>`;
+  }, 8000);
 }
 
 async function load() {

@@ -5,6 +5,7 @@ import { showAdminToast } from '../components/toast.js';
 import { confirmDialog } from '../components/confirmDialog.js';
 import { createAdminModal } from '../components/modal.js';
 import { fetchDiscounts, createDiscount, toggleDiscountStatus, deleteDiscount } from '../services/discountService.js';
+import { startLiveRefresh } from '../services/liveRefresh.js';
 
 const session = initAdminShell({ page: 'discounts', title: 'Discounts' });
 if (session) init();
@@ -12,6 +13,7 @@ if (session) init();
 function init() {
   document.getElementById('newDiscountBtn').addEventListener('click', openNewDiscount);
   load();
+  startLiveRefresh(load, 15000, { pauseWhileEditing: true });
 }
 
 function discountStatus(d) {

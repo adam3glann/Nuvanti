@@ -3,11 +3,12 @@ import { hasPermission } from '../components/permissions.js';
 import { escapeHtml, formatDateTime } from '../components/utils.js';
 import { showAdminToast } from '../components/toast.js';
 import { fetchNewsletterSubscribers } from '../services/newsletterService.js';
+import { startLiveRefresh } from '../services/liveRefresh.js';
 
 const session = initAdminShell({ page: 'newsletter', title: 'Newsletter' });
 if (session && !hasPermission(session.role, 'content.manage')) {
   document.getElementById('newsletterRoot').innerHTML = '<div class="admin-empty"><h2>Restricted</h2><p>You do not have permission to view subscribers.</p></div>';
-} else if (session) load();
+} else if (session) { load(); startLiveRefresh(load, 20000); }
 
 async function load() {
   const root = document.getElementById('newsletterRoot');

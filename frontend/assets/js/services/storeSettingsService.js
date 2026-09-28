@@ -8,7 +8,7 @@ let settingsPromise;
 
 export function loadStoreSettings() {
   if (!settingsPromise) {
-    settingsPromise = fetch(`${API_ORIGIN}/api/storefront/settings`)
+    settingsPromise = fetch(`${API_ORIGIN}/api/storefront/settings`, { cache: 'no-store' })
       .then((response) => {
         if (!response.ok) throw new Error('Store settings are unavailable.');
         return response.json();
@@ -20,6 +20,11 @@ export function loadStoreSettings() {
       });
   }
   return settingsPromise;
+}
+
+export async function refreshStoreSettings() {
+  settingsPromise = null;
+  return loadStoreSettings();
 }
 
 export { DEFAULTS as DEFAULT_STORE_SETTINGS };

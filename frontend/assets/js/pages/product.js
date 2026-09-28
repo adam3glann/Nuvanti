@@ -27,6 +27,7 @@ import {
 import { addToCart, variantStockRemaining } from "../services/cartService.js";
 
 import { toggleWishlist, isWishlisted } from "../services/wishlistService.js";
+import { startLiveRefresh } from "../services/liveRefresh.js";
 
 /* =========================================================
    PAGE SETUP
@@ -97,6 +98,17 @@ async function init() {
   await loadRelated();
 
   await loadRecentlyViewed();
+  startLiveRefresh(refreshProduct, 10000);
+}
+
+async function refreshProduct() {
+  const latest = await fetchProductBySlug(slug);
+  if (!latest || JSON.stringify(latest) === JSON.stringify(product)) return;
+  product = latest;
+  if (!product.colors?.includes(selectedColor)) selectedColor = product.colors?.[0] || null;
+  if (product.sizes?.length && !product.sizes.includes(selectedSize)) selectedSize = null;
+  renderGallery();
+  renderInfo();
 }
 
 /* =========================================================

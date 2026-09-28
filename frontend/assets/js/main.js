@@ -5,9 +5,10 @@ import { mountSearchOverlay } from './components/searchOverlay.js';
 import { initScrollReveal } from './components/scrollReveal.js';
 import { onCartChange } from './services/cartService.js';
 import { onWishlistChange } from './services/wishlistService.js';
-import { loadStoreSettings } from './services/storeSettingsService.js';
+import { loadStoreSettings, refreshStoreSettings } from './services/storeSettingsService.js';
 import { configureFreeShippingThreshold } from './services/cartService.js';
 import { startStorePresence } from './services/presenceService.js';
+import { startLiveRefresh } from './services/liveRefresh.js';
 
 export function initShell({ transparentHeader = false, currentPage = '' } = {}) {
   startStorePresence();
@@ -23,6 +24,11 @@ export function initShell({ transparentHeader = false, currentPage = '' } = {}) 
     configureFreeShippingThreshold(settings.freeShippingThresholdCents / 100);
     refreshCartDrawer();
   }).catch((error) => console.error('Store settings unavailable:', error));
+  startLiveRefresh(async () => {
+    const settings = await refreshStoreSettings();
+    configureFreeShippingThreshold(settings.freeShippingThresholdCents / 100);
+    refreshCartDrawer();
+  }, 30000);
 
   window.addEventListener('load', () => initScrollReveal());
   initScrollReveal();

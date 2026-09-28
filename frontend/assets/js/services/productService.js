@@ -4,7 +4,7 @@ import { getPublishedProducts, getProductBySlug as localBySlug } from '../data/p
 import { categories as localCategories } from '../data/categories.js';
 import { API_ORIGIN as API, LOCAL_DEVELOPMENT } from '../config.js';
 async function api(path) {
-  const response = await fetch(`${API}${path}`);
+  const response = await fetch(`${API}${path}`, { cache: 'no-store' });
   if (!response.ok) {
     const error = new Error('Catalog service unavailable');
     error.status = response.status;

@@ -2,6 +2,7 @@ import { initAdminShell } from '../components/shell.js';
 import { formatPrice, formatDate, paginationHTML, escapeHtml } from '../components/utils.js';
 import { statusBadge } from '../components/statusBadge.js';
 import { fetchAdminOrders } from '../services/orderService.js';
+import { startLiveRefresh } from '../services/liveRefresh.js';
 
 const params = new URLSearchParams(location.search);
 const state = { query: params.get('q') || '', status: params.get('status') || '', payment: '', page: 1, perPage: 10, sort: 'newest' };
@@ -18,16 +19,21 @@ function init() {
   document.getElementById('paymentFilter').addEventListener('change', (e) => { state.payment = e.target.value; state.page = 1; load(); });
   document.getElementById('sortSelect').addEventListener('change', (e) => { state.sort = e.target.value; state.page = 1; load(); });
   load();
+  startLiveRefresh(() => load(false), 5000);
 }
 
-async function load() {
+let loading = false;
+async function load(showLoading = true) {
+  if (loading) return;
+  loading = true;
   const tbody = document.getElementById('ordersBody');
-  tbody.innerHTML = `<tr><td colspan="7"><div class="a-skeleton" style="height:36px"></div></td></tr>`;
+  if (showLoading) tbody.innerHTML = `<tr><td colspan="7"><div class="a-skeleton" style="height:36px"></div></td></tr>`;
   let items, total;
   try {
     ({ items, total } = await fetchAdminOrders(state));
   } catch (error) {
     tbody.innerHTML = `<tr><td colspan="7"><div class="admin-empty"><h3>Couldn't load orders</h3><p>${escapeHtml(error.message)}</p></div></td></tr>`;
+    loading = false;
     return;
   }
 
@@ -45,6 +51,7 @@ async function load() {
 
   document.getElementById('paginationWrap').innerHTML = paginationHTML(state.page, state.perPage, total);
   document.querySelectorAll('#paginationWrap [data-page]').forEach((btn) => btn.addEventListener('click', () => { state.page = Number(btn.dataset.page); load(); }));
+  loading = false;
 }
 
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }

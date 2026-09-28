@@ -5,13 +5,14 @@ import { showAdminToast } from '../components/toast.js';
 import { confirmDialog } from '../components/confirmDialog.js';
 import { hasPermission } from '../components/permissions.js';
 import { fetchAdminOrder, updateOrderStatus, cancelOrder } from '../services/orderService.js';
+import { startLiveRefresh } from '../services/liveRefresh.js';
 
 const params = new URLSearchParams(location.search);
 const id = params.get('id');
 const session = initAdminShell({ page: 'orders', title: 'Order Details' });
 const canEdit = session && hasPermission(session.role, 'orders.edit');
 const canCancel = session && hasPermission(session.role, 'orders.cancel');
-if (session) init();
+if (session) { init(); startLiveRefresh(init, 8000, { pauseWhileEditing: true }); }
 
 async function init() {
   let order;

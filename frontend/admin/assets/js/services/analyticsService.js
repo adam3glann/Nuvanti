@@ -6,6 +6,7 @@ async function load(range) {
   if (!cache.has(range)) {
     cache.set(range, fetch(`${API_ORIGIN}/api/admin/analytics?range=${encodeURIComponent(range)}`, {
       credentials: 'include',
+      cache: 'no-store',
     }).then(async (response) => {
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || 'Unable to load analytics.');
@@ -17,6 +18,8 @@ async function load(range) {
   }
   return cache.get(range);
 }
+
+export function clearAnalyticsCache() { cache.clear(); }
 
 export async function fetchRevenueSeries(range = '30d') { return (await load(range)).series; }
 export async function fetchTopProducts(range = '30d') { return (await load(range)).topProducts; }

@@ -5,11 +5,12 @@ import { showAdminToast } from '../components/toast.js';
 import { confirmDialog } from '../components/confirmDialog.js';
 import { hasPermission } from '../components/permissions.js';
 import { fetchAdminCustomer, toggleCustomerStatus } from '../services/customerService.js';
+import { startLiveRefresh } from '../services/liveRefresh.js';
 
 const id = new URLSearchParams(location.search).get('id');
 const session = initAdminShell({ page: 'customers', title: 'Customer Details' });
 const canDisable = session && hasPermission(session.role, 'customers.disable');
-if (session) init();
+if (session) { init(); startLiveRefresh(init, 12000, { pauseWhileEditing: true }); }
 
 async function init() {
   if (!id) {

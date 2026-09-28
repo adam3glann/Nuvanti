@@ -2,9 +2,10 @@ import { initAdminShell } from '../components/shell.js';
 import { formatDateTime, escapeHtml } from '../components/utils.js';
 import { showAdminToast } from '../components/toast.js';
 import { fetchMessages, setMessageRead } from '../services/messageService.js';
+import { startLiveRefresh } from '../services/liveRefresh.js';
 
 const session = initAdminShell({ page: 'messages', title: 'Contact Messages' });
-if (session) load();
+ if (session) { load(); startLiveRefresh(load, 10000); }
 
 async function load() {
   const root = document.getElementById('messagesRoot');

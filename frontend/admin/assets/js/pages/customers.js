@@ -2,6 +2,7 @@ import { initAdminShell } from '../components/shell.js';
 import { formatPrice, formatDate, paginationHTML, escapeHtml } from '../components/utils.js';
 import { statusBadge } from '../components/statusBadge.js';
 import { fetchAdminCustomers } from '../services/customerService.js';
+import { startLiveRefresh } from '../services/liveRefresh.js';
 
 const state = { query: '', status: '', page: 1, perPage: 10, sort: 'recent' };
 
@@ -13,6 +14,7 @@ function init() {
   document.getElementById('statusFilter').addEventListener('change', (e) => { state.status = e.target.value; state.page = 1; load(); });
   document.getElementById('sortSelect').addEventListener('change', (e) => { state.sort = e.target.value; state.page = 1; load(); });
   load();
+  startLiveRefresh(load, 12000);
 }
 
 async function load() {

@@ -3,10 +3,11 @@ import { showAdminToast } from '../components/toast.js';
 import { hasPermission } from '../components/permissions.js';
 import { getEmailStatus, getSettings, saveSettingsSection, sendAdminTestEmail } from '../services/settingsService.js';
 import { escapeHtml } from '../components/utils.js';
+import { startLiveRefresh } from '../services/liveRefresh.js';
 
 const session = initAdminShell({ page: 'settings', title: 'Settings' });
 const canEdit = session && hasPermission(session.role, 'settings.edit');
-if (session) init();
+if (session) { init(); startLiveRefresh(init, 20000, { pauseWhileEditing: true }); }
 
 let tab = 'general';
 let settings;

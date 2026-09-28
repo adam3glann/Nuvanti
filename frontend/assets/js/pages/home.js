@@ -4,8 +4,9 @@ import { productCardHTML, bindProductCardEvents } from '../components/productCar
 import { refreshCartDrawer } from '../components/cartDrawer.js';
 import { subscribeToNewsletter, unsubscribeFromNewsletter } from '../services/newsletterService.js';
 import { fetchHomepageSlides } from '../services/homepageService.js';
+import { startLiveRefresh } from '../services/liveRefresh.js';
 import {
-  fetchFeatured, fetchBestsellers, fetchNewArrivals, fetchCategories,
+  fetchFeatured, fetchBestsellers, fetchNewArrivals, fetchCategories, fetchProducts,
 } from '../services/productService.js';
 
 initShell({ transparentHeader: true, currentPage: 'index' });
@@ -42,6 +43,14 @@ loadNewArrivals();
 loadBestsellers();
 initNewsletter();
 initInstagramGrid();
+document.getElementById('naPrev')?.addEventListener('click', () => document.getElementById('newArrivalsTrack')?.scrollBy({ left: -320, behavior: 'smooth' }));
+document.getElementById('naNext')?.addEventListener('click', () => document.getElementById('newArrivalsTrack')?.scrollBy({ left: 320, behavior: 'smooth' }));
+let lastHeroSlides = '';
+startLiveRefresh(async () => {
+  await loadHeroSlides();
+  const [products, categories] = await Promise.all([fetchProducts(), fetchCategories()]);
+  await Promise.all([loadFeatured(products), loadCategories(categories), loadNewArrivals(products), loadBestsellers(products)]);
+}, 20000);
 
 async function loadHeroSlides() {
   let slides;
@@ -55,8 +64,11 @@ async function loadHeroSlides() {
       secondaryLabel: slide.secondary?.label || '', secondaryHref: slide.secondary?.href || '',
     }));
   }
+  const signature = JSON.stringify(slides);
+  if (signature === lastHeroSlides) return;
+  lastHeroSlides = signature;
   renderHero(slides);
-  if (slides.length) initHeroSlider();
+  initHeroSlider();
 }
 
 function renderHero(slides) {
@@ -131,13 +143,17 @@ function textGradientAttributes(slide, part) {
   return `data-text-gradient="${enabled}" style="${styles.join(';')}"`;
 }
 
+let heroSliderCleanup = () => {};
 function initHeroSlider() {
+  heroSliderCleanup();
   const slider = document.getElementById('heroSlider');
   const slides = [...slider.querySelectorAll('.hero-slide')];
   const dots = [...slider.querySelectorAll('.hero-dot')];
   if (slides.length < 2) return;
 
   const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const controller = new AbortController();
+  const { signal } = controller;
   let current = 0;
   let timer;
 
@@ -177,26 +193,28 @@ function initHeroSlider() {
     startAutoplay();
   }
 
-  document.getElementById('heroNext').addEventListener('click', () => manualGo(next));
-  document.getElementById('heroPrev').addEventListener('click', () => manualGo(prev));
-  dots.forEach((dot) => dot.addEventListener('click', () => manualGo(() => goTo(Number(dot.dataset.goto)))));
-  document.addEventListener('visibilitychange', startAutoplay);
-  motionPreference.addEventListener?.('change', startAutoplay);
+  document.getElementById('heroNext').addEventListener('click', () => manualGo(next), { signal });
+  document.getElementById('heroPrev').addEventListener('click', () => manualGo(prev), { signal });
+  dots.forEach((dot) => dot.addEventListener('click', () => manualGo(() => goTo(Number(dot.dataset.goto))), { signal }));
+  document.addEventListener('visibilitychange', startAutoplay, { signal });
+  motionPreference.addEventListener?.('change', startAutoplay, { signal });
 
   slider.setAttribute('tabindex', '0');
   slider.addEventListener('keydown', (event) => {
     if (event.key === 'ArrowRight') manualGo(next);
     if (event.key === 'ArrowLeft') manualGo(prev);
-  });
+  }, { signal });
 
   let startX = null;
-  slider.addEventListener('touchstart', (event) => { startX = event.touches[0].clientX; }, { passive: true });
+  slider.addEventListener('touchstart', (event) => { startX = event.touches[0].clientX; }, { passive: true, signal });
   slider.addEventListener('touchend', (event) => {
     if (startX == null) return;
     const dx = event.changedTouches[0].clientX - startX;
     if (Math.abs(dx) > 40) manualGo(dx < 0 ? next : prev);
     startX = null;
-  }, { passive: true });
+  }, { passive: true, signal });
+
+  heroSliderCleanup = () => { clearTimeout(timer); controller.abort(); };
 
   startAutoplay();
 }
@@ -205,19 +223,19 @@ function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 }
 
-async function loadFeatured() {
+async function loadFeatured(products = null) {
   const el = document.getElementById('featuredGrid');
   try {
-    const list = await fetchFeatured();
+    const list = products ? products.filter((product) => product.featured) : await fetchFeatured();
     el.innerHTML = list.slice(0, 8).map(productCardHTML).join('');
     bindProductCardEvents(el, { products: list, onCartChange: refreshCartDrawer });
   } catch { el.innerHTML = serviceUnavailable(); }
 }
 
-async function loadCategories() {
+async function loadCategories(categories = null) {
   const el = document.getElementById('categoryGrid');
   try {
-  const list = await fetchCategories();
+  const list = categories || await fetchCategories();
   el.innerHTML = list.map((c, index) => `
     <a class="category-card reveal" style="--card-order:${Math.min(index, 7)}" href="shop.html?category=${encodeURIComponent(c.slug)}">
       <img src="${escapeHtml(c.image)}" alt="${escapeHtml(c.name)}" loading="lazy" />
@@ -231,23 +249,20 @@ async function loadCategories() {
   } catch { el.innerHTML = serviceUnavailable(); }
 }
 
-async function loadNewArrivals() {
+async function loadNewArrivals(products = null) {
   const el = document.getElementById('newArrivalsTrack');
   try {
-  const list = await fetchNewArrivals();
+  const list = products ? products.filter((product) => product.newArrival) : await fetchNewArrivals();
   el.innerHTML = list.map(productCardHTML).join('');
   bindProductCardEvents(el, { products: list, onCartChange: refreshCartDrawer });
 
-  const track = document.getElementById('newArrivalsTrack');
-  document.getElementById('naPrev')?.addEventListener('click', () => track.scrollBy({ left: -320, behavior: 'smooth' }));
-  document.getElementById('naNext')?.addEventListener('click', () => track.scrollBy({ left: 320, behavior: 'smooth' }));
   } catch { el.innerHTML = serviceUnavailable(); }
 }
 
-async function loadBestsellers() {
+async function loadBestsellers(products = null) {
   const el = document.getElementById('bestsellerGrid');
   try {
-    const list = await fetchBestsellers();
+    const list = products ? products.filter((product) => product.bestseller) : await fetchBestsellers();
     el.innerHTML = list.slice(0, 4).map(productCardHTML).join('');
     bindProductCardEvents(el, { products: list, onCartChange: refreshCartDrawer });
   } catch { el.innerHTML = serviceUnavailable(); }

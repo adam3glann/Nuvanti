@@ -10,6 +10,7 @@ import {
   productStockStatus, productStockTotal,
 } from '../services/productService.js';
 import { fetchCategories } from '../services/categoryService.js';
+import { startLiveRefresh } from '../services/liveRefresh.js';
 
 const session = initAdminShell({ page: 'products', title: 'Products' });
 if (session) init();
@@ -38,6 +39,7 @@ async function init() {
   document.getElementById('bulkDelete').addEventListener('click', bulkDelete);
 
   load();
+  startLiveRefresh(load, 12000, { pauseWhileEditing: true });
 }
 
 async function load() {

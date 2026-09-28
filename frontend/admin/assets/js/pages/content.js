@@ -6,6 +6,7 @@ import {
   updateHomepageSlide, uploadHomepageSlideImage,
 } from '../services/homepageSlideService.js';
 import { escapeHtml } from '../components/utils.js';
+import { startLiveRefresh } from '../services/liveRefresh.js';
 
 const session = initAdminShell({ page: 'content', title: 'Homepage Slides' });
 const root = document.getElementById('contentRoot');
@@ -13,15 +14,21 @@ let slides = [];
 if (session) {
   if (!hasPermission(session.role, 'content.manage')) {
     root.innerHTML = '<div class="admin-empty"><h1>Restricted</h1><p>You do not have permission to manage homepage slides.</p></div>';
-  } else loadSlides();
+  } else {
+    loadSlides();
+    startLiveRefresh(() => loadSlides(true), 12000, { pauseWhileEditing: true });
+  }
 }
 
-async function loadSlides() {
-  root.innerHTML = '<div class="admin-empty"><p>Loading homepage slides…</p></div>';
+async function loadSlides(quiet = false) {
+  if (!quiet) root.innerHTML = '<div class="admin-empty"><p>Loading homepage slides…</p></div>';
   try {
-    slides = await fetchHomepageSlides();
+    const nextSlides = await fetchHomepageSlides();
+    if (JSON.stringify(nextSlides) === JSON.stringify(slides)) return;
+    slides = nextSlides;
     render();
   } catch (error) {
+    if (quiet) return;
     root.innerHTML = `<div class="admin-empty"><h2>Slides unavailable</h2><p>${escapeHtml(error.message)}</p><button class="btn btn-outline" id="retrySlides">Try again</button></div>`;
     root.querySelector('#retrySlides')?.addEventListener('click', loadSlides);
   }

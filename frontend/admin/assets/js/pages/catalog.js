@@ -9,6 +9,7 @@ import {
   fetchCategories, toggleCategoryStatus, deleteCategory, createCategory, editCategory, uploadCategoryImage,
   fetchCollections, toggleCollectionStatus, deleteCollection, createCollection,
 } from '../services/categoryService.js';
+import { startLiveRefresh } from '../services/liveRefresh.js';
 
 const params = new URLSearchParams(location.search);
 let tab = params.get('tab') === 'collections' ? 'collections' : 'categories';
@@ -30,6 +31,7 @@ function init() {
   renderTabs();
   document.getElementById('newBtn').addEventListener('click', () => (tab === 'categories' ? openCategoryEditor() : openNewCollection()));
   render();
+  startLiveRefresh(render, 15000, { pauseWhileEditing: true });
 }
 
 function renderTabs() {

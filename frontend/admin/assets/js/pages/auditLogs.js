@@ -1,7 +1,8 @@
 import { initAdminShell } from '../components/shell.js';
 import { formatDateTime, paginationHTML, escapeHtml } from '../components/utils.js';
 import { hasPermission } from '../components/permissions.js';
-import { fetchAuditLogs, uniqueUsers } from '../services/auditLogService.js';
+import { fetchAuditLogs, uniqueUsers, clearAuditLogCache } from '../services/auditLogService.js';
+import { startLiveRefresh } from '../services/liveRefresh.js';
 
 const state = { query: '', user: '', page: 1, perPage: 15 };
 
@@ -20,6 +21,7 @@ async function init() {
   document.getElementById('searchInput').addEventListener('input', debounce((e) => { state.query = e.target.value; state.page = 1; load(); }, 250));
   document.getElementById('userFilter').addEventListener('change', (e) => { state.user = e.target.value; state.page = 1; load(); });
   load();
+  startLiveRefresh(() => { clearAuditLogCache(); return load(); }, 15000);
 }
 
 async function load() {

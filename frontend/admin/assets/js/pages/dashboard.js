@@ -3,10 +3,15 @@ import { escapeHtml, formatBusinessAmount, formatDate } from '../components/util
 import { statusBadge } from '../components/statusBadge.js';
 import { lineChart } from '../components/charts.js';
 import { fetchRecentAdminOrders } from '../services/orderService.js';
-import { fetchRevenueSeries, fetchFinancialSummary } from '../services/analyticsService.js';
+import { fetchRevenueSeries, fetchFinancialSummary, clearAnalyticsCache } from '../services/analyticsService.js';
+import { startLiveRefresh } from '../services/liveRefresh.js';
 
 const session = initAdminShell({ page: 'dashboard', title: 'Dashboard' });
-if (session) render();
+if (session) {
+  document.getElementById('rangeSelect').addEventListener('change', (e) => renderChart(e.target.value));
+  render();
+  startLiveRefresh(() => { clearAnalyticsCache(); return render(); }, 10000);
+}
 
 async function render() {
   const [financialResult, dashboardResult, recentResult] = await Promise.allSettled([
@@ -86,14 +91,13 @@ async function render() {
       </div>`).join('')
     : `<p style="color:var(--a-muted);font-size:.83rem">All products are well stocked.</p>`;
 
-  renderChart('30d').catch((error) => {
+  renderChart(document.getElementById('rangeSelect').value || '30d').catch((error) => {
     document.getElementById('revenueChart').textContent = `Chart unavailable: ${error.message}`;
   });
-  document.getElementById('rangeSelect').addEventListener('change', (e) => renderChart(e.target.value));
 }
 
 async function loadDashboardSummary() {
-  const response = await fetch(`${location.origin}/api/admin/dashboard`, { credentials: 'include' });
+  const response = await fetch(`${location.origin}/api/admin/dashboard`, { credentials: 'include', cache: 'no-store' });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body.error || 'Unable to load dashboard statistics.');
   return body;

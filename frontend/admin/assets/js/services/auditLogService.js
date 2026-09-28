@@ -60,6 +60,7 @@ function normalize(row) {
 }
 
 let cache = null;
+export function clearAuditLogCache() { cache = null; }
 async function loadAll() {
   if (!cache) cache = (await request('/api/admin/audit-logs')).map(normalize);
   return cache;

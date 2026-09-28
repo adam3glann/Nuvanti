@@ -3,6 +3,7 @@ import { API_ORIGIN } from '../config.js';
 async function request(path, options = {}) {
   const response = await fetch(`${API_ORIGIN}${path}`, {
     credentials: 'include',
+    cache: 'no-store',
     headers: { 'Content-Type': 'application/json' },
     ...options,
   });

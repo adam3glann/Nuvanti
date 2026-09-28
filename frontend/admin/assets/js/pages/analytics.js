@@ -2,6 +2,8 @@ import { initAdminShell } from '../components/shell.js';
 import { formatPrice, escapeHtml } from '../components/utils.js';
 import { lineChart, barChart } from '../components/charts.js';
 import { fetchRevenueSeries, fetchTopProducts, fetchTopCategories, fetchPendingOrders, summarize } from '../services/analyticsService.js';
+import { clearAnalyticsCache } from '../services/analyticsService.js';
+import { startLiveRefresh } from '../services/liveRefresh.js';
 
 const session = initAdminShell({ page: 'analytics', title: 'Analytics' });
 if (session) init();
@@ -10,6 +12,7 @@ let activeRender = 0;
 function init() {
   document.getElementById('rangeSelect').addEventListener('change', (e) => render(e.target.value));
   render('30d');
+  startLiveRefresh(() => { clearAnalyticsCache(); return render(document.getElementById('rangeSelect').value); }, 15000);
 }
 
 async function render(range) {

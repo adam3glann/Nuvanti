@@ -6,7 +6,8 @@ import { getCurrentUser } from '../services/authService.js';
 import { showToast } from '../components/toast.js';
 import { refreshCartDrawer } from '../components/cartDrawer.js';
 import { checkDiscount, getSavedDiscountCode, saveDiscountCode, clearDiscountCode } from '../services/discountService.js';
-import { loadStoreSettings } from '../services/storeSettingsService.js';
+import { loadStoreSettings, refreshStoreSettings } from '../services/storeSettingsService.js';
+import { startLiveRefresh } from '../services/liveRefresh.js';
 import { fetchProductBySlug } from '../services/productService.js';
 import { fetchAddresses } from '../services/addressService.js';
 import { API_ORIGIN } from '../config.js';
@@ -70,6 +71,30 @@ async function initializeCheckout() {
   render();
   await restoreSavedDiscount();
   renderSummary();
+  startLiveRefresh(async () => {
+    const latestProducts = await Promise.all([...new Set(lines.map((line) => line.slug))].map(fetchProductBySlug));
+    const stockChanges = syncCartWithProducts(latestProducts);
+    lines = getCart();
+    if (!lines.length) {
+      showToast('The items in your bag are no longer available.');
+      window.location.href = 'cart.html';
+      return;
+    }
+    if (stockChanges.removed.length || stockChanges.adjusted.length || stockChanges.priceChanged) {
+      await restoreSavedDiscount();
+      renderSummary();
+      showToast('Your bag was updated to match current stock and prices. Please review the order summary.');
+    }
+    const latest = await refreshStoreSettings();
+    if (JSON.stringify(latest) === JSON.stringify(storeSettings)) return;
+    storeSettings = latest;
+    const subtotal = cartSubtotal();
+    const standard = document.querySelector('.delivery-option[data-value="standard"] .delivery-option__price');
+    const express = document.querySelector('.delivery-option[data-value="express"] .delivery-option__price');
+    if (standard) standard.textContent = subtotal >= storeSettings.freeShippingThresholdCents / 100 ? 'Free' : formatPrice(storeSettings.standardShippingCents / 100);
+    if (express) express.textContent = formatPrice(storeSettings.expressShippingCents / 100);
+    renderSummary();
+  }, 15000);
 }
 
 async function restoreSavedDiscount() {
