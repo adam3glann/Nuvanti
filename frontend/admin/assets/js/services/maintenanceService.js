@@ -40,3 +40,10 @@ export function resetStoreData() {
     body: JSON.stringify({ confirmation: 'RESET STORE DATA' }),
   });
 }
+
+export async function restoreStoreBackup(file) {
+  const form = new FormData();
+  form.set('backupFile', file);
+  form.set('confirmation', 'RESTORE STORE BACKUP');
+  return maintenanceRequest('restore', { method: 'POST', body: form });
+}

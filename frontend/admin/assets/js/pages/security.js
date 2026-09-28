@@ -71,15 +71,23 @@ function openEnableMfa() {
     try {
       const setup = await beginMfaSetup(modal.root.querySelector('#mfaCurrentPassword').value);
       modal.root.querySelector('.a-modal__body').innerHTML = `
-        <p>In your authenticator app, choose <strong>Enter setup key</strong> and add this account:</p>
+        <p>Scan this QR code with your authenticator app, then enter the current 6-digit code. Keep this screen private.</p>
+        <div style="display:flex;justify-content:center;margin:1rem 0;padding:1rem;background:#fff;border-radius:12px"><img src="${escapeHtml(setup.qrCodeDataUrl)}" alt="Authenticator app setup QR code" width="240" height="240" style="display:block;max-width:100%;height:auto;image-rendering:pixelated" /></div>
+        <details style="margin-bottom:1rem"><summary>Can't scan the QR code? Enter the setup key manually.</summary>
         <div class="field"><label>Account</label><input readonly value="${escapeHtml(session.email)}" /></div>
-        <div class="field"><label>Setup key</label><input id="mfaSetupSecret" readonly value="${escapeHtml(setup.secret)}" /></div>
-        <p class="hint">In Google Authenticator, Microsoft Authenticator, or another TOTP app, add an account using the setup key above and choose time-based codes. Enter the current 6-digit code here. If it is rejected, sync your phone's date and time automatically, wait for the next code, and try again. Keep the setup key private. This setup expires in 10 minutes.</p>
+        <div class="field"><label>Setup key</label><input id="mfaSetupSecret" readonly value="${escapeHtml(setup.secret)}" /></div></details>
+        <p class="hint">Works with Google Authenticator, Microsoft Authenticator, and other TOTP apps. If the code is rejected, sync your phone's date and time automatically and try the next code. Setup expires in 10 minutes.</p>
         <div class="field"><label for="mfaSetupCode">6-digit code from the app</label><input id="mfaSetupCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" /></div>`;
       modal.root.querySelector('.a-modal__foot').innerHTML = '<button class="btn btn-outline" id="mfaCopyKey">Copy setup key</button><button class="btn btn-primary" id="mfaVerifySetup">Verify and Enable</button>';
       modal.root.querySelector('#mfaCopyKey').addEventListener('click', async () => {
         try { await navigator.clipboard.writeText(setup.secret); showAdminToast('Setup key copied.', 'success'); }
-        catch { const input = modal.root.querySelector('#mfaSetupSecret'); input.select(); showAdminToast('Copy the selected setup key.', 'info'); }
+        catch {
+          const details = modal.root.querySelector('details');
+          details.open = true;
+          const input = modal.root.querySelector('#mfaSetupSecret');
+          input.select();
+          showAdminToast('Copy the selected setup key.', 'info');
+        }
       });
       modal.root.querySelector('#mfaVerifySetup').addEventListener('click', async (event) => {
         const verifyButton = event.currentTarget;

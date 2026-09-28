@@ -91,6 +91,14 @@
             <button class="btn btn-danger" id="resetStoreData" type="button" disabled>Reset customer, order & dashboard data</button>
           </div>
           <p class="maintenance-note" id="maintenanceNote" role="status">Reset stays locked until a backup has downloaded. It deletes customers, orders, saved addresses, messages, newsletter subscribers, inventory adjustment history, visitor sessions and view totals. It restores stock reserved by non-cancelled test orders. Admin accounts, products and stock, photos, categories, collections, homepage slides and text, store settings, and discount codes are kept.</p>
+          <div class="maintenance-restore">
+            <h3>Restore from a backup file</h3>
+            <p class="maintenance-note">Choose a previously downloaded Nuvanti JSON backup. This replaces the exported store data with that snapshot; current admin accounts and their passwords and MFA stay unchanged. Customer passwords, sessions, MFA secrets, Paymob transaction references, and private tokens are not in the file. Restored customers will need password resets; restore will not recreate payment-provider references or old newsletter unsubscribe links.</p>
+            <label for="restoreBackupFile">Backup file (.json)</label>
+            <input id="restoreBackupFile" type="file" accept=".json,application/json" />
+            <p class="maintenance-note" id="restoreBackupPreview" role="status" aria-live="polite">Select a backup file to preview its contents.</p>
+            <button class="btn btn-danger" id="restoreStoreBackup" type="button" disabled>Restore selected backup</button>
+          </div>
         </div>
       </section>
     </div>
@@ -105,6 +113,10 @@
 .maintenance-intro,.maintenance-note{font-size:.84rem;line-height:1.6;color:var(--a-muted);max-width:78rem}
 .maintenance-actions{display:flex;flex-wrap:wrap;gap:.75rem;margin:1rem 0}
 .maintenance-actions .btn-danger{background:var(--a-danger,#a33);color:#fff;border-color:var(--a-danger,#a33)}
+.maintenance-restore{border-top:1px solid var(--a-border);margin-top:1.5rem;padding-top:1.25rem;max-width:52rem}
+.maintenance-restore h3{margin:0 0 .5rem;font-size:1rem}
+.maintenance-restore label{display:block;margin:.75rem 0 .4rem;font-size:.85rem;font-weight:600}
+.maintenance-restore input[type=file]{display:block;max-width:100%;margin-bottom:.75rem}
 .maintenance-actions button:disabled{opacity:.5;cursor:not-allowed}
 @media (max-width:960px){ .dash-split{ grid-template-columns:1fr !important; } }
 </style>

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { z } from 'zod';
+import QRCode from 'qrcode';
 import { query, transaction } from '../lib/db.js';
 import { clearMfaChallengeCookie, clearSession, issueSession, readMfaChallenge, readSession, requireAuth, requireRole, setMfaChallengeCookie, setSessionCookie } from '../lib/auth.js';
 import { sendPasswordReset, sendVerificationEmail } from '../lib/mail.js';
@@ -220,7 +221,10 @@ router.post('/mfa/setup', requireAuth, requireStaff, asyncRoute(async (req, res)
   try { encryptedSecret = encryptTotpSecret(secret); }
   catch (error) { return res.status(error.status || 500).json({ error: error.message }); }
   await query(`UPDATE users SET totp_pending_secret_enc = $1, totp_pending_expires_at = NOW() + INTERVAL '10 minutes' WHERE id = $2`, [encryptedSecret, user.id]);
-  res.json({ secret, otpauthUri: createOtpAuthUri(secret, user.email), expiresInSeconds: 600 });
+  const otpauthUri = createOtpAuthUri(secret, user.email);
+  const qrCodeDataUrl = await QRCode.toDataURL(otpauthUri, { errorCorrectionLevel: 'M', margin: 2, width: 240 });
+  res.set('Cache-Control', 'no-store');
+  res.json({ secret, otpauthUri, qrCodeDataUrl, expiresInSeconds: 600 });
 }));
 
 router.get('/mfa/status', requireAuth, requireStaff, asyncRoute(async (req, res) => {

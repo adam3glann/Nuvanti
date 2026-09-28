@@ -5,7 +5,7 @@ import { lineChart } from '../components/charts.js';
 import { fetchRecentAdminOrders } from '../services/orderService.js';
 import { fetchRevenueSeries, fetchFinancialSummary, clearAnalyticsCache } from '../services/analyticsService.js';
 import { startLiveRefresh } from '../services/liveRefresh.js';
-import { downloadStoreBackup, resetStoreData } from '../services/maintenanceService.js';
+import { downloadStoreBackup, resetStoreData, restoreStoreBackup } from '../services/maintenanceService.js';
 import { showAdminToast } from '../components/toast.js';
 
 const session = initAdminShell({ page: 'dashboard', title: 'Dashboard' });
@@ -24,17 +24,88 @@ function initStoreMaintenance(adminSession) {
   const backupButton = document.getElementById('downloadStoreBackup');
   const resetButton = document.getElementById('resetStoreData');
   const note = document.getElementById('maintenanceNote');
+  const restoreFileInput = document.getElementById('restoreBackupFile');
+  const restorePreview = document.getElementById('restoreBackupPreview');
+  const restoreButton = document.getElementById('restoreStoreBackup');
   let backupDownloaded = false;
+  let selectedRestoreFile = null;
+
+  const updateActionButtons = () => {
+    resetButton.disabled = !backupDownloaded;
+    restoreButton.disabled = !backupDownloaded || !selectedRestoreFile;
+  };
 
   backupButton.addEventListener('click', async () => {
     backupButton.disabled = true;
     try {
       await downloadStoreBackup();
       backupDownloaded = true;
-      resetButton.disabled = false;
+      updateActionButtons();
       note.textContent = 'Backup downloaded. The reset button is unlocked; it will still ask you to confirm the destructive action.';
       showAdminToast('Store backup downloaded.', 'success');
     } catch (error) {
+      showAdminToast(error.message, 'error');
+    } finally {
+      backupButton.disabled = false;
+    }
+  });
+
+  restoreFileInput.addEventListener('change', async () => {
+    selectedRestoreFile = null;
+    updateActionButtons();
+    const file = restoreFileInput.files?.[0];
+    if (!file) {
+      restorePreview.textContent = 'Select a backup file to preview its contents.';
+      return;
+    }
+    if (file.size > 25 * 1024 * 1024) {
+      restorePreview.textContent = 'This file is larger than the 25 MB restore limit.';
+      return;
+    }
+
+    try {
+      const backup = JSON.parse(await file.text());
+      const sections = ['customers', 'products', 'categories', 'collections', 'homepageSlides', 'storeSettings', 'discounts', 'orders', 'orderItems', 'addresses', 'contactMessages', 'newsletterSubscribers', 'inventoryAdjustments', 'auditLogs'];
+      if (backup?.format !== 'nuvanti-store-backup' || backup.version !== 1 || sections.some((key) => !Array.isArray(backup[key]))) {
+        throw new Error('This is not a supported Nuvanti store backup.');
+      }
+      selectedRestoreFile = file;
+      restorePreview.textContent = `Backup from ${backup.generatedAt || 'an unknown date'}: ${backup.customers.length} customers, ${backup.orders.length} orders, ${backup.products.length} products, and ${backup.homepageSlides.length} homepage slides. Admin accounts and login security data are not included.`;
+      if (!backupDownloaded) restorePreview.textContent += ' Download a current backup before restoring to unlock the button.';
+      updateActionButtons();
+    } catch (error) {
+      restorePreview.textContent = error.message || 'The selected file is not valid JSON.';
+    }
+  });
+
+  restoreButton.addEventListener('click', async () => {
+    if (!backupDownloaded || !selectedRestoreFile) return;
+    const accepted = window.confirm('Restoring replaces the exported customer, order, catalog, content, settings, and dashboard data with the selected backup. Current admin accounts and their passwords and MFA are kept. Customer passwords and payment-provider transaction references are not in the backup. Continue?');
+    if (!accepted) return;
+    if (window.prompt('To confirm, type RESTORE STORE BACKUP exactly:') !== 'RESTORE STORE BACKUP') {
+      showAdminToast('Restore cancelled. The confirmation text did not match.', 'info');
+      return;
+    }
+
+    restoreButton.disabled = true;
+    backupButton.disabled = true;
+    resetButton.disabled = true;
+    restoreButton.textContent = 'Restoring…';
+    try {
+      const result = await restoreStoreBackup(selectedRestoreFile);
+      backupDownloaded = false;
+      selectedRestoreFile = null;
+      restoreFileInput.value = '';
+      restorePreview.textContent = `Restore complete: ${result.customers} customers, ${result.orders} orders, and ${result.products} products restored. ${result.customersNeedingPasswordReset} restored customer accounts need password resets because passwords are not stored in backups.`;
+      restoreButton.textContent = 'Restore selected backup';
+      updateActionButtons();
+      clearAnalyticsCache();
+      await render();
+      window.dispatchEvent(new Event('nuvanti:refresh-store-presence'));
+      showAdminToast('Store data restored from backup.', 'success');
+    } catch (error) {
+      restoreButton.textContent = 'Restore selected backup';
+      updateActionButtons();
       showAdminToast(error.message, 'error');
     } finally {
       backupButton.disabled = false;
@@ -56,6 +127,7 @@ function initStoreMaintenance(adminSession) {
     try {
       const result = await resetStoreData();
       backupDownloaded = false;
+      updateActionButtons();
       resetButton.textContent = 'Reset customer, order & dashboard data';
       note.textContent = `Cleanup complete: removed ${result.customers} customer accounts and ${result.orders} orders. Store products, photos and design were kept; stock was restored for prior non-cancelled orders. Download a fresh backup before another reset.`;
       clearAnalyticsCache();

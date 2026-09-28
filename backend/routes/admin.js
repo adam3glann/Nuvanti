@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import multer from 'multer';
 import { query, transaction } from '../lib/db.js';
 import { productPayload, toAdminProduct, toPublicProduct } from '../lib/catalog.js';
 import { hasPermission, requirePermission } from '../lib/permissions.js';
@@ -9,10 +10,12 @@ import { logAudit } from '../lib/audit.js';
 import { emailDeliveryStatus, sendAdminWelcome, sendTestEmail, sendOrderStatusUpdate } from '../lib/mail.js';
 import { adminPublicOrigin, storePublicOrigin } from '../lib/publicOrigins.js';
 import { restoreOrderInventory } from '../lib/orderLifecycle.js';
+import { restoreStoreBackup, validateStoreBackup } from '../lib/maintenanceBackup.js';
 const router = Router();
 const asyncRoute = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
 const MANAGEABLE_ROLES = ['staff', 'manager', 'admin', 'super_admin'];
 const RESETTABLE_ROLES = ['admin', 'super_admin'];
+const restoreBackupUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024, files: 1 } });
 function requireStoreMaintenanceRole(req, res, next) {
   if (!RESETTABLE_ROLES.includes(req.user?.role)) return res.status(403).json({ error: 'Only an administrator can export or reset store data.' });
   next();
@@ -125,6 +128,24 @@ router.get('/maintenance/backup', requireStoreMaintenanceRole, asyncRoute(async 
     };
   });
   res.set({ 'Cache-Control': 'no-store', 'Content-Disposition': 'attachment; filename="nuvanti-store-backup.json"' }).json(backup);
+}));
+
+router.post('/maintenance/restore', requireStoreMaintenanceRole, restoreBackupUpload.single('backupFile'), asyncRoute(async (req, res) => {
+  if (req.body?.confirmation !== 'RESTORE STORE BACKUP') {
+    return res.status(400).json({ error: 'Type RESTORE STORE BACKUP to confirm this operation.' });
+  }
+  if (!req.file) return res.status(400).json({ error: 'Choose a Nuvanti JSON backup file first.' });
+
+  let backup;
+  try {
+    backup = validateStoreBackup(JSON.parse(req.file.buffer.toString('utf8')));
+  } catch (error) {
+    return res.status(400).json({ error: error.message || 'The selected backup file is not valid JSON.' });
+  }
+
+  const result = await transaction((client) => restoreStoreBackup(client, backup));
+  await logAudit({ req, action: 'store.backup_restored', targetType: 'store', targetId: 'backup', metadata: result });
+  res.set('Cache-Control', 'no-store').json({ ok: true, ...result });
 }));
 
 router.post('/maintenance/reset', requireStoreMaintenanceRole, asyncRoute(async (req, res) => {
