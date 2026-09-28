@@ -250,9 +250,16 @@ adminApp.use((req, res, next) => {
 });
 adminApp.use(cookieParser());
 // A brand favicon is public, including on the unauthenticated login page.
-adminApp.get("/favicon.svg", (req, res) =>
-  res.sendFile(path.join(frontendRoot, "admin/favicon.svg")),
-);
+  adminApp.get("/favicon.svg", (req, res) =>
+    res.sendFile(path.join(frontendRoot, "admin/favicon.svg")),
+  );
+  // Keep the raster tab and home-screen icons public for mobile browsers too.
+  adminApp.get("/favicon.png", (req, res) =>
+    res.sendFile(path.join(frontendRoot, "favicon.png")),
+  );
+  adminApp.get("/apple-touch-icon.png", (req, res) =>
+    res.sendFile(path.join(frontendRoot, "apple-touch-icon.png")),
+  );
 adminApp.get("/login.html", (req, res) =>
   res.sendFile(path.join(frontendRoot, "admin/login.html")),
 );
