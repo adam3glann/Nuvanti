@@ -12,6 +12,11 @@ import { restoreOrderInventory } from '../lib/orderLifecycle.js';
 const router = Router();
 const asyncRoute = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
 const MANAGEABLE_ROLES = ['staff', 'manager', 'admin', 'super_admin'];
+const RESETTABLE_ROLES = ['admin', 'super_admin'];
+function requireStoreMaintenanceRole(req, res, next) {
+  if (!RESETTABLE_ROLES.includes(req.user?.role)) return res.status(403).json({ error: 'Only an administrator can export or reset store data.' });
+  next();
+}
 const productImage = z.string().trim().max(1000).refine((value) => {
   if (/^https:\/\//i.test(value)) { try { return new URL(value).protocol === 'https:'; } catch { return false; } }
   return /^\/?assets\/[\w./-]+(?:\?[\w%=&.-]*)?$/.test(value) && !value.includes('..');
@@ -81,8 +86,107 @@ const homepageSlideColumns = 'id::text, image_url AS "imageUrl", mobile_image_ur
 router.get('/store-presence', asyncRoute(async (req, res) => {
   const { rows } = await query(`SELECT count(DISTINCT visitor_id)::int AS "activeVisitors",
       COALESCE((SELECT total_views FROM storefront_metrics WHERE id = 1), 0)::text AS "totalViews"
-    FROM storefront_presence WHERE last_seen_at >= NOW() - INTERVAL '35 seconds'`);
+    FROM storefront_presence WHERE last_seen_at >= NOW() - INTERVAL '12 seconds'`);
   res.set('Cache-Control', 'no-store').json(rows[0] || { activeVisitors: 0, totalViews: '0' });
+}));
+
+// This backup intentionally omits password hashes, MFA secrets, sessions,
+// reset/verification tokens, payment gateway references, IPs, and visitor IDs.
+router.get('/maintenance/backup', requireStoreMaintenanceRole, asyncRoute(async (req, res) => {
+  const backup = await transaction(async (client) => {
+    await client.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');
+    const read = async (sql) => (await client.query(sql)).rows;
+    const [customers, administrators, products, categories, collections, homepageSlides,
+      storeSettings, discounts, orders, orderItems, addresses, contactMessages,
+      newsletterSubscribers, inventoryAdjustments, auditLogs, storefrontMetrics] = await Promise.all([
+      read(`SELECT id::text, email, name, is_active AS "isActive", email_verified_at AS "emailVerifiedAt", created_at AS "createdAt" FROM users WHERE role = 'customer' ORDER BY id`),
+      read(`SELECT id::text, email, name, role, is_active AS "isActive", created_at AS "createdAt" FROM users WHERE role <> 'customer' ORDER BY id`),
+      read(`SELECT id::text, slug, name, description, price_cents AS "priceCents", category, collection, images, colors, sizes, inventory, is_active AS "isActive", metadata, created_at AS "createdAt", updated_at AS "updatedAt" FROM products ORDER BY id`),
+      read(`SELECT id::text, slug, name, description, image_url AS "imageUrl", is_active AS "isActive", created_at AS "createdAt" FROM categories ORDER BY id`),
+      read(`SELECT id::text, slug, name, is_active AS "isActive", created_at AS "createdAt" FROM collections ORDER BY id`),
+      read(`SELECT * FROM homepage_slides ORDER BY position, id`),
+      read(`SELECT * FROM store_settings ORDER BY id`),
+      read(`SELECT id::text, code, type, value, min_subtotal_cents AS "minSubtotalCents", usage_limit AS "usageLimit", used_count AS "usedCount", is_active AS "isActive", expires_at AS "expiresAt", created_at AS "createdAt" FROM discounts ORDER BY id`),
+      read(`SELECT id::text, user_id::text AS "userId", status, subtotal_cents AS "subtotalCents", shipping_cents AS "shippingCents", total_cents AS "totalCents", shipping_address AS "shippingAddress", created_at AS "createdAt", discount_code AS "discountCode", discount_cents AS "discountCents", delivery, payment_method AS "paymentMethod", payment_status AS "paymentStatus", payment_provider AS "paymentProvider", payment_updated_at AS "paymentUpdatedAt" FROM orders ORDER BY id`),
+      read(`SELECT id::text, order_id::text AS "orderId", product_id::text AS "productId", product_name AS "productName", unit_price_cents AS "unitPriceCents", unit_cost_cents AS "unitCostCents", quantity, color, size, image_url AS "imageUrl" FROM order_items ORDER BY id`),
+      read(`SELECT id::text, user_id::text AS "userId", label, name, phone, address1, city, country, postal_code AS "postalCode", is_default AS "isDefault", created_at AS "createdAt" FROM addresses ORDER BY id`),
+      read(`SELECT id::text, name, email, message, is_read AS "isRead", created_at AS "createdAt" FROM contact_messages ORDER BY id`),
+      read(`SELECT id::text, email, consented_at AS "consentedAt", confirmed_at AS "confirmedAt", unsubscribed_at AS "unsubscribedAt", created_at AS "createdAt" FROM newsletter_subscribers ORDER BY id`),
+      read(`SELECT id::text, product_id::text AS "productId", size, change, reason, actor_user_id::text AS "actorUserId", created_at AS "createdAt" FROM inventory_adjustments ORDER BY id`),
+      read(`SELECT id::text, actor_user_id::text AS "actorUserId", actor_email AS "actorEmail", action, target_type AS "targetType", target_id AS "targetId", metadata, created_at AS "createdAt" FROM audit_logs ORDER BY id`),
+      read(`SELECT total_views AS "totalViews", updated_at AS "updatedAt" FROM storefront_metrics WHERE id = 1`),
+    ]);
+    return {
+      format: 'nuvanti-store-backup', version: 1, generatedAt: new Date().toISOString(),
+      note: 'Sensitive authentication secrets, sessions, payment gateway references, IP addresses, and anonymous visitor IDs are excluded.',
+      customers, administrators, products, categories, collections, homepageSlides,
+      storeSettings, discounts, orders, orderItems, addresses, contactMessages,
+      newsletterSubscribers, inventoryAdjustments, auditLogs, storefrontMetrics: storefrontMetrics[0] || null,
+    };
+  });
+  res.set({ 'Cache-Control': 'no-store', 'Content-Disposition': 'attachment; filename="nuvanti-store-backup.json"' }).json(backup);
+}));
+
+router.post('/maintenance/reset', requireStoreMaintenanceRole, asyncRoute(async (req, res) => {
+  if (req.body?.confirmation !== 'RESET STORE DATA') {
+    return res.status(400).json({ error: 'Type RESET STORE DATA to confirm this operation.' });
+  }
+  const result = await transaction(async (client) => {
+    await client.query('LOCK TABLE products, orders, users IN SHARE ROW EXCLUSIVE MODE');
+
+    // Checkout subtracts stock when an order is placed. Put back quantities
+    // from every non-cancelled test order before removing its history.
+    const { rows: soldRows } = await client.query(`SELECT oi.product_id::text AS "productId", oi.size,
+        SUM(oi.quantity)::int AS quantity, p.inventory, p.metadata
+      FROM order_items oi JOIN orders o ON o.id = oi.order_id
+      JOIN products p ON p.id = oi.product_id
+      WHERE o.status <> 'cancelled'
+      GROUP BY oi.product_id, oi.size, p.inventory, p.metadata
+      ORDER BY oi.product_id, oi.size`);
+    const stockByProduct = new Map();
+    const legacyStockRestore = new Map();
+    for (const row of soldRows) {
+      const size = row.size || 'One Size';
+      if (!row.metadata?.inventory || !Object.keys(row.metadata.inventory).length) {
+        legacyStockRestore.set(row.productId, {
+          inventory: Number(row.inventory) || 0,
+          quantity: (legacyStockRestore.get(row.productId)?.quantity || 0) + Number(row.quantity),
+        });
+        continue;
+      }
+      const current = stockByProduct.get(row.productId) || { stock: { ...row.metadata.inventory } };
+      current.stock[size] = Math.max(0, Number(current.stock[size]) || 0) + Number(row.quantity);
+      stockByProduct.set(row.productId, current);
+    }
+    for (const [productId, current] of stockByProduct) {
+      const inventory = Object.values(current.stock).reduce((total, value) => total + Math.max(0, Number(value) || 0), 0);
+      await client.query(`UPDATE products SET inventory = $1,
+        metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{inventory}', $2::jsonb, true), updated_at = NOW()
+        WHERE id = $3`, [inventory, JSON.stringify(current.stock), productId]);
+    }
+    for (const [productId, current] of legacyStockRestore) {
+      await client.query('UPDATE products SET inventory = inventory + $1, updated_at = NOW() WHERE id = $2', [current.quantity, productId]);
+    }
+
+    const orders = await client.query('DELETE FROM orders');
+    // Delayed until after orders so customer foreign keys remain valid.
+    const messages = await client.query('DELETE FROM contact_messages');
+    const subscribers = await client.query('DELETE FROM newsletter_subscribers');
+    const adjustments = await client.query('DELETE FROM inventory_adjustments');
+    const deletedCustomers = await client.query(`DELETE FROM users WHERE role = 'customer'`);
+    await client.query('DELETE FROM storefront_presence');
+    await client.query('UPDATE storefront_metrics SET total_views = 0, updated_at = NOW() WHERE id = 1');
+    await client.query('UPDATE discounts SET used_count = 0');
+    await client.query('DELETE FROM audit_logs');
+    return {
+      orders: orders.rowCount, customers: deletedCustomers.rowCount,
+      messages: messages.rowCount, subscribers: subscribers.rowCount,
+      inventoryAdjustments: adjustments.rowCount,
+      productsWithRestoredStock: stockByProduct.size + legacyStockRestore.size,
+    };
+  });
+  await logAudit({ req, action: 'store.prelaunch_reset', targetType: 'store', targetId: 'operational-data', metadata: result });
+  res.set('Cache-Control', 'no-store').json({ ok: true, ...result });
 }));
 router.get('/homepage-slides', requirePermission('content.manage'), async (req, res) => {
   const { rows } = await query(`SELECT ${homepageSlideColumns} FROM homepage_slides ORDER BY position, id`);

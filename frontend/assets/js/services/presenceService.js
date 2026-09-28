@@ -41,8 +41,8 @@ export function startStorePresence() {
 
   heartbeat();
   const timer = window.setInterval(heartbeat, heartbeatMs);
-  // Keep background tabs counted. A close event removes the tab immediately;
-  // a 35-second server expiry handles crashes and browsers that skip pagehide.
+  // Keep active background tabs counted. A close event removes the tab
+  // immediately; a 12-second server expiry handles crashes and skipped pagehide.
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') heartbeat();
   });

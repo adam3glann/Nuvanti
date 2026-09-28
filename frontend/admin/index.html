@@ -78,6 +78,18 @@
           </div>
         </div>
       </div>
+
+      <section class="card maintenance-card" id="storeMaintenance" hidden aria-labelledby="maintenanceTitle">
+        <div class="card-head"><h2 id="maintenanceTitle">Pre-launch cleanup</h2></div>
+        <div class="card-pad">
+          <p class="maintenance-intro">Download a private backup before clearing test activity. The backup is a JSON export; keep it somewhere secure because it contains customer and order details.</p>
+          <div class="maintenance-actions">
+            <button class="btn btn-outline" id="downloadStoreBackup" type="button">Download store backup</button>
+            <button class="btn btn-danger" id="resetStoreData" type="button" disabled>Reset customer, order & dashboard data</button>
+          </div>
+          <p class="maintenance-note" id="maintenanceNote" role="status">Reset stays locked until a backup has downloaded. It deletes customers, orders, saved addresses, messages, newsletter subscribers, inventory adjustment history, visitor sessions and view totals. It restores stock reserved by non-cancelled test orders. Admin accounts, products and stock, photos, categories, collections, homepage slides and text, store settings, and discount codes are kept.</p>
+        </div>
+      </section>
     </div>
   </div>
 </div>
@@ -85,6 +97,12 @@
 .dash-period{font-size:.75rem;font-weight:500;color:var(--a-muted);margin-left:.35rem}
 .dash-finance-note{font-size:.78rem;color:var(--a-muted);margin:-.75rem 0 1.5rem}
 .dash-finance-card .stat-card__value{font-size:clamp(1.15rem,2vw,1.6rem);overflow-wrap:anywhere}
+.maintenance-card{margin-top:1.5rem;border-color:var(--a-danger,#b94b4b)}
+#storeMaintenance[hidden]{display:none}
+.maintenance-intro,.maintenance-note{font-size:.84rem;line-height:1.6;color:var(--a-muted);max-width:78rem}
+.maintenance-actions{display:flex;flex-wrap:wrap;gap:.75rem;margin:1rem 0}
+.maintenance-actions .btn-danger{background:var(--a-danger,#a33);color:#fff;border-color:var(--a-danger,#a33)}
+.maintenance-actions button:disabled{opacity:.5;cursor:not-allowed}
 @media (max-width:960px){ .dash-split{ grid-template-columns:1fr !important; } }
 </style>
 <script type="module" src="assets/js/pages/dashboard.js"></script>

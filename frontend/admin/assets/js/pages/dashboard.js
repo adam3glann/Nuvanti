@@ -5,12 +5,71 @@ import { lineChart } from '../components/charts.js';
 import { fetchRecentAdminOrders } from '../services/orderService.js';
 import { fetchRevenueSeries, fetchFinancialSummary, clearAnalyticsCache } from '../services/analyticsService.js';
 import { startLiveRefresh } from '../services/liveRefresh.js';
+import { downloadStoreBackup, resetStoreData } from '../services/maintenanceService.js';
+import { showAdminToast } from '../components/toast.js';
 
 const session = initAdminShell({ page: 'dashboard', title: 'Dashboard' });
 if (session) {
   document.getElementById('rangeSelect').addEventListener('change', (e) => renderChart(e.target.value));
+  initStoreMaintenance(session);
   render();
   startLiveRefresh(() => { clearAnalyticsCache(); return render(); }, 10000);
+}
+
+function initStoreMaintenance(adminSession) {
+  const panel = document.getElementById('storeMaintenance');
+  if (!panel || !['admin', 'super_admin'].includes(adminSession.role)) return;
+  panel.hidden = false;
+
+  const backupButton = document.getElementById('downloadStoreBackup');
+  const resetButton = document.getElementById('resetStoreData');
+  const note = document.getElementById('maintenanceNote');
+  let backupDownloaded = false;
+
+  backupButton.addEventListener('click', async () => {
+    backupButton.disabled = true;
+    try {
+      await downloadStoreBackup();
+      backupDownloaded = true;
+      resetButton.disabled = false;
+      note.textContent = 'Backup downloaded. The reset button is unlocked; it will still ask you to confirm the destructive action.';
+      showAdminToast('Store backup downloaded.', 'success');
+    } catch (error) {
+      showAdminToast(error.message, 'error');
+    } finally {
+      backupButton.disabled = false;
+    }
+  });
+
+  resetButton.addEventListener('click', async () => {
+    if (!backupDownloaded) return;
+    const accepted = window.confirm('This permanently deletes customer accounts, orders, messages, newsletter signups, inventory history and visitor analytics. Your admin accounts and shop catalog/design are kept. Continue?');
+    if (!accepted) return;
+    if (window.prompt('To confirm, type RESET STORE DATA exactly:') !== 'RESET STORE DATA') {
+      showAdminToast('Reset cancelled. The confirmation text did not match.', 'info');
+      return;
+    }
+
+    resetButton.disabled = true;
+    backupButton.disabled = true;
+    resetButton.textContent = 'Resetting…';
+    try {
+      const result = await resetStoreData();
+      backupDownloaded = false;
+      resetButton.textContent = 'Reset customer, order & dashboard data';
+      note.textContent = `Cleanup complete: removed ${result.customers} customer accounts and ${result.orders} orders. Store products, photos and design were kept; stock was restored for prior non-cancelled orders. Download a fresh backup before another reset.`;
+      clearAnalyticsCache();
+      await render();
+      window.dispatchEvent(new Event('nuvanti:refresh-store-presence'));
+      showAdminToast('Test customer, order, and dashboard data cleared.', 'success');
+    } catch (error) {
+      resetButton.textContent = 'Reset customer, order & dashboard data';
+      resetButton.disabled = false;
+      showAdminToast(error.message, 'error');
+    } finally {
+      backupButton.disabled = false;
+    }
+  });
 }
 
 async function render() {
