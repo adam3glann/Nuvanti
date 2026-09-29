@@ -20,9 +20,7 @@ export function renderHeader({ transparentOnHero = false, currentPage = '' } = {
           </button>
           <nav class="primary-nav" aria-label="Main">
             <ul class="primary-nav__list">
-              ${mainNav.filter((item) => !item.href.includes('collection=')).map((item) => `<li><a class="primary-nav__link" href="${item.href}" ${isCurrent(item, currentPage) ? 'aria-current="page"' : ''}>${item.label}</a></li>`).join('')}
-              ${renderMenuGroup('collection', 'Collections', 'desktop')}
-              ${renderMenuGroup('category', 'Categories', 'desktop')}
+              ${mainNav.map((item) => `<li><a class="primary-nav__link${item.label.includes('SUMMER') ? ' primary-nav__link--summer' : ''}" href="${item.href}" ${isCurrent(item, currentPage) ? 'aria-current="page"' : ''}>${item.label}</a></li>`).join('')}
             </ul>
           </nav>
         </div>
@@ -51,8 +49,8 @@ export function renderHeader({ transparentOnHero = false, currentPage = '' } = {
       </div>
       <ul class="mobile-nav__list">
         ${mainNav.filter((item) => !item.href.includes('collection=')).map((item) => `<li><a class="mobile-nav__link" href="${item.href}">${item.label}</a></li>`).join('')}
-        ${renderMenuGroup('collection', 'Collections', 'mobile')}
-        ${renderMenuGroup('category', 'Categories', 'mobile')}
+        ${renderMenuGroup('collection', 'Collections')}
+        ${renderMenuGroup('category', 'Categories')}
       </ul>
       <div class="mobile-nav__foot">
         <a href="account.html" class="btn btn-outline btn-block">Account</a>
@@ -106,7 +104,6 @@ export function renderHeader({ transparentOnHero = false, currentPage = '' } = {
     const items = await fetchMenuLinks();
     const signature = JSON.stringify(items);
     [
-      ['collection', 'desktop'], ['category', 'desktop'],
       ['collection', 'mobile'], ['category', 'mobile'],
     ].forEach(([type, target]) => {
       const group = document.querySelector(`[data-menu-group="${type}"][data-menu-target="${target}"]`);
@@ -116,7 +113,7 @@ export function renderHeader({ transparentOnHero = false, currentPage = '' } = {
       list.querySelectorAll('[data-configured-menu-item]').forEach((item) => item.remove());
       const groupItems = Array.isArray(items) ? items.filter((item) => item.type === type) : [];
       if (groupItems.length) {
-        list.insertAdjacentHTML('beforeend', groupItems.map((item) => renderMenuItem(item, target)).join(''));
+        list.insertAdjacentHTML('beforeend', groupItems.map(renderMenuItem).join(''));
       }
       group.hidden = Array.isArray(items) && groupItems.length === 0;
       list.dataset.menuItemsSignature = signature;
@@ -144,27 +141,20 @@ export function renderHeader({ transparentOnHero = false, currentPage = '' } = {
   refreshHeaderCounts();
 }
 
-function renderMenuGroup(type, label, target) {
-  const isMobile = target === 'mobile';
+function renderMenuGroup(type, label) {
   const staticCollections = type === 'collection'
     ? mainNav.filter((item) => item.href.includes('collection=')).map((item) => {
-      const className = item.label.includes('SUMMER') ? ' primary-nav__link--summer' : '';
-      return `<li data-default-menu-link><a class="${isMobile ? 'mobile-nav__link' : 'primary-nav__link'}${className}" href="${item.href}">${item.label}</a></li>`;
+      const className = item.label.includes('SUMMER') ? ' mobile-nav__link--summer' : '';
+      return `<li data-default-menu-link><a class="mobile-nav__link${className}" href="${item.href}">${item.label}</a></li>`;
     }).join('')
     : '';
-  if (isMobile) {
-    return `<li class="mobile-nav__group" data-menu-group="${type}" data-menu-target="mobile"${type === 'category' ? ' hidden' : ''}>
-      <button type="button" class="mobile-nav__group-toggle" data-menu-group-toggle aria-controls="mobile-${type}-submenu" aria-expanded="false">${label}<span aria-hidden="true">⌄</span></button>
-      <ul class="mobile-nav__submenu" id="mobile-${type}-submenu" data-menu-items>${staticCollections}</ul>
-    </li>`;
-  }
-  return `<li class="primary-nav__group" data-menu-group="${type}" data-menu-target="desktop"${type === 'category' ? ' hidden' : ''}>
-    <button type="button" class="primary-nav__link primary-nav__group-toggle" data-menu-group-toggle aria-controls="desktop-${type}-submenu" aria-expanded="false">${label}<span aria-hidden="true">⌄</span></button>
-    <ul class="primary-nav__submenu" id="desktop-${type}-submenu" data-menu-items>${staticCollections}</ul>
+  return `<li class="mobile-nav__group" data-menu-group="${type}" data-menu-target="mobile"${type === 'category' ? ' hidden' : ''}>
+    <button type="button" class="mobile-nav__group-toggle" data-menu-group-toggle aria-controls="mobile-${type}-submenu" aria-expanded="false">${label}<span aria-hidden="true">⌄</span></button>
+    <ul class="mobile-nav__submenu" id="mobile-${type}-submenu" data-menu-items>${staticCollections}</ul>
   </li>`;
 }
 
-function renderMenuItem(item, target = 'mobile') {
+function renderMenuItem(item) {
   if (!['category', 'collection'].includes(item.type) || !/^[a-z0-9-]{1,80}$/.test(item.slug || '')) return '';
   const label = escapeMenuText(item.menuLabel || item.name);
   const href = `shop.html?${item.type}=${encodeURIComponent(item.slug)}`;
@@ -172,9 +162,6 @@ function renderMenuItem(item, target = 'mobile') {
   const color = /^#[0-9a-fA-F]{6}$/.test(item.menuBackgroundColor || '') ? item.menuBackgroundColor : '#35604a';
   const textColor = /^#[0-9a-fA-F]{6}$/.test(item.menuTextColor || '') ? item.menuTextColor : '#ffffff';
   const customStyle = style === 'link' ? '' : ` style="--menu-bg:${color};--menu-text:${textColor}"`;
-  if (target === 'desktop') {
-    return `<li data-configured-menu-item><a class="primary-nav__link primary-nav__link--configured primary-nav__link--${style}" href="${href}"${customStyle}>${label}</a></li>`;
-  }
   return `<li data-configured-menu-item><a class="mobile-nav__link mobile-nav__link--${style}" href="${href}"${customStyle}>${label}</a></li>`;
 }
 
