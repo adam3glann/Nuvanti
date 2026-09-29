@@ -103,6 +103,7 @@ export function renderHeader({ transparentOnHero = false, currentPage = '' } = {
   const refreshMenuLinks = async () => {
     const items = await fetchMenuLinks();
     const signature = JSON.stringify(items);
+    syncPrimaryCollectionStyles(items);
     [
       ['collection', 'mobile'], ['category', 'mobile'],
     ].forEach(([type, target]) => {
@@ -141,6 +142,36 @@ export function renderHeader({ transparentOnHero = false, currentPage = '' } = {
   refreshHeaderCounts();
 }
 
+function syncPrimaryCollectionStyles(items) {
+  const collections = new Map((Array.isArray(items) ? items : [])
+    .filter((item) => item.type === 'collection')
+    .map((item) => [item.slug, item]));
+  document.querySelectorAll('.primary-nav__link[href*="collection="]').forEach((link) => {
+    const slug = new URL(link.href, window.location.href).searchParams.get('collection');
+    const item = collections.get(slug);
+    const label = link.dataset.baseMenuLabel || (link.dataset.baseMenuLabel = link.textContent.trim());
+    const glyph = getMenuGlyph(item?.menuIcon);
+    const animation = ['ice', 'pulse', 'float'].includes(item?.menuAnimation) ? item.menuAnimation : 'none';
+    link.classList.remove('menu-effect--ice', 'menu-effect--pulse', 'menu-effect--float');
+    if (animation !== 'none') link.classList.add(`menu-effect--${animation}`);
+    link.innerHTML = `<span class="menu-button__content">${glyph ? `<span class="menu-button__icon" aria-hidden="true">${glyph}</span>` : ''}<span class="menu-button__label">${escapeMenuText(label)}</span></span>`;
+    link.style.removeProperty('background');
+    link.style.removeProperty('color');
+    link.style.removeProperty('border-radius');
+    link.style.removeProperty('padding');
+    if (!item || item.menuStyle === 'link') return;
+
+    const start = /^#[0-9a-fA-F]{6}$/.test(item.menuBackgroundColor || '') ? item.menuBackgroundColor : '#35604a';
+    const end = /^#[0-9a-fA-F]{6}$/.test(item.menuBackgroundEndColor || '') ? item.menuBackgroundEndColor : null;
+    const background = end ? `linear-gradient(110deg,${start},${end})` : start;
+    const text = /^#[0-9a-fA-F]{6}$/.test(item.menuTextColor || '') ? item.menuTextColor : '#ffffff';
+    link.style.background = background;
+    link.style.setProperty('color', text, 'important');
+    link.style.borderRadius = item.menuStyle === 'card' ? '10px' : '999px';
+    link.style.padding = '.45rem 1rem';
+  });
+}
+
 function renderMenuGroup(type, label) {
   const staticCollections = type === 'collection'
     ? mainNav.filter((item) => item.href.includes('collection=')).map((item) => {
@@ -160,9 +191,17 @@ function renderMenuItem(item) {
   const href = `shop.html?${item.type}=${encodeURIComponent(item.slug)}`;
   const style = ['link', 'pill', 'card'].includes(item.menuStyle) ? item.menuStyle : 'pill';
   const color = /^#[0-9a-fA-F]{6}$/.test(item.menuBackgroundColor || '') ? item.menuBackgroundColor : '#35604a';
+  const endColor = /^#[0-9a-fA-F]{6}$/.test(item.menuBackgroundEndColor || '') ? item.menuBackgroundEndColor : null;
   const textColor = /^#[0-9a-fA-F]{6}$/.test(item.menuTextColor || '') ? item.menuTextColor : '#ffffff';
-  const customStyle = style === 'link' ? '' : ` style="--menu-bg:${color};--menu-text:${textColor}"`;
-  return `<li data-configured-menu-item><a class="mobile-nav__link mobile-nav__link--${style}" href="${href}"${customStyle}>${label}</a></li>`;
+  const background = endColor ? `linear-gradient(110deg,${color},${endColor})` : color;
+  const customStyle = style === 'link' ? '' : ` style="--menu-bg:${background};--menu-text:${textColor}"`;
+  const glyph = getMenuGlyph(item.menuIcon);
+  const animation = ['ice', 'pulse', 'float'].includes(item.menuAnimation) ? ` menu-effect--${item.menuAnimation}` : '';
+  return `<li data-configured-menu-item><a class="mobile-nav__link mobile-nav__link--${style}${animation}" href="${href}"${customStyle}><span class="menu-button__content">${glyph ? `<span class="menu-button__icon" aria-hidden="true">${glyph}</span>` : ''}<span class="menu-button__label">${label}</span></span></a></li>`;
+}
+
+function getMenuGlyph(name) {
+  return ({ sparkle: '✦', star: '★', heart: '♥', arrow: '→' })[name] || '';
 }
 
 function escapeMenuText(value) {
