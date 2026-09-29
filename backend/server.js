@@ -19,6 +19,7 @@ import adminRouter from "./routes/admin.js";
 import uploadsRouter from "./routes/uploads.js";
 import paymentsRouter from "./routes/payments.js";
 import { requireAdminPage, requireAuth, requireRole } from "./lib/auth.js";
+import { requireUnblockedAdminIp } from "./lib/adminLoginSecurity.js";
 import { errorHandler, notFound, sameOrigin } from "./middleware/security.js";
 import { query } from "./lib/db.js";
 import { emailDeliveryStatus } from "./lib/mail.js";
@@ -204,7 +205,7 @@ app.use("/api/newsletter", newsletterRouter);
 app.use("/api/orders", ordersRouter);
 app.use("/api/addresses", addressesRouter);
 app.use("/api/contact", contactRouter);
-app.use("/api/admin", requireAuth, requireRole(...STAFF_ROLES), adminRouter);
+app.use("/api/admin", requireUnblockedAdminIp, requireAuth, requireRole(...STAFF_ROLES), adminRouter);
 app.use(
   "/api/admin/uploads",
   requireAuth,
@@ -291,7 +292,7 @@ adminApp.use(
   "/assets/js/pages/login.js",
   express.static(path.join(frontendRoot, "admin/assets/js/pages/login.js")),
 );
-adminApp.use(requireAdminPage, requireRole(...STAFF_ROLES));
+adminApp.use(requireUnblockedAdminIp, requireAdminPage, requireRole(...STAFF_ROLES));
 adminApp.use(
   "/store-assets",
   express.static(path.join(frontendRoot, "assets")),

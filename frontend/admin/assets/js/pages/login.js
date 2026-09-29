@@ -1,4 +1,4 @@
-import { confirmAdminPasswordReset, getAdminSession, refreshAdminSession, loginAdmin, completeAdminMfa, requestAdminPasswordReset } from '../services/adminAuthService.js';
+import { confirmAdminPasswordReset, getAdminSession, refreshAdminSession, loginAdmin, completeAdminEmailCode, completeAdminMfa, requestAdminPasswordReset } from '../services/adminAuthService.js';
 
 const initialQuery = new URLSearchParams(location.search);
 if (getAdminSession() && !initialQuery.has('reset') && initialQuery.get('forgot') !== '1') {
@@ -35,24 +35,38 @@ if (resetToken) {
     button.disabled = true;
     button.textContent = 'Signing in…';
     const result = await loginAdmin(document.getElementById('email').value.trim(), passwordInput.value);
+    if (result.requiresEmailCode) { showLoginChallenge('email'); return; }
     if (result.requiresTwoFactor) {
-      document.querySelector('.h1').textContent = 'Two-factor verification';
-      document.querySelector('.admin-login-mark p').textContent = 'Enter the current code from your authenticator app, or use one unused recovery code.';
-      const mfaForm = form.cloneNode(false);
-      mfaForm.innerHTML = `<div class="field"><label for="mfaCode">Authenticator or recovery code</label><input type="text" id="mfaCode" required minlength="6" maxlength="32" autocomplete="one-time-code" autocapitalize="characters" /></div><button class="btn btn-primary" type="submit" id="loginSubmit" style="width:100%">Verify and Sign In</button><p style="text-align:center;margin-top:1rem"><a href="login.html" class="btn-ghost">Start over</a></p>`;
-      form.replaceWith(mfaForm);
-      mfaForm.addEventListener('submit', async (mfaEvent) => {
-        mfaEvent.preventDefault();
-        const verifyButton = document.getElementById('loginSubmit');
-        verifyButton.disabled = true;
-        verifyButton.textContent = 'Verifying…';
-        const verified = await completeAdminMfa(document.getElementById('mfaCode').value.trim());
-        if (!verified.ok) { show(verified.error, true); verifyButton.disabled = false; verifyButton.textContent = 'Verify and Sign In'; return; }
-        location.href = 'index.html';
-      });
+      showLoginChallenge('totp');
       return;
     }
     if (!result.ok) { show(result.error, true); button.disabled = false; button.textContent = 'Sign In'; return; }
+    location.href = 'index.html';
+  });
+}
+
+function showLoginChallenge(kind) {
+  const emailCode = kind === 'email';
+  const inputId = emailCode ? 'adminEmailCode' : 'mfaCode';
+  const buttonText = emailCode ? 'Verify Email Code' : 'Verify and Sign In';
+  document.querySelector('.h1').textContent = emailCode ? 'Check your email' : 'Authenticator verification';
+  document.querySelector('.admin-login-mark p').textContent = emailCode
+    ? 'Enter the 6-digit sign-in code sent to your admin email. It expires in 10 minutes.'
+    : 'Enter the current code from your authenticator app, or use one unused recovery code.';
+  const currentForm = document.getElementById('loginForm');
+  const challengeForm = currentForm.cloneNode(false);
+  challengeForm.innerHTML = `<div class="field"><label for="${inputId}">${emailCode ? '6-digit email code' : 'Authenticator or recovery code'}</label><input type="text" id="${inputId}" required ${emailCode ? 'inputmode="numeric" minlength="6" maxlength="6" pattern="[0-9]{6}"' : 'minlength="6" maxlength="32" autocapitalize="characters"'} autocomplete="one-time-code" /></div><button class="btn btn-primary" type="submit" id="loginSubmit" style="width:100%">${buttonText}</button><p style="text-align:center;margin-top:1rem"><a href="login.html" class="btn-ghost">Start over</a></p>`;
+  currentForm.replaceWith(challengeForm);
+  challengeForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const button = document.getElementById('loginSubmit');
+    button.disabled = true;
+    button.textContent = 'Verifying…';
+    const verified = emailCode
+      ? await completeAdminEmailCode(document.getElementById(inputId).value.trim())
+      : await completeAdminMfa(document.getElementById(inputId).value.trim());
+    if (verified.requiresTwoFactor) { showLoginChallenge('totp'); return; }
+    if (!verified.ok) { show(verified.error, true); button.disabled = false; button.textContent = buttonText; return; }
     location.href = 'index.html';
   });
 }

@@ -4,6 +4,7 @@ import { query } from './db.js';
 
 const cookieName = 'nuvanti_session';
 const challengeCookieName = 'nuvanti_mfa_challenge';
+const emailChallengeCookieName = 'nuvanti_admin_email_challenge';
 // Both frontends call the API through same-origin routes (Railway for admin,
 // Cloudflare Pages Functions for the store). Lax keeps these cookies first-party
 // on mobile browsers while blocking cross-site cookie attachment.
@@ -61,6 +62,28 @@ export function clearMfaChallengeCookie(res) {
   res.clearCookie(challengeCookieName, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: cookieSameSite, path: '/', ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}) });
 }
 
+export function setAdminEmailChallengeCookie(res, user, challengeId) {
+  const token = jwt.sign(
+    { sub: String(user.id), ver: Number(user.sessionVersion ?? 0), jti: challengeId, purpose: 'admin_email_login' },
+    secret(),
+    { expiresIn: '10m', issuer: 'nuvanti-api', audience: 'nuvanti-admin-email' },
+  );
+  res.cookie(emailChallengeCookieName, token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: cookieSameSite, maxAge: 10 * 60 * 1000, path: '/', ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}) });
+}
+
+export function readAdminEmailChallenge(req) {
+  try {
+    const token = req.cookies?.[emailChallengeCookieName];
+    if (!token) return null;
+    const challenge = jwt.verify(token, secret(), { issuer: 'nuvanti-api', audience: 'nuvanti-admin-email' });
+    return challenge.purpose === 'admin_email_login' && typeof challenge.jti === 'string' ? challenge : null;
+  } catch { return null; }
+}
+
+export function clearAdminEmailChallengeCookie(res) {
+  res.clearCookie(emailChallengeCookieName, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: cookieSameSite, path: '/', ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}) });
+}
+
 export function readMfaChallenge(req) {
   try {
     const token = req.cookies?.[challengeCookieName];
@@ -74,6 +97,7 @@ export function clearSession(res) {
   const options = { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: cookieSameSite, path: '/', ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}) };
   res.clearCookie(cookieName, options);
   res.clearCookie(challengeCookieName, options);
+  res.clearCookie(emailChallengeCookieName, options);
 }
 
 async function resolveSession(session) {

@@ -88,6 +88,18 @@ export async function sendPasswordReset({ to, resetUrl }) {
   });
 }
 
+export async function sendAdminLoginCode({ to, name, code }) {
+  const safeName = escapeHtml(name || 'administrator');
+  await deliver({
+    to,
+    subject: 'Your Nuvanti admin sign-in code',
+    text: `Hi ${name || 'administrator'}, your Nuvanti admin sign-in code is ${code}. It expires in 10 minutes and can be used once. If you did not try to sign in, change your password and contact the store owner.`,
+    html: `<p>Hi ${safeName},</p><p>Your Nuvanti admin sign-in code is:</p><p style="font-size:28px;font-weight:700;letter-spacing:8px">${code}</p><p>This code expires in 10 minutes and can be used once. If you did not try to sign in, change your password and contact the store owner.</p>`,
+    devLabel: 'Development admin sign-in code',
+    devDetail: code,
+  });
+}
+
 export async function sendVerificationEmail({ to, name, verifyUrl }) {
   await deliver({
     to,

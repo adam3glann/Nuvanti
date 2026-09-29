@@ -4,11 +4,12 @@ import crypto from 'crypto';
 import { z } from 'zod';
 import QRCode from 'qrcode';
 import { query, transaction } from '../lib/db.js';
-import { clearMfaChallengeCookie, clearSession, issueSession, readMfaChallenge, readSession, requireAuth, requireRole, setMfaChallengeCookie, setSessionCookie } from '../lib/auth.js';
-import { sendPasswordReset, sendVerificationEmail } from '../lib/mail.js';
+import { clearAdminEmailChallengeCookie, clearMfaChallengeCookie, clearSession, issueSession, readAdminEmailChallenge, readMfaChallenge, readSession, requireAuth, requireRole, setAdminEmailChallengeCookie, setMfaChallengeCookie, setSessionCookie } from '../lib/auth.js';
+import { sendAdminLoginCode, sendPasswordReset, sendVerificationEmail } from '../lib/mail.js';
 import { logAudit } from '../lib/audit.js';
 import { adminPublicOrigin, storePublicOrigin } from '../lib/publicOrigins.js';
 import { createOtpAuthUri, createRecoveryCodes, createTotpSecret, decryptTotpSecret, encryptTotpSecret, hashRecoveryCode, verifyTotp } from '../lib/totp.js';
+import { clearAdminEmailCodeFailures, hashAdminEmailCode, recordAdminEmailCodeFailure, rejectBlockedAdminIp, safeHashEquals } from '../lib/adminLoginSecurity.js';
 
 const STAFF_ROLES = ['staff', 'manager', 'admin', 'super_admin'];
 const MAX_FAILED_ATTEMPTS = 5;
@@ -83,6 +84,25 @@ router.post('/login', asyncRoute(async (req, res) => {
   }
   const safeUser = { id: user.id, email: user.email, name: user.name, role: user.role };
   clearSession(res);
+  if (STAFF_ROLES.includes(user.role)) {
+    if (await rejectBlockedAdminIp(req, res)) return;
+    const challengeId = crypto.randomUUID();
+    const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+    await query('DELETE FROM admin_email_login_challenges WHERE user_id = $1 OR expires_at < NOW()', [user.id]);
+    await query(`INSERT INTO admin_email_login_challenges (id, user_id, code_hash, expires_at)
+      VALUES ($1, $2, $3, NOW() + INTERVAL '10 minutes')`, [challengeId, user.id, hashAdminEmailCode(challengeId, code)]);
+    try {
+      await sendAdminLoginCode({ to: user.email, name: user.name, code });
+    } catch (error) {
+      await query('DELETE FROM admin_email_login_challenges WHERE id = $1', [challengeId]);
+      clearSession(res);
+      console.error('Admin sign-in code delivery failed:', error);
+      return res.status(503).json({ error: 'Email verification is unavailable right now. Contact the store administrator before signing in.' });
+    }
+    setAdminEmailChallengeCookie(res, user, challengeId);
+    await logAudit({ req, actor: safeUser, action: 'auth.admin_email_code_sent', targetType: 'user', targetId: safeUser.id });
+    return res.json({ requiresEmailCode: true });
+  }
   if (user.totpEnabledAt && user.totpSecretEnc) {
     setMfaChallengeCookie(res, user);
     await logAudit({ req, actor: safeUser, action: 'auth.mfa_challenge', targetType: 'user', targetId: safeUser.id });
@@ -94,6 +114,69 @@ router.post('/login', asyncRoute(async (req, res) => {
 }));
 
 const mfaCodeInput = z.object({ code: z.string().trim().min(6).max(32) });
+const emailCodeInput = z.object({ code: z.string().trim().regex(/^\d{6}$/) });
+
+router.post('/login/email-code', asyncRoute(async (req, res) => {
+  if (await rejectBlockedAdminIp(req, res)) {
+    clearAdminEmailChallengeCookie(res);
+    return;
+  }
+  const challenge = readAdminEmailChallenge(req);
+  const { code } = emailCodeInput.parse(req.body);
+  if (!challenge) {
+    clearAdminEmailChallengeCookie(res);
+    return res.status(401).json({ error: 'Your email code expired. Enter your password again to request a new one.' });
+  }
+
+  const { rows } = await query(`UPDATE admin_email_login_challenges c
+    SET attempt_count = c.attempt_count + 1
+    FROM users u
+    WHERE c.id = $1 AND c.user_id = $2 AND c.expires_at > NOW() AND c.consumed_at IS NULL AND c.attempt_count < 3
+      AND u.id = c.user_id AND u.session_version = $3 AND u.is_active = true
+      AND u.role = ANY($4::text[])
+    RETURNING c.code_hash AS "codeHash", c.attempt_count AS "attemptCount",
+      u.id, u.email, u.name, u.role, u.session_version AS "sessionVersion",
+      u.totp_secret_enc AS "totpSecretEnc", u.totp_enabled_at AS "totpEnabledAt"`,
+  [challenge.jti, challenge.sub, challenge.ver, STAFF_ROLES]);
+  const user = rows[0];
+  if (!user) {
+    clearAdminEmailChallengeCookie(res);
+    return res.status(401).json({ error: 'Your email code expired or was already used. Enter your password again.' });
+  }
+
+  if (!safeHashEquals(user.codeHash, hashAdminEmailCode(challenge.jti, code))) {
+    const ipBlock = await recordAdminEmailCodeFailure(req);
+    const isBlocked = ipBlock.blockedUntil && new Date(ipBlock.blockedUntil) > new Date();
+    const attemptsLeft = Math.max(0, 3 - Number(user.attemptCount));
+    if (Number(user.attemptCount) >= 3 || isBlocked) {
+      await query('UPDATE admin_email_login_challenges SET consumed_at = NOW() WHERE id = $1 AND consumed_at IS NULL', [challenge.jti]);
+      clearAdminEmailChallengeCookie(res);
+    }
+    await logAudit({ req, actor: user, action: isBlocked ? 'auth.admin_ip_blocked' : 'auth.admin_email_code_failed', targetType: 'user', targetId: user.id, metadata: { failedAttempts: ipBlock.failedAttempts } });
+    if (isBlocked) {
+      res.set('Retry-After', String(Math.max(1, Math.ceil((new Date(ipBlock.blockedUntil).getTime() - Date.now()) / 1000))));
+      return res.status(423).json({ error: 'Three incorrect email codes blocked admin sign-in from this network for 24 hours.' });
+    }
+    return res.status(401).json({ error: `Incorrect email code. ${attemptsLeft} attempt${attemptsLeft === 1 ? '' : 's'} remaining.` });
+  }
+
+  const consumed = await query('UPDATE admin_email_login_challenges SET consumed_at = NOW() WHERE id = $1 AND consumed_at IS NULL AND expires_at > NOW()', [challenge.jti]);
+  if (consumed.rowCount !== 1) {
+    clearAdminEmailChallengeCookie(res);
+    return res.status(401).json({ error: 'That email code was already used. Enter your password again.' });
+  }
+  await clearAdminEmailCodeFailures(req);
+  clearAdminEmailChallengeCookie(res);
+  const safeUser = { id: user.id, email: user.email, name: user.name, role: user.role, sessionVersion: user.sessionVersion };
+  if (user.totpEnabledAt && user.totpSecretEnc) {
+    setMfaChallengeCookie(res, user);
+    await logAudit({ req, actor: safeUser, action: 'auth.mfa_challenge', targetType: 'user', targetId: safeUser.id, metadata: { emailCodeVerified: true } });
+    return res.json({ requiresTwoFactor: true });
+  }
+  setSessionCookie(res, await issueSession(safeUser, req));
+  await logAudit({ req, actor: safeUser, action: 'auth.login_success_email_code', targetType: 'user', targetId: safeUser.id });
+  res.json({ user: { id: user.id, email: user.email, name: user.name, role: user.role } });
+}));
 
 router.post('/login/mfa', asyncRoute(async (req, res) => {
   const challenge = readMfaChallenge(req);
