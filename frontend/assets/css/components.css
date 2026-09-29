@@ -2316,15 +2316,48 @@
 @media (max-width: 600px) {
   /* Dynamic category/collection choices belong in the burger drawer. */
   .primary-nav { display: none; }
-  .site-header__side--end > a[href="account.html"],
-  .site-header__side--end > a[href="wishlist.html"] {
-    display: none;
+  .site-header__inner {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    column-gap: clamp(.35rem, 2vw, .75rem);
+    padding-inline: clamp(.5rem, 2.5vw, 1rem);
+  }
+  .site-header__side {
+    flex: 0 0 auto;
+    gap: 0;
+  }
+  .site-header__side--end {
+    justify-content: flex-end;
+    gap: 2px;
+  }
+  .site-header__inner > .site-logo {
+    justify-self: center;
+  }
+  .site-header__side--end > .icon-btn,
+  .hamburger {
+    width: clamp(34px, 10vw, 40px);
+    height: clamp(34px, 10vw, 40px);
+    flex: 0 0 clamp(34px, 10vw, 40px);
+  }
+  .site-header__side--end > .icon-btn svg,
+  .hamburger svg {
+    width: 18px;
+    height: 18px;
   }
 }
 
 @media (max-width: 360px) {
   .site-header__inner {
-    gap: .25rem;
-    padding-inline: .45rem;
+    column-gap: .25rem;
+    padding-inline: .4rem;
+  }
+  .site-header__side--end {
+    gap: 0;
+  }
+  .site-header__side--end > .icon-btn,
+  .hamburger {
+    width: 34px;
+    height: 34px;
+    flex-basis: 34px;
   }
 }
