@@ -28,3 +28,12 @@ WHERE slug IN ('mens', 'womens')
   AND menu_style = 'link'
   AND menu_background_color IS NULL
   AND menu_text_color IS NULL;
+
+-- Shown categories use the familiar green button treatment by default.
+-- Admins can switch any item back to a plain link or choose custom colors.
+UPDATE categories
+SET menu_style = 'pill',
+    menu_background_color = COALESCE(menu_background_color, '#35604A'),
+    menu_text_color = COALESCE(menu_text_color, '#FFFFFF')
+WHERE menu_show = true
+  AND menu_style = 'link';
