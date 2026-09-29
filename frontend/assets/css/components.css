@@ -204,8 +204,8 @@
   max-width: 100%;
   border: 0;
   border-radius: 999px;
-  background: var(--mobile-menu-bg, var(--color-accent));
-  color: var(--mobile-menu-text, #fff);
+  background: var(--menu-bg, var(--color-accent));
+  color: var(--menu-text, #fff);
   padding: .7rem 1.1rem;
   margin-block: .45rem;
   font-family: var(--font-body);
@@ -2270,4 +2270,48 @@
   -webkit-background-clip: text;
   color: transparent !important;
   -webkit-text-fill-color: transparent !important;
+}
+
+/* Admin-configured category and collection links share styles in both menus. */
+.primary-nav {
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.primary-nav::-webkit-scrollbar {
+  display: none;
+}
+.primary-nav__list {
+  width: max-content;
+  flex-wrap: nowrap;
+}
+.primary-nav__link--configured {
+  white-space: nowrap;
+}
+.site-header__side,
+.primary-nav {
+  min-width: 0;
+}
+.primary-nav__link--configured.primary-nav__link--pill,
+.primary-nav__link--configured.primary-nav__link--card {
+  padding: 0.45rem 1rem;
+  border-radius: 999px;
+  background: var(--menu-bg, var(--color-accent));
+  color: var(--menu-text, #fff) !important;
+  letter-spacing: normal;
+  text-transform: none;
+  transition: filter var(--dur-fast) var(--ease-editorial), transform var(--dur-fast) var(--ease-editorial);
+}
+.primary-nav__link--configured.primary-nav__link--pill::after,
+.primary-nav__link--configured.primary-nav__link--card::after {
+  display: none;
+}
+.primary-nav__link--configured.primary-nav__link--pill:hover,
+.primary-nav__link--configured.primary-nav__link--card:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+.primary-nav__link--configured.primary-nav__link--card {
+  border-radius: 0.8rem;
 }

@@ -20,7 +20,7 @@ export function renderHeader({ transparentOnHero = false, currentPage = '' } = {
           </button>
           <nav class="primary-nav" aria-label="Main">
             <ul class="primary-nav__list">
-              ${mainNav.map((item) => `<li><a class="primary-nav__link${item.label.includes('SUMMER') ? ' primary-nav__link--summer' : ''}" href="${item.href}" ${isCurrent(item, currentPage) ? 'aria-current="page"' : ''}>${item.label}</a></li>`).join('')}
+              ${mainNav.map((item) => `<li${item.href.includes('collection=') ? ' data-default-menu-link' : ''}><a class="primary-nav__link${item.label.includes('SUMMER') ? ' primary-nav__link--summer' : ''}" href="${item.href}" ${isCurrent(item, currentPage) ? 'aria-current="page"' : ''}>${item.label}</a></li>`).join('')}
             </ul>
           </nav>
         </div>
@@ -80,14 +80,19 @@ export function renderHeader({ transparentOnHero = false, currentPage = '' } = {
 
   const refreshMenuLinks = async () => {
     const items = await fetchMenuLinks();
-    const list = document.querySelector('.mobile-nav__list');
     const signature = JSON.stringify(items);
-    if (list?.dataset.menuItemsSignature === signature) return;
-    if (list) list.querySelectorAll('[data-configured-menu-item]').forEach((item) => item.remove());
-    if (list && Array.isArray(items) && items.length) {
-      list.insertAdjacentHTML('beforeend', items.map(renderMenuItem).join(''));
-    }
-    if (list) list.dataset.menuItemsSignature = signature;
+    [
+      [document.querySelector('.primary-nav__list'), 'desktop'],
+      [document.querySelector('.mobile-nav__list'), 'mobile'],
+    ].forEach(([list, target]) => {
+      if (!list || list.dataset.menuItemsSignature === signature) return;
+      if (Array.isArray(items)) list.querySelectorAll('[data-default-menu-link]').forEach((item) => item.remove());
+      list.querySelectorAll('[data-configured-menu-item]').forEach((item) => item.remove());
+      if (Array.isArray(items) && items.length) {
+        list.insertAdjacentHTML('beforeend', items.map((item) => renderMenuItem(item, target)).join(''));
+      }
+      list.dataset.menuItemsSignature = signature;
+    });
   };
   refreshMenuLinks().catch((error) => console.warn('Store menu links unavailable:', error));
   startLiveRefresh(refreshMenuLinks, 15000);
@@ -111,7 +116,7 @@ export function renderHeader({ transparentOnHero = false, currentPage = '' } = {
   refreshHeaderCounts();
 }
 
-function renderMenuItem(item) {
+function renderMenuItem(item, target = 'mobile') {
   if (!['category', 'collection'].includes(item.type) || !/^[a-z0-9-]{1,80}$/.test(item.slug || '')) return '';
   const label = escapeMenuText(item.menuLabel || item.name);
   const type = item.type === 'category' ? 'Category' : 'Collection';
@@ -119,7 +124,10 @@ function renderMenuItem(item) {
   const style = ['link', 'pill', 'card'].includes(item.menuStyle) ? item.menuStyle : 'link';
   const color = /^#[0-9a-fA-F]{6}$/.test(item.menuBackgroundColor || '') ? item.menuBackgroundColor : '#285c43';
   const textColor = /^#[0-9a-fA-F]{6}$/.test(item.menuTextColor || '') ? item.menuTextColor : '#ffffff';
-  const customStyle = style === 'link' ? '' : ` style="--mobile-menu-bg:${color};--mobile-menu-text:${textColor}"`;
+  const customStyle = style === 'link' ? '' : ` style="--menu-bg:${color};--menu-text:${textColor}"`;
+  if (target === 'desktop') {
+    return `<li data-configured-menu-item><a class="primary-nav__link primary-nav__link--configured primary-nav__link--${style}" href="${href}"${customStyle}>${label}</a></li>`;
+  }
   return `<li data-configured-menu-item><span class="mobile-nav__kind">${type}</span><a class="mobile-nav__link mobile-nav__link--${style}" href="${href}"${customStyle}>${label}</a></li>`;
 }
 

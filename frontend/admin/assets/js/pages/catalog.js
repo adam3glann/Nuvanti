@@ -243,12 +243,12 @@ function openCollectionEditor(collection = null) {
 function menuAppearanceFields(item = null) {
   return `
     <fieldset style="border:1px solid var(--a-border);border-radius:10px;padding:1rem;margin:1rem 0">
-      <legend style="padding:0 .35rem;font-weight:600">Burger menu button</legend>
-      <label style="display:flex;align-items:center;gap:.6rem;margin-bottom:.85rem"><input id="mMenuShow" type="checkbox" ${item?.menuShow ? 'checked' : ''} /> Show this ${tab === 'categories' ? 'category' : 'collection'} in the mobile menu</label>
+      <legend style="padding:0 .35rem;font-weight:600">Store header menu</legend>
+      <label style="display:flex;align-items:center;gap:.6rem;margin-bottom:.85rem"><input id="mMenuShow" type="checkbox" ${item?.menuShow ? 'checked' : ''} /> Show this ${tab === 'categories' ? 'category' : 'collection'} in the store menu</label>
       <div class="field"><label for="mMenuLabel">Menu label <span class="hint">(optional)</span></label><input id="mMenuLabel" maxlength="80" placeholder="Use the ${tab === 'categories' ? 'category' : 'collection'} name" value="${escapeHtml(item?.menuLabel || '')}" /></div>
       <div class="field"><label for="mMenuStyle">Button style</label><select id="mMenuStyle"><option value="link" ${item?.menuStyle === 'link' || !item?.menuStyle ? 'selected' : ''}>Simple link</option><option value="pill" ${item?.menuStyle === 'pill' ? 'selected' : ''}>Pill button</option><option value="card" ${item?.menuStyle === 'card' ? 'selected' : ''}>Featured button</option></select></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem"><div class="field"><label for="mMenuBackground">Button color</label><input id="mMenuBackground" type="color" value="${escapeHtml(item?.menuBackgroundColor || '#285c43')}" /></div><div class="field"><label for="mMenuText">Text color</label><input id="mMenuText" type="color" value="${escapeHtml(item?.menuTextColor || '#ffffff')}" /></div></div>
-      <p class="hint">Choose which links appear and style each one. Colors apply to Pill and Featured styles.</p>
+      <p class="hint">Choose which links appear in the desktop header and mobile burger menu. Colors apply to Pill and Featured styles; updates appear in the store automatically.</p>
     </fieldset>`;
 }
 
