@@ -2315,3 +2315,191 @@
 .primary-nav__link--configured.primary-nav__link--card {
   border-radius: 0.8rem;
 }
+
+/* Group store navigation under two clear top-level menus. */
+.primary-nav__group {
+  position: relative;
+}
+.primary-nav__group[hidden],
+.mobile-nav__group[hidden] {
+  display: none;
+}
+.primary-nav__group-toggle {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  gap: .35rem;
+}
+.primary-nav__group-toggle span {
+  font-size: .9em;
+  transition: transform var(--dur-fast) var(--ease-editorial);
+}
+.primary-nav__group[data-open="true"] > .primary-nav__group-toggle span {
+  transform: rotate(180deg);
+}
+.primary-nav__submenu {
+  display: none;
+  position: absolute;
+  top: calc(100% + .5rem);
+  left: 0;
+  z-index: 120;
+  min-width: 220px;
+  max-height: min(70vh, 520px);
+  overflow-y: auto;
+  padding: .5rem;
+  list-style: none;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-drawer);
+}
+.primary-nav__group:hover > .primary-nav__submenu,
+.primary-nav__group:focus-within > .primary-nav__submenu,
+.primary-nav__group[data-open="true"] > .primary-nav__submenu {
+  display: block;
+}
+.primary-nav__submenu > li {
+  display: block;
+}
+.primary-nav__submenu .primary-nav__link {
+  display: flex;
+  width: 100%;
+  padding: .65rem .75rem;
+  font-size: .9rem;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: nowrap;
+}
+.primary-nav__submenu .primary-nav__link--configured.primary-nav__link--pill,
+.primary-nav__submenu .primary-nav__link--configured.primary-nav__link--card {
+  width: fit-content;
+  margin: .2rem;
+}
+.mobile-nav__group-toggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  padding: .9rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  background: transparent;
+  color: inherit;
+  font: 700 1.15rem var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+.mobile-nav__group-toggle span {
+  transition: transform var(--dur-fast) var(--ease-editorial);
+}
+.mobile-nav__group[data-open="true"] > .mobile-nav__group-toggle span {
+  transform: rotate(180deg);
+}
+.mobile-nav__submenu {
+  display: none;
+  flex-direction: column;
+  gap: .25rem;
+  padding: .35rem 0 .65rem .7rem;
+  list-style: none;
+}
+.mobile-nav__group[data-open="true"] > .mobile-nav__submenu {
+  display: flex;
+}
+.mobile-nav__submenu .mobile-nav__link--link {
+  padding-block: .6rem;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* Put the two store sections in the mobile header's open space. */
+@media (max-width: 600px) {
+  .site-header__inner {
+    gap: .4rem;
+    padding-inline: .65rem;
+  }
+  .site-header__side {
+    min-width: 0;
+    gap: .2rem;
+  }
+  .site-header__side:first-child {
+    flex: 1 1 auto;
+  }
+  .site-header__side--end {
+    flex: 0 0 auto;
+    gap: .15rem;
+  }
+  .site-header__side--end > a[href="account.html"],
+  .site-header__side--end > a[href="wishlist.html"] {
+    display: none;
+  }
+  .primary-nav {
+    display: block;
+    flex: 1 1 auto;
+    max-width: none;
+    overflow: visible;
+  }
+  .primary-nav__list {
+    width: auto;
+    gap: .2rem;
+  }
+  .primary-nav__list > li:first-child {
+    display: none;
+  }
+  .primary-nav__group-toggle {
+    gap: .15rem;
+    padding: .35rem .15rem;
+    font-size: .68rem;
+    letter-spacing: 0;
+    text-transform: none;
+    white-space: nowrap;
+  }
+  .hamburger,
+  .site-header__side--end > .icon-btn {
+    width: 36px;
+    height: 36px;
+    flex: 0 0 36px;
+  }
+  .site-header__side--end > .icon-btn svg,
+  .hamburger svg {
+    width: 18px;
+    height: 18px;
+  }
+  .site-header__side--end .cart-count {
+    top: -1px;
+    right: -1px;
+  }
+  .site-logo__mark {
+    height: 30px;
+  }
+}
+
+@media (max-width: 360px) {
+  .site-header__inner {
+    gap: .25rem;
+    padding-inline: .45rem;
+  }
+  .site-header__side {
+    gap: .1rem;
+  }
+  .site-header__side--end {
+    gap: .05rem;
+  }
+  .primary-nav__list {
+    gap: .1rem;
+  }
+  .primary-nav__group-toggle {
+    gap: .08rem;
+    font-size: .58rem;
+  }
+  .hamburger,
+  .site-header__side--end > .icon-btn {
+    width: 32px;
+    height: 32px;
+    flex-basis: 32px;
+  }
+  .site-logo__mark {
+    height: 26px;
+  }
+}

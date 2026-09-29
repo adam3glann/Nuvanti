@@ -10,6 +10,7 @@ import {
   fetchCollections, toggleCollectionStatus, deleteCollection, createCollection, editCollection,
 } from '../services/categoryService.js';
 import { startLiveRefresh } from '../services/liveRefresh.js';
+import { fetchAdminProducts, updateAdminProduct } from '../services/productService.js';
 
 const params = new URLSearchParams(location.search);
 let tab = params.get('tab') === 'collections' ? 'collections' : 'categories';
@@ -143,6 +144,7 @@ function openCategoryEditor(category = null) {
     `,
     footHTML: `<button class="btn btn-outline" id="mCancel">Cancel</button><button class="btn btn-primary" id="mSave">${editing ? 'Save Changes' : 'Create Category'}</button>`,
   });
+  bindMenuAppearancePreview(modal.root);
   modal.root.querySelector('#mCancel').addEventListener('click', modal.close);
   const imageUrl = modal.root.querySelector('#mImageUrl');
   const preview = modal.root.querySelector('#mCoverPreview');
@@ -210,17 +212,48 @@ function openCategoryEditor(category = null) {
   modal.open();
 }
 
-function openCollectionEditor(collection = null) {
+async function openCollectionEditor(collection = null) {
   const editing = Boolean(collection);
+  let products;
+  try {
+    const result = await fetchAdminProducts({ perPage: 1000000 });
+    products = result.items;
+  } catch (error) {
+    showAdminToast(`Could not load products for this collection: ${error.message}`, 'error');
+    return;
+  }
+  const initiallyAssigned = new Set(products.filter((product) => product.collection === collection?.slug).map((product) => String(product.id)));
   const modal = createAdminModal({
     title: editing ? 'Edit Collection' : 'New Collection',
     bodyHTML: `
       <div class="field"><label for="mName">Name</label><input id="mName" maxlength="80" value="${escapeHtml(collection?.name || '')}" /></div>
       <div class="field"><label for="mSlug">Slug</label><input id="mSlug" maxlength="80" value="${escapeHtml(collection?.slug || '')}" ${editing ? 'readonly' : ''} /></div>
       ${menuAppearanceFields(collection)}
+      <fieldset style="border:1px solid var(--a-border);border-radius:10px;padding:1rem;margin:1rem 0">
+        <legend style="padding:0 .35rem;font-weight:600">Products in this collection</legend>
+        <p class="hint">Select as many products as you want. Selected products will appear on this collection’s shop page. A product can belong to one collection at a time.</p>
+        <div class="field"><label for="mProductSearch">Find products</label><input id="mProductSearch" type="search" placeholder="Search by product name" /></div>
+        <div id="mProductCount" class="hint" aria-live="polite"></div>
+        <div id="mCollectionProducts" style="max-height:260px;overflow:auto;border:1px solid var(--a-border);border-radius:8px;padding:.4rem .75rem">
+          ${products.map((product) => `<label data-collection-product-row data-search-name="${escapeHtml(product.name.toLowerCase())}" style="display:flex;align-items:center;gap:.65rem;padding:.65rem 0;border-bottom:1px solid var(--a-border)"><input type="checkbox" data-collection-product="${escapeHtml(product.id)}" ${initiallyAssigned.has(String(product.id)) ? 'checked' : ''} /><span>${escapeHtml(product.name)}</span><small class="hint" style="margin-left:auto">${product.status === 'active' ? 'Published' : 'Draft'}</small></label>`).join('') || '<p class="hint">No products yet. Create products first, then add them here.</p>'}
+        </div>
+      </fieldset>
     `,
     footHTML: `<button class="btn btn-outline" id="mCancel">Cancel</button><button class="btn btn-primary" id="mSave">${editing ? 'Save Changes' : 'Create'}</button>`,
   });
+  bindMenuAppearancePreview(modal.root);
+  const updateProductCount = () => {
+    const selectedCount = modal.root.querySelectorAll('[data-collection-product]:checked').length;
+    modal.root.querySelector('#mProductCount').textContent = `${selectedCount} product${selectedCount === 1 ? '' : 's'} selected`;
+  };
+  modal.root.querySelector('#mProductSearch').addEventListener('input', (event) => {
+    const search = event.target.value.trim().toLowerCase();
+    modal.root.querySelectorAll('[data-collection-product-row]').forEach((row) => {
+      row.hidden = search && !row.dataset.searchName.includes(search);
+    });
+  });
+  modal.root.querySelector('#mCollectionProducts').addEventListener('change', updateProductCount);
+  updateProductCount();
   modal.root.querySelector('#mCancel').addEventListener('click', modal.close);
   modal.root.querySelector('#mSave').addEventListener('click', async () => {
     const name = modal.root.querySelector('#mName').value.trim();
@@ -230,10 +263,21 @@ function openCollectionEditor(collection = null) {
     if (!slug) return showAdminToast('Enter a name or slug using letters and numbers.', 'error');
     try {
       const data = { name, slug, ...readMenuAppearance(modal.root) };
-      if (editing) await editCollection(collection.id, data);
-      else await createCollection(data);
+      let savedCollection;
+      if (editing) savedCollection = await editCollection(collection.id, data);
+      else savedCollection = await createCollection(data);
+      const selectedIds = new Set([...modal.root.querySelectorAll('[data-collection-product]:checked')].map((input) => input.dataset.collectionProduct));
+      const changes = products.filter((product) => {
+        const id = String(product.id);
+        return selectedIds.has(id) ? product.collection !== savedCollection.slug : initiallyAssigned.has(id);
+      });
+      for (let index = 0; index < changes.length; index += 5) {
+        await Promise.all(changes.slice(index, index + 5).map((product) => updateAdminProduct(product.id, {
+          collection: selectedIds.has(String(product.id)) ? savedCollection.slug : null,
+        })));
+      }
       modal.close();
-      showAdminToast(editing ? 'Collection updated.' : 'Collection created.', 'success');
+      showAdminToast(`${editing ? 'Collection updated' : 'Collection created'}${changes.length ? `; ${changes.length} product assignment${changes.length === 1 ? '' : 's'} saved` : ''}.`, 'success');
       render();
     } catch (error) { showAdminToast(error.message, 'error'); }
   });
@@ -243,13 +287,31 @@ function openCollectionEditor(collection = null) {
 function menuAppearanceFields(item = null) {
   return `
     <fieldset style="border:1px solid var(--a-border);border-radius:10px;padding:1rem;margin:1rem 0">
-      <legend style="padding:0 .35rem;font-weight:600">Store header menu</legend>
-      <label style="display:flex;align-items:center;gap:.6rem;margin-bottom:.85rem"><input id="mMenuShow" type="checkbox" ${item?.menuShow ? 'checked' : ''} /> Show this ${tab === 'categories' ? 'category' : 'collection'} in the store menu</label>
+      <legend style="padding:0 .35rem;font-weight:600">${tab === 'categories' ? 'Categories menu' : 'Collections menu'}</legend>
+      <label style="display:flex;align-items:center;gap:.6rem;margin-bottom:.85rem"><input id="mMenuShow" type="checkbox" ${item?.menuShow ? 'checked' : ''} /> Show under ${tab === 'categories' ? 'Categories' : 'Collections'}</label>
       <div class="field"><label for="mMenuLabel">Menu label <span class="hint">(optional)</span></label><input id="mMenuLabel" maxlength="80" placeholder="Use the ${tab === 'categories' ? 'category' : 'collection'} name" value="${escapeHtml(item?.menuLabel || '')}" /></div>
       <div class="field"><label for="mMenuStyle">Button style</label><select id="mMenuStyle"><option value="link" ${item?.menuStyle === 'link' ? 'selected' : ''}>Simple link</option><option value="pill" ${item?.menuStyle === 'pill' || !item?.menuStyle ? 'selected' : ''}>Green pill button</option><option value="card" ${item?.menuStyle === 'card' ? 'selected' : ''}>Featured button</option></select></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem"><div class="field"><label for="mMenuBackground">Button color</label><input id="mMenuBackground" type="color" value="${escapeHtml(item?.menuBackgroundColor || '#35604a')}" /></div><div class="field"><label for="mMenuText">Text color</label><input id="mMenuText" type="color" value="${escapeHtml(item?.menuTextColor || '#ffffff')}" /></div></div>
-      <p class="hint">Choose which links appear in the desktop header and mobile burger menu. Colors apply to Pill and Featured styles; updates appear in the store automatically.</p>
+      <div style="display:flex;align-items:center;gap:.75rem;margin:.75rem 0 1rem"><span class="hint">Live preview</span><span id="mMenuPreview" style="display:inline-flex;align-items:center;justify-content:center;padding:.45rem 1rem;border-radius:999px;font-weight:700">${escapeHtml(item?.menuLabel || item?.name || 'SUMMER \'26')}</span></div>
+      <p class="hint">${tab === 'collections' ? 'This item appears inside the main Collections menu. Choose its label, button style, and colors; select any number of products below.' : 'This item appears inside the main Categories menu. Choose its label, button style, and colors.'}</p>
     </fieldset>`;
+}
+
+function bindMenuAppearancePreview(root) {
+  const preview = root.querySelector('#mMenuPreview');
+  const fields = ['#mName', '#mMenuLabel', '#mMenuStyle', '#mMenuBackground', '#mMenuText'];
+  const update = () => {
+    const label = root.querySelector('#mMenuLabel').value.trim() || root.querySelector('#mName').value.trim() || 'SUMMER \'26';
+    const style = root.querySelector('#mMenuStyle').value;
+    preview.textContent = label;
+    preview.style.background = style === 'link' ? 'transparent' : root.querySelector('#mMenuBackground').value;
+    preview.style.color = style === 'link' ? 'var(--a-text)' : root.querySelector('#mMenuText').value;
+    preview.style.borderRadius = style === 'card' ? '10px' : '999px';
+    preview.style.padding = style === 'link' ? '.35rem .15rem' : '.45rem 1rem';
+  };
+  fields.forEach((selector) => root.querySelector(selector).addEventListener('input', update));
+  root.querySelector('#mMenuStyle').addEventListener('change', update);
+  update();
 }
 
 function readMenuAppearance(root) {

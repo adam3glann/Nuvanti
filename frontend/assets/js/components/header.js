@@ -20,7 +20,9 @@ export function renderHeader({ transparentOnHero = false, currentPage = '' } = {
           </button>
           <nav class="primary-nav" aria-label="Main">
             <ul class="primary-nav__list">
-              ${mainNav.map((item) => `<li${item.href.includes('collection=') ? ' data-default-menu-link' : ''}><a class="primary-nav__link${item.label.includes('SUMMER') ? ' primary-nav__link--summer' : ''}" href="${item.href}" ${isCurrent(item, currentPage) ? 'aria-current="page"' : ''}>${item.label}</a></li>`).join('')}
+              ${mainNav.filter((item) => !item.href.includes('collection=')).map((item) => `<li><a class="primary-nav__link" href="${item.href}" ${isCurrent(item, currentPage) ? 'aria-current="page"' : ''}>${item.label}</a></li>`).join('')}
+              ${renderMenuGroup('collection', 'Collections', 'desktop')}
+              ${renderMenuGroup('category', 'Categories', 'desktop')}
             </ul>
           </nav>
         </div>
@@ -49,6 +51,8 @@ export function renderHeader({ transparentOnHero = false, currentPage = '' } = {
       </div>
       <ul class="mobile-nav__list">
         ${mainNav.filter((item) => !item.href.includes('collection=')).map((item) => `<li><a class="mobile-nav__link" href="${item.href}">${item.label}</a></li>`).join('')}
+        ${renderMenuGroup('collection', 'Collections', 'mobile')}
+        ${renderMenuGroup('category', 'Categories', 'mobile')}
       </ul>
       <div class="mobile-nav__foot">
         <a href="account.html" class="btn btn-outline btn-block">Account</a>
@@ -76,21 +80,45 @@ export function renderHeader({ transparentOnHero = false, currentPage = '' } = {
   document.getElementById('openMobileNav').addEventListener('click', openNav);
   document.getElementById('closeMobileNav').addEventListener('click', closeNav);
   scrim.addEventListener('click', closeNav);
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeNav(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    closeNav();
+    document.querySelectorAll('[data-menu-group][data-open="true"]').forEach((group) => {
+      group.dataset.open = 'false';
+      group.querySelector('[data-menu-group-toggle]')?.setAttribute('aria-expanded', 'false');
+    });
+  });
+  document.addEventListener('click', (event) => {
+    if (event.target.closest('[data-menu-group]')) return;
+    document.querySelectorAll('[data-menu-group][data-open="true"]').forEach((group) => {
+      group.dataset.open = 'false';
+      group.querySelector('[data-menu-group-toggle]')?.setAttribute('aria-expanded', 'false');
+    });
+  });
+  document.querySelectorAll('[data-menu-group-toggle]').forEach((button) => button.addEventListener('click', () => {
+    const group = button.closest('[data-menu-group]');
+    const isOpen = group.dataset.open === 'true';
+    group.dataset.open = String(!isOpen);
+    button.setAttribute('aria-expanded', String(!isOpen));
+  }));
 
   const refreshMenuLinks = async () => {
     const items = await fetchMenuLinks();
     const signature = JSON.stringify(items);
     [
-      [document.querySelector('.primary-nav__list'), 'desktop'],
-      [document.querySelector('.mobile-nav__list'), 'mobile'],
-    ].forEach(([list, target]) => {
+      ['collection', 'desktop'], ['category', 'desktop'],
+      ['collection', 'mobile'], ['category', 'mobile'],
+    ].forEach(([type, target]) => {
+      const group = document.querySelector(`[data-menu-group="${type}"][data-menu-target="${target}"]`);
+      const list = group?.querySelector('[data-menu-items]');
       if (!list || list.dataset.menuItemsSignature === signature) return;
       if (Array.isArray(items)) list.querySelectorAll('[data-default-menu-link]').forEach((item) => item.remove());
       list.querySelectorAll('[data-configured-menu-item]').forEach((item) => item.remove());
-      if (Array.isArray(items) && items.length) {
-        list.insertAdjacentHTML('beforeend', items.map((item) => renderMenuItem(item, target)).join(''));
+      const groupItems = Array.isArray(items) ? items.filter((item) => item.type === type) : [];
+      if (groupItems.length) {
+        list.insertAdjacentHTML('beforeend', groupItems.map((item) => renderMenuItem(item, target)).join(''));
       }
+      group.hidden = Array.isArray(items) && groupItems.length === 0;
       list.dataset.menuItemsSignature = signature;
     });
   };
@@ -114,6 +142,26 @@ export function renderHeader({ transparentOnHero = false, currentPage = '' } = {
   }
 
   refreshHeaderCounts();
+}
+
+function renderMenuGroup(type, label, target) {
+  const isMobile = target === 'mobile';
+  const staticCollections = type === 'collection'
+    ? mainNav.filter((item) => item.href.includes('collection=')).map((item) => {
+      const className = item.label.includes('SUMMER') ? ' primary-nav__link--summer' : '';
+      return `<li data-default-menu-link><a class="${isMobile ? 'mobile-nav__link' : 'primary-nav__link'}${className}" href="${item.href}">${item.label}</a></li>`;
+    }).join('')
+    : '';
+  if (isMobile) {
+    return `<li class="mobile-nav__group" data-menu-group="${type}" data-menu-target="mobile"${type === 'category' ? ' hidden' : ''}>
+      <button type="button" class="mobile-nav__group-toggle" data-menu-group-toggle aria-controls="mobile-${type}-submenu" aria-expanded="false">${label}<span aria-hidden="true">⌄</span></button>
+      <ul class="mobile-nav__submenu" id="mobile-${type}-submenu" data-menu-items>${staticCollections}</ul>
+    </li>`;
+  }
+  return `<li class="primary-nav__group" data-menu-group="${type}" data-menu-target="desktop"${type === 'category' ? ' hidden' : ''}>
+    <button type="button" class="primary-nav__link primary-nav__group-toggle" data-menu-group-toggle aria-controls="desktop-${type}-submenu" aria-expanded="false">${label}<span aria-hidden="true">⌄</span></button>
+    <ul class="primary-nav__submenu" id="desktop-${type}-submenu" data-menu-items>${staticCollections}</ul>
+  </li>`;
 }
 
 function renderMenuItem(item, target = 'mobile') {

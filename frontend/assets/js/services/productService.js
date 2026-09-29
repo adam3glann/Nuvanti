@@ -13,7 +13,30 @@ async function api(path) {
   return response.json();
 }
 function filter(list, filters) { let out = [...list]; if (filters.colors?.length) out = out.filter((p) => p.colors.some((c) => filters.colors.includes(c))); if (filters.sizes?.length) out = out.filter((p) => p.sizes.some((s) => filters.sizes.includes(s))); if (filters.minPrice != null) out = out.filter((p) => p.price >= filters.minPrice); if (filters.maxPrice != null) out = out.filter((p) => p.price <= filters.maxPrice); if (filters.availability === 'in-stock') out = out.filter((p) => Object.values(p.inventory).some((n) => n > 0)); if (filters.badge === 'new') out = out.filter((p) => p.newArrival); if (filters.badge === 'bestseller') out = out.filter((p) => p.bestseller); return out; }
-export async function fetchProducts(filters = {}) { try { const q = new URLSearchParams(); if (filters.category) q.set('category', filters.category); if (filters.collection) q.set('collection', filters.collection); if (filters.query) q.set('search', filters.query); const list = filter(await api(`/api/products?${q}`), filters); const sorts = { 'price-asc': (a,b) => a.price-b.price, 'price-desc': (a,b) => b.price-a.price, 'name-asc': (a,b) => a.name.localeCompare(b.name), newest: (a,b) => Number(b.newArrival)-Number(a.newArrival) }; return sorts[filters.sort] ? list.sort(sorts[filters.sort]) : list; } catch (error) { if (!LOCAL_DEVELOPMENT) throw error; return filter(getPublishedProducts(), filters); } }
+export async function fetchProducts(filters = {}) {
+  try {
+    const pageSize = 100;
+    const list = [];
+    let offset = 0;
+    let page;
+    do {
+      const q = new URLSearchParams({ limit: String(pageSize), offset: String(offset) });
+      if (filters.category) q.set('category', filters.category);
+      if (filters.collection) q.set('collection', filters.collection);
+      if (filters.query) q.set('search', filters.query);
+      page = await api(`/api/products?${q}`);
+      if (!Array.isArray(page)) throw new Error('Catalog response was invalid.');
+      list.push(...page);
+      offset += page.length;
+    } while (page.length === pageSize);
+    const filtered = filter(list, filters);
+    const sorts = { 'price-asc': (a,b) => a.price-b.price, 'price-desc': (a,b) => b.price-a.price, 'name-asc': (a,b) => a.name.localeCompare(b.name), newest: (a,b) => Number(b.newArrival)-Number(a.newArrival) };
+    return sorts[filters.sort] ? filtered.sort(sorts[filters.sort]) : filtered;
+  } catch (error) {
+    if (!LOCAL_DEVELOPMENT) throw error;
+    return filter(getPublishedProducts(), filters);
+  }
+}
 export async function fetchProductBySlug(slug) { try { return await api(`/api/products/${encodeURIComponent(slug)}`); } catch (error) { if (error.status === 404) return null; if (!LOCAL_DEVELOPMENT) throw error; return localBySlug(slug) || null; } }
 export async function fetchFeatured() { return (await fetchProducts()).filter((p) => p.featured); }
 export async function fetchBestsellers() { return (await fetchProducts()).filter((p) => p.bestseller); }
