@@ -7,7 +7,7 @@ import { createAdminModal } from '../components/modal.js';
 import { escapeHtml, storeAssetSrc } from '../components/utils.js';
 import {
   fetchCategories, toggleCategoryStatus, deleteCategory, createCategory, editCategory, uploadCategoryImage,
-  fetchCollections, toggleCollectionStatus, deleteCollection, createCollection,
+  fetchCollections, toggleCollectionStatus, deleteCollection, createCollection, editCollection,
 } from '../services/categoryService.js';
 import { startLiveRefresh } from '../services/liveRefresh.js';
 
@@ -29,7 +29,7 @@ if (session) init();
 
 function init() {
   renderTabs();
-  document.getElementById('newBtn').addEventListener('click', () => (tab === 'categories' ? openCategoryEditor() : openNewCollection()));
+  document.getElementById('newBtn').addEventListener('click', () => (tab === 'categories' ? openCategoryEditor() : openCollectionEditor()));
   render();
   startLiveRefresh(render, 15000, { pauseWhileEditing: true });
 }
@@ -82,11 +82,12 @@ async function renderTable(body, headRow) {
     const cols = await fetchCollections();
     body.innerHTML = cols.map((c) => `
       <tr>
-        <td style="font-weight:600">${c.name}</td>
-        <td class="mono">${c.slug}</td>
+        <td style="font-weight:600">${escapeHtml(c.name)}</td>
+        <td class="mono">${escapeHtml(c.slug)}</td>
         <td>${c.productCount}</td>
         <td>${statusBadge(c.status)}</td>
         <td style="text-align:right">
+          <button class="btn btn-outline btn-sm" data-edit-collection="${escapeHtml(c.id)}">Edit</button>
           <button class="btn btn-outline btn-sm" data-toggle="${c.id}">${c.status === 'published' ? 'Unpublish' : 'Publish'}</button>
           <button class="icon-btn" data-delete="${c.id}" aria-label="Delete">${icon('trash')}</button>
         </td>
@@ -101,6 +102,13 @@ function bindRows(kind) {
       const category = (await fetchCategories()).find((item) => item.id === btn.dataset.edit);
       if (!category) return showAdminToast('Category not found. Refresh the page and try again.', 'error');
       openCategoryEditor(category);
+    } catch (error) { showAdminToast(error.message, 'error'); }
+  }));
+  if (kind === 'collection') document.querySelectorAll('[data-edit-collection]').forEach((btn) => btn.addEventListener('click', async () => {
+    try {
+      const collection = (await fetchCollections()).find((item) => item.id === btn.dataset.editCollection);
+      if (!collection) return showAdminToast('Collection not found. Refresh the page and try again.', 'error');
+      openCollectionEditor(collection);
     } catch (error) { showAdminToast(error.message, 'error'); }
   }));
   document.querySelectorAll('[data-toggle]').forEach((btn) => btn.addEventListener('click', async () => {
@@ -131,6 +139,7 @@ function openCategoryEditor(category = null) {
       <div class="field"><label for="mCoverFile">Cover photo</label><input id="mCoverFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" aria-describedby="mUploadHint mUploadStatus" /><span class="hint" id="mUploadHint">JPEG, PNG, WebP, or GIF up to 5 MB. Uploaded securely to Cloudinary.</span><span class="hint" id="mUploadStatus" role="status" aria-live="polite"></span></div>
       <div class="field"><label for="mImageUrl">Image URL</label><input id="mImageUrl" type="url" maxlength="1000" placeholder="Upload a cover or paste an HTTPS image URL" value="${escapeHtml(category?.imageUrl || '')}" /></div>
       <span id="mPreviewStatus" class="hint" role="status" hidden>Image preview could not be loaded. Check the image URL or upload a new image.</span><img id="mCoverPreview" src="${category?.imageUrl ? escapeHtml(storeAssetSrc(category.imageUrl)) : ''}" alt="Cover preview" ${category?.imageUrl ? '' : 'hidden'} style="max-width:100%;max-height:220px;object-fit:cover;border-radius:8px" />
+      ${menuAppearanceFields(category)}
     `,
     footHTML: `<button class="btn btn-outline" id="mCancel">Cancel</button><button class="btn btn-primary" id="mSave">${editing ? 'Save Changes' : 'Create Category'}</button>`,
   });
@@ -190,7 +199,7 @@ function openCategoryEditor(category = null) {
     const slug = slugify(rawSlug || name);
     if (!slug) return showAdminToast('Enter a name or slug using letters and numbers.', 'error');
     try {
-      const data = { name, slug, description: modal.root.querySelector('#mDesc').value.trim(), imageUrl: imageUrl.value.trim() || null };
+      const data = { name, slug, description: modal.root.querySelector('#mDesc').value.trim(), imageUrl: imageUrl.value.trim() || null, ...readMenuAppearance(modal.root) };
       if (editing) await editCategory(category.id, data);
       else await createCategory(data);
       modal.close();
@@ -201,28 +210,54 @@ function openCategoryEditor(category = null) {
   modal.open();
 }
 
-function openNewCollection() {
+function openCollectionEditor(collection = null) {
+  const editing = Boolean(collection);
   const modal = createAdminModal({
-    title: 'New Collection',
+    title: editing ? 'Edit Collection' : 'New Collection',
     bodyHTML: `
-      <div class="field"><label>Name</label><input id="mName" /></div>
-      <div class="field"><label>Slug</label><input id="mSlug" /></div>
+      <div class="field"><label for="mName">Name</label><input id="mName" maxlength="80" value="${escapeHtml(collection?.name || '')}" /></div>
+      <div class="field"><label for="mSlug">Slug</label><input id="mSlug" maxlength="80" value="${escapeHtml(collection?.slug || '')}" ${editing ? 'readonly' : ''} /></div>
+      ${menuAppearanceFields(collection)}
     `,
-    footHTML: `<button class="btn btn-outline" id="mCancel">Cancel</button><button class="btn btn-primary" id="mSave">Create</button>`,
+    footHTML: `<button class="btn btn-outline" id="mCancel">Cancel</button><button class="btn btn-primary" id="mSave">${editing ? 'Save Changes' : 'Create'}</button>`,
   });
   modal.root.querySelector('#mCancel').addEventListener('click', modal.close);
   modal.root.querySelector('#mSave').addEventListener('click', async () => {
     const name = modal.root.querySelector('#mName').value.trim();
-    if (!name) return;
+    if (name.length < 2) return showAdminToast('Collection name must have at least 2 characters.', 'error');
     const rawSlug = modal.root.querySelector('#mSlug').value.trim();
     const slug = slugify(rawSlug || name);
     if (!slug) return showAdminToast('Enter a name or slug using letters and numbers.', 'error');
     try {
-      await createCollection({ name, slug });
+      const data = { name, slug, ...readMenuAppearance(modal.root) };
+      if (editing) await editCollection(collection.id, data);
+      else await createCollection(data);
       modal.close();
-      showAdminToast('Collection created.', 'success');
+      showAdminToast(editing ? 'Collection updated.' : 'Collection created.', 'success');
       render();
     } catch (error) { showAdminToast(error.message, 'error'); }
   });
   modal.open();
+}
+
+function menuAppearanceFields(item = null) {
+  return `
+    <fieldset style="border:1px solid var(--a-border);border-radius:10px;padding:1rem;margin:1rem 0">
+      <legend style="padding:0 .35rem;font-weight:600">Burger menu button</legend>
+      <label style="display:flex;align-items:center;gap:.6rem;margin-bottom:.85rem"><input id="mMenuShow" type="checkbox" ${item?.menuShow ? 'checked' : ''} /> Show this ${tab === 'categories' ? 'category' : 'collection'} in the mobile menu</label>
+      <div class="field"><label for="mMenuLabel">Menu label <span class="hint">(optional)</span></label><input id="mMenuLabel" maxlength="80" placeholder="Use the ${tab === 'categories' ? 'category' : 'collection'} name" value="${escapeHtml(item?.menuLabel || '')}" /></div>
+      <div class="field"><label for="mMenuStyle">Button style</label><select id="mMenuStyle"><option value="link" ${item?.menuStyle === 'link' || !item?.menuStyle ? 'selected' : ''}>Simple link</option><option value="pill" ${item?.menuStyle === 'pill' ? 'selected' : ''}>Pill button</option><option value="card" ${item?.menuStyle === 'card' ? 'selected' : ''}>Featured button</option></select></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem"><div class="field"><label for="mMenuBackground">Button color</label><input id="mMenuBackground" type="color" value="${escapeHtml(item?.menuBackgroundColor || '#285c43')}" /></div><div class="field"><label for="mMenuText">Text color</label><input id="mMenuText" type="color" value="${escapeHtml(item?.menuTextColor || '#ffffff')}" /></div></div>
+      <p class="hint">Choose which links appear and style each one. Colors apply to Pill and Featured styles.</p>
+    </fieldset>`;
+}
+
+function readMenuAppearance(root) {
+  return {
+    menuShow: root.querySelector('#mMenuShow').checked,
+    menuLabel: root.querySelector('#mMenuLabel').value.trim() || null,
+    menuStyle: root.querySelector('#mMenuStyle').value,
+    menuBackgroundColor: root.querySelector('#mMenuBackground').value,
+    menuTextColor: root.querySelector('#mMenuText').value,
+  };
 }

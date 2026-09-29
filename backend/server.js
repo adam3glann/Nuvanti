@@ -8,6 +8,7 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import productsRouter from "./routes/products.js";
 import categoriesRouter from "./routes/categories.js";
+import navigationRouter from "./routes/navigation.js";
 import storefrontRouter from "./routes/storefront.js";
 import newsletterRouter from "./routes/newsletter.js";
 import ordersRouter from "./routes/orders.js";
@@ -197,6 +198,7 @@ app.get("/api/health", async (req, res, next) => {
 });
 app.use("/api/products", productsRouter);
 app.use("/api/categories", categoriesRouter);
+app.use("/api/navigation", navigationRouter);
 app.use("/api/storefront", storefrontRouter);
 app.use("/api/newsletter", newsletterRouter);
 app.use("/api/orders", ordersRouter);

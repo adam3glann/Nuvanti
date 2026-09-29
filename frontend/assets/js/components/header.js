@@ -4,6 +4,8 @@ import { cartCount } from '../services/cartService.js';
 import { getWishlist } from '../services/wishlistService.js';
 import { openCartDrawer } from './cartDrawer.js';
 import { openSearchOverlay } from './searchOverlay.js';
+import { fetchMenuLinks } from '../services/productService.js';
+import { startLiveRefresh } from '../services/liveRefresh.js';
 
 export function renderHeader({ transparentOnHero = false, currentPage = '' } = {}) {
   const mount = document.getElementById('site-header');
@@ -46,7 +48,7 @@ export function renderHeader({ transparentOnHero = false, currentPage = '' } = {
         <button class="icon-btn" id="closeMobileNav" aria-label="Close menu">${icon('close')}</button>
       </div>
       <ul class="mobile-nav__list">
-        ${mainNav.map((item) => `<li><a class="mobile-nav__link${item.label.includes('SUMMER') ? ' mobile-nav__link--summer' : ''}" href="${item.href}">${item.label}</a></li>`).join('')}
+        ${mainNav.filter((item) => !item.href.includes('collection=')).map((item) => `<li><a class="mobile-nav__link" href="${item.href}">${item.label}</a></li>`).join('')}
       </ul>
       <div class="mobile-nav__foot">
         <a href="account.html" class="btn btn-outline btn-block">Account</a>
@@ -76,6 +78,20 @@ export function renderHeader({ transparentOnHero = false, currentPage = '' } = {
   scrim.addEventListener('click', closeNav);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeNav(); });
 
+  const refreshMenuLinks = async () => {
+    const items = await fetchMenuLinks();
+    const list = document.querySelector('.mobile-nav__list');
+    const signature = JSON.stringify(items);
+    if (list?.dataset.menuItemsSignature === signature) return;
+    if (list) list.querySelectorAll('[data-configured-menu-item]').forEach((item) => item.remove());
+    if (list && Array.isArray(items) && items.length) {
+      list.insertAdjacentHTML('beforeend', items.map(renderMenuItem).join(''));
+    }
+    if (list) list.dataset.menuItemsSignature = signature;
+  };
+  refreshMenuLinks().catch((error) => console.warn('Store menu links unavailable:', error));
+  startLiveRefresh(refreshMenuLinks, 15000);
+
   document.getElementById('openCart').addEventListener('click', () => openCartDrawer());
   document.getElementById('openSearch').addEventListener('click', () => openSearchOverlay());
 
@@ -93,6 +109,22 @@ export function renderHeader({ transparentOnHero = false, currentPage = '' } = {
   }
 
   refreshHeaderCounts();
+}
+
+function renderMenuItem(item) {
+  if (!['category', 'collection'].includes(item.type) || !/^[a-z0-9-]{1,80}$/.test(item.slug || '')) return '';
+  const label = escapeMenuText(item.menuLabel || item.name);
+  const type = item.type === 'category' ? 'Category' : 'Collection';
+  const href = `shop.html?${item.type}=${encodeURIComponent(item.slug)}`;
+  const style = ['link', 'pill', 'card'].includes(item.menuStyle) ? item.menuStyle : 'link';
+  const color = /^#[0-9a-fA-F]{6}$/.test(item.menuBackgroundColor || '') ? item.menuBackgroundColor : '#285c43';
+  const textColor = /^#[0-9a-fA-F]{6}$/.test(item.menuTextColor || '') ? item.menuTextColor : '#ffffff';
+  const customStyle = style === 'link' ? '' : ` style="--mobile-menu-bg:${color};--mobile-menu-text:${textColor}"`;
+  return `<li data-configured-menu-item><span class="mobile-nav__kind">${type}</span><a class="mobile-nav__link mobile-nav__link--${style}" href="${href}"${customStyle}>${label}</a></li>`;
+}
+
+function escapeMenuText(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 }
 
 export function refreshHeaderCounts() {

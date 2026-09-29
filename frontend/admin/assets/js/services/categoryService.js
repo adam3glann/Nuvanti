@@ -13,3 +13,4 @@ export const fetchCollections = () => request('/api/admin/collections');
 export const toggleCollectionStatus = async (id) => { const collection = (await fetchCollections()).find((item) => item.id === String(id)); return request(`/api/admin/collections/${id}`, { method: 'PATCH', body: JSON.stringify({ isActive: !collection?.isActive }) }); };
 export const deleteCollection = (id) => request(`/api/admin/collections/${id}`, { method: 'DELETE' });
 export const createCollection = (data) => request('/api/admin/collections', { method: 'POST', body: JSON.stringify(data) });
+export const editCollection = (id, data) => request(`/api/admin/collections/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(data) });

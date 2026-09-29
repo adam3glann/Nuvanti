@@ -20,4 +20,5 @@ export async function fetchBestsellers() { return (await fetchProducts()).filter
 export async function fetchNewArrivals() { return (await fetchProducts()).filter((p) => p.newArrival); }
 export async function fetchRelated(product, count = 4) { return (await fetchProducts({ category: product.category })).filter((p) => p.id !== product.id).slice(0, count); }
 export async function fetchCategories() { try { const remote = await api('/api/categories'); return remote.map((category) => ({ ...category, image: category.imageUrl || localCategories.find((local) => local.slug === category.slug)?.image || '' })); } catch (error) { if (!LOCAL_DEVELOPMENT) throw error; return localCategories; } }
+export async function fetchMenuLinks() { return api('/api/navigation'); }
 export async function searchProducts(query) { return query ? (await fetchProducts({ query })).slice(0, 8) : []; }

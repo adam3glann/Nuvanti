@@ -189,6 +189,39 @@
 .mobile-nav__link--summer {
   color: var(--color-accent);
 }
+.mobile-nav__kind {
+  display: block;
+  margin-top: var(--space-3);
+  color: var(--color-muted);
+  font-size: .62rem;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.mobile-nav__link--pill,
+.mobile-nav__link--card {
+  width: fit-content;
+  max-width: 100%;
+  border: 0;
+  border-radius: 999px;
+  background: var(--mobile-menu-bg, var(--color-accent));
+  color: var(--mobile-menu-text, #fff);
+  padding: .7rem 1.1rem;
+  margin-block: .45rem;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.25;
+}
+.mobile-nav__link--card {
+  width: 100%;
+  border-radius: 12px;
+  padding: 1rem 1.1rem;
+  font-size: 1.1rem;
+}
+.mobile-nav__link--pill:hover,
+.mobile-nav__link--card:hover {
+  filter: brightness(1.08);
+}
 .mobile-nav__foot {
   margin-top: auto;
   padding-top: var(--space-5);
