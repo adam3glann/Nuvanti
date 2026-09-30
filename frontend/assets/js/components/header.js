@@ -153,21 +153,24 @@ function syncPrimaryCollectionStyles(items) {
     const glyph = getMenuGlyph(item?.menuIcon);
     const animation = ['ice', 'pulse', 'float'].includes(item?.menuAnimation) ? item.menuAnimation : 'none';
     link.classList.remove('menu-effect--ice', 'menu-effect--pulse', 'menu-effect--float');
+    link.classList.remove('menu-style--pill', 'menu-style--card', 'menu-style--outline', 'menu-style--soft', 'menu-style--glass');
     if (animation !== 'none') link.classList.add(`menu-effect--${animation}`);
     link.innerHTML = `<span class="menu-button__content">${glyph ? `<span class="menu-button__icon" aria-hidden="true">${glyph}</span>` : ''}<span class="menu-button__label">${escapeMenuText(label)}</span></span>`;
-    link.style.removeProperty('background');
-    link.style.removeProperty('color');
-    link.style.removeProperty('border-radius');
-    link.style.removeProperty('padding');
-    if (!item || item.menuStyle === 'link') return;
+    ['background', 'color', 'border-radius', 'padding', '--menu-bg', '--menu-bg-start', '--menu-bg-end', '--menu-text'].forEach((property) => link.style.removeProperty(property));
+    const style = ['pill', 'card', 'outline', 'soft', 'glass'].includes(item?.menuStyle) ? item.menuStyle : 'link';
+    if (style === 'link') return;
 
     const start = /^#[0-9a-fA-F]{6}$/.test(item.menuBackgroundColor || '') ? item.menuBackgroundColor : '#35604a';
     const end = /^#[0-9a-fA-F]{6}$/.test(item.menuBackgroundEndColor || '') ? item.menuBackgroundEndColor : null;
     const background = end ? `linear-gradient(110deg,${start},${end})` : start;
     const text = /^#[0-9a-fA-F]{6}$/.test(item.menuTextColor || '') ? item.menuTextColor : '#ffffff';
-    link.style.background = background;
-    link.style.setProperty('color', text, 'important');
-    link.style.borderRadius = item.menuStyle === 'card' ? '10px' : '999px';
+    link.classList.add(`menu-style--${style}`);
+    link.style.setProperty('--menu-bg', background);
+    link.style.setProperty('--menu-bg-start', start);
+    link.style.setProperty('--menu-bg-end', end || start);
+    link.style.setProperty('--menu-text', text);
+    link.style.setProperty('color', style === 'soft' ? start : text, 'important');
+    link.style.borderRadius = style === 'card' ? '10px' : '999px';
     link.style.padding = '.45rem 1rem';
   });
 }
@@ -189,15 +192,16 @@ function renderMenuItem(item) {
   if (!['category', 'collection'].includes(item.type) || !/^[a-z0-9-]{1,80}$/.test(item.slug || '')) return '';
   const label = escapeMenuText(item.menuLabel || item.name);
   const href = `shop.html?${item.type}=${encodeURIComponent(item.slug)}`;
-  const style = ['link', 'pill', 'card'].includes(item.menuStyle) ? item.menuStyle : 'pill';
+  const style = ['link', 'pill', 'card', 'outline', 'soft', 'glass'].includes(item.menuStyle) ? item.menuStyle : 'pill';
   const color = /^#[0-9a-fA-F]{6}$/.test(item.menuBackgroundColor || '') ? item.menuBackgroundColor : '#35604a';
   const endColor = /^#[0-9a-fA-F]{6}$/.test(item.menuBackgroundEndColor || '') ? item.menuBackgroundEndColor : null;
   const textColor = /^#[0-9a-fA-F]{6}$/.test(item.menuTextColor || '') ? item.menuTextColor : '#ffffff';
   const background = endColor ? `linear-gradient(110deg,${color},${endColor})` : color;
-  const customStyle = style === 'link' ? '' : ` style="--menu-bg:${background};--menu-text:${textColor}"`;
+  const customStyle = style === 'link' ? '' : ` style="--menu-bg:${background};--menu-bg-start:${color};--menu-bg-end:${endColor || color};--menu-text:${textColor}"`;
   const glyph = getMenuGlyph(item.menuIcon);
   const animation = ['ice', 'pulse', 'float'].includes(item.menuAnimation) ? ` menu-effect--${item.menuAnimation}` : '';
-  return `<li data-configured-menu-item><a class="mobile-nav__link mobile-nav__link--${style}${animation}" href="${href}"${customStyle}><span class="menu-button__content">${glyph ? `<span class="menu-button__icon" aria-hidden="true">${glyph}</span>` : ''}<span class="menu-button__label">${label}</span></span></a></li>`;
+  const design = style === 'link' ? '' : ` menu-style--${style}`;
+  return `<li data-configured-menu-item><a class="mobile-nav__link mobile-nav__link--${style}${design}${animation}" href="${href}"${customStyle}><span class="menu-button__content">${glyph ? `<span class="menu-button__icon" aria-hidden="true">${glyph}</span>` : ''}<span class="menu-button__label">${label}</span></span></a></li>`;
 }
 
 function getMenuGlyph(name) {

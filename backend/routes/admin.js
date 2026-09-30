@@ -36,7 +36,7 @@ const categoryImage = z.string().trim().max(1000).refine((value) => {
 const menuAppearance = z.object({
   menuShow: z.boolean().optional(),
   menuLabel: z.string().trim().max(80).nullable().optional(),
-  menuStyle: z.enum(['link', 'pill', 'card']).optional(),
+  menuStyle: z.enum(['link', 'pill', 'card', 'outline', 'soft', 'glass']).optional(),
   menuBackgroundColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
   menuBackgroundEndColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
   menuTextColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),

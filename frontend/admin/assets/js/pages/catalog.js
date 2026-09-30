@@ -290,7 +290,7 @@ function menuAppearanceFields(item = null) {
       <legend style="padding:0 .35rem;font-weight:600">${tab === 'categories' ? 'Categories menu' : 'Collections menu'}</legend>
       <label style="display:flex;align-items:center;gap:.6rem;margin-bottom:.85rem"><input id="mMenuShow" type="checkbox" ${item?.menuShow ? 'checked' : ''} /> Show under ${tab === 'categories' ? 'Categories' : 'Collections'}</label>
       <div class="field"><label for="mMenuLabel">Menu label <span class="hint">(optional)</span></label><input id="mMenuLabel" maxlength="80" placeholder="Use the ${tab === 'categories' ? 'category' : 'collection'} name" value="${escapeHtml(item?.menuLabel || '')}" /></div>
-      <div class="field"><label for="mMenuStyle">Button style</label><select id="mMenuStyle"><option value="link" ${item?.menuStyle === 'link' ? 'selected' : ''}>Simple link</option><option value="pill" ${item?.menuStyle === 'pill' || !item?.menuStyle ? 'selected' : ''}>Green pill button</option><option value="card" ${item?.menuStyle === 'card' ? 'selected' : ''}>Featured button</option></select></div>
+      <div class="field"><label for="mMenuStyle">Button design</label><select id="mMenuStyle"><option value="link" ${item?.menuStyle === 'link' ? 'selected' : ''}>Simple link</option><option value="pill" ${item?.menuStyle === 'pill' || !item?.menuStyle ? 'selected' : ''}>Classic pill</option><option value="outline" ${item?.menuStyle === 'outline' ? 'selected' : ''}>Outlined</option><option value="soft" ${item?.menuStyle === 'soft' ? 'selected' : ''}>Soft color</option><option value="glass" ${item?.menuStyle === 'glass' ? 'selected' : ''}>Frosted glass</option><option value="card" ${item?.menuStyle === 'card' ? 'selected' : ''}>Featured card</option></select></div>
       <label style="display:flex;align-items:center;gap:.6rem;margin:.75rem 0"><input id="mMenuGradient" type="checkbox" ${item?.menuBackgroundEndColor ? 'checked' : ''} /> Use a two-color gradient</label>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem"><div class="field"><label for="mMenuBackground">Start color</label><input id="mMenuBackground" type="color" value="${escapeHtml(item?.menuBackgroundColor || '#35604a')}" /></div><div class="field"><label for="mMenuBackgroundEnd">End color</label><input id="mMenuBackgroundEnd" type="color" value="${escapeHtml(item?.menuBackgroundEndColor || '#849274')}" ${item?.menuBackgroundEndColor ? '' : 'disabled'} /></div><div class="field"><label for="mMenuText">Text color</label><input id="mMenuText" type="color" value="${escapeHtml(item?.menuTextColor || '#ffffff')}" /></div></div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1rem"><div class="field"><label for="mMenuIcon">Button detail</label><select id="mMenuIcon"><option value="none">No icon</option><option value="sparkle" ${item?.menuIcon === 'sparkle' ? 'selected' : ''}>Sparkle</option><option value="star" ${item?.menuIcon === 'star' ? 'selected' : ''}>Star</option><option value="heart" ${item?.menuIcon === 'heart' ? 'selected' : ''}>Heart</option><option value="arrow" ${item?.menuIcon === 'arrow' ? 'selected' : ''}>Arrow</option></select></div><div class="field"><label for="mMenuAnimation">Button animation</label><select id="mMenuAnimation"><option value="none">None</option><option value="ice" ${item?.menuAnimation === 'ice' ? 'selected' : ''}>Ice shine</option><option value="pulse" ${item?.menuAnimation === 'pulse' ? 'selected' : ''}>Soft pulse</option><option value="float" ${item?.menuAnimation === 'float' ? 'selected' : ''}>Gentle float</option></select></div></div>
@@ -306,17 +306,27 @@ function bindMenuAppearancePreview(root) {
     const label = root.querySelector('#mMenuLabel').value.trim() || root.querySelector('#mName').value.trim() || 'SUMMER \'26';
     const style = root.querySelector('#mMenuStyle').value;
     const useGradient = root.querySelector('#mMenuGradient').checked;
+    const startColor = root.querySelector('#mMenuBackground').value;
+    const endColor = root.querySelector('#mMenuBackgroundEnd').value;
+    const textColor = root.querySelector('#mMenuText').value;
     root.querySelector('#mMenuBackgroundEnd').disabled = !useGradient;
     const glyphs = { sparkle: '✦', star: '★', heart: '♥', arrow: '→' };
     preview.querySelector('.menu-button-preview__label').textContent = label;
     preview.querySelector('.menu-button-preview__icon').textContent = glyphs[root.querySelector('#mMenuIcon').value] || '';
     preview.dataset.animation = root.querySelector('#mMenuAnimation').value;
-    preview.style.background = style === 'link' ? 'transparent' : useGradient
-      ? `linear-gradient(110deg, ${root.querySelector('#mMenuBackground').value}, ${root.querySelector('#mMenuBackgroundEnd').value})`
-      : root.querySelector('#mMenuBackground').value;
-    preview.style.color = style === 'link' ? 'var(--a-text)' : root.querySelector('#mMenuText').value;
+    preview.dataset.style = style;
+    preview.style.setProperty('--preview-fill', useGradient ? `linear-gradient(110deg, ${startColor}, ${endColor})` : startColor);
+    preview.style.setProperty('--preview-start', startColor);
+    preview.style.setProperty('--preview-end', useGradient ? endColor : startColor);
+    preview.style.color = style === 'link' ? 'var(--a-text)' : style === 'soft' ? startColor : textColor;
     preview.style.borderRadius = style === 'card' ? '10px' : '999px';
     preview.style.padding = style === 'link' ? '.35rem .15rem' : '.45rem 1rem';
+    preview.style.border = style === 'outline' ? `1px solid ${startColor}` : '1px solid transparent';
+    preview.style.backdropFilter = style === 'glass' ? 'blur(8px)' : 'none';
+    preview.style.background = style === 'link' || style === 'outline' ? 'transparent'
+      : style === 'soft' ? `color-mix(in srgb, ${startColor} 16%, var(--a-surface))`
+        : style === 'glass' ? `color-mix(in srgb, ${startColor} 25%, transparent)`
+          : preview.style.getPropertyValue('--preview-fill');
   };
   fields.forEach((selector) => root.querySelector(selector).addEventListener('input', update));
   ['#mMenuStyle', '#mMenuGradient', '#mMenuIcon', '#mMenuAnimation'].forEach((selector) => {
