@@ -149,15 +149,16 @@ function syncPrimaryCollectionStyles(items) {
   document.querySelectorAll('.primary-nav__link[href*="collection="]').forEach((link) => {
     const slug = new URL(link.href, window.location.href).searchParams.get('collection');
     const item = collections.get(slug);
-    const label = link.dataset.baseMenuLabel || (link.dataset.baseMenuLabel = link.textContent.trim());
+    const baseLabel = link.dataset.baseMenuLabel || (link.dataset.baseMenuLabel = link.textContent.trim());
+    const label = escapeMenuText(item?.menuLabel || baseLabel);
     const glyph = getMenuGlyph(item?.menuIcon);
-    const animation = ['ice', 'pulse', 'float', 'glow', 'bounce', 'sweep'].includes(item?.menuAnimation) ? item.menuAnimation : 'none';
-    link.classList.remove('menu-effect--ice', 'menu-effect--pulse', 'menu-effect--float', 'menu-effect--glow', 'menu-effect--bounce', 'menu-effect--sweep');
-    link.classList.remove('menu-style--pill', 'menu-style--card', 'menu-style--outline', 'menu-style--soft', 'menu-style--glass', 'menu-style--gradient', 'menu-style--elevated', 'menu-style--glow', 'menu-style--cut', 'menu-style--underline');
+    const animation = ['ice', 'pulse', 'float', 'glow', 'bounce', 'sweep', 'shine', 'tilt', 'orbit', 'twinkle', 'wave', 'pop'].includes(item?.menuAnimation) ? item.menuAnimation : 'none';
+    link.classList.remove('menu-effect--ice', 'menu-effect--pulse', 'menu-effect--float', 'menu-effect--glow', 'menu-effect--bounce', 'menu-effect--sweep', 'menu-effect--shine', 'menu-effect--tilt', 'menu-effect--orbit', 'menu-effect--twinkle', 'menu-effect--wave', 'menu-effect--pop');
+    link.classList.remove('menu-style--pill', 'menu-style--card', 'menu-style--outline', 'menu-style--soft', 'menu-style--glass', 'menu-style--gradient', 'menu-style--elevated', 'menu-style--glow', 'menu-style--cut', 'menu-style--underline', 'menu-style--double', 'menu-style--sticker', 'menu-style--gradient-outline', 'menu-style--neon', 'menu-style--dashed', 'menu-style--tag', 'menu-style--corner', 'menu-style--inset');
     if (animation !== 'none') link.classList.add(`menu-effect--${animation}`);
-    link.innerHTML = `<span class="menu-button__content">${glyph ? `<span class="menu-button__icon" aria-hidden="true">${glyph}</span>` : ''}<span class="menu-button__label">${escapeMenuText(label)}</span></span>`;
+    link.innerHTML = `<span class="menu-button__content">${glyph ? `<span class="menu-button__icon" aria-hidden="true">${glyph}</span>` : ''}<span class="menu-button__label">${label}</span></span>`;
     ['background', 'color', 'border-radius', 'padding', '--menu-bg', '--menu-bg-start', '--menu-bg-end', '--menu-text'].forEach((property) => link.style.removeProperty(property));
-    const style = ['pill', 'card', 'outline', 'soft', 'glass', 'gradient', 'elevated', 'glow', 'cut', 'underline'].includes(item?.menuStyle) ? item.menuStyle : 'link';
+    const style = ['pill', 'card', 'outline', 'soft', 'glass', 'gradient', 'elevated', 'glow', 'cut', 'underline', 'double', 'sticker', 'gradient-outline', 'neon', 'dashed', 'tag', 'corner', 'inset'].includes(item?.menuStyle) ? item.menuStyle : 'link';
     if (style === 'link') return;
 
     const start = /^#[0-9a-fA-F]{6}$/.test(item.menuBackgroundColor || '') ? item.menuBackgroundColor : '#35604a';
@@ -169,9 +170,14 @@ function syncPrimaryCollectionStyles(items) {
     link.style.setProperty('--menu-bg-start', start);
     link.style.setProperty('--menu-bg-end', end || start);
     link.style.setProperty('--menu-text', text);
-    link.style.setProperty('color', style === 'soft' || style === 'underline' ? start : text, 'important');
-    link.style.borderRadius = style === 'card' ? '10px' : style === 'cut' ? '4px' : '999px';
-    link.style.padding = style === 'underline' ? '.35rem .15rem' : '.45rem 1rem';
+    link.style.setProperty('color', ['soft', 'underline', 'gradient-outline', 'dashed', 'inset'].includes(style) ? start : text, 'important');
+    link.style.borderRadius = style === 'card' ? '10px'
+      : ['cut', 'corner'].includes(style) ? '4px'
+        : style === 'sticker' ? '9px 15px 10px 14px'
+          : style === 'tag' ? '6px 999px 999px 6px'
+            : style === 'underline' ? '0' : '999px';
+    link.style.padding = style === 'underline' ? '.35rem .15rem'
+      : style === 'tag' ? '.45rem 1.45rem .45rem 1.25rem' : '.45rem 1rem';
   });
 }
 
@@ -192,20 +198,20 @@ function renderMenuItem(item) {
   if (!['category', 'collection'].includes(item.type) || !/^[a-z0-9-]{1,80}$/.test(item.slug || '')) return '';
   const label = escapeMenuText(item.menuLabel || item.name);
   const href = `shop.html?${item.type}=${encodeURIComponent(item.slug)}`;
-  const style = ['link', 'pill', 'card', 'outline', 'soft', 'glass', 'gradient', 'elevated', 'glow', 'cut', 'underline'].includes(item.menuStyle) ? item.menuStyle : 'pill';
+  const style = ['link', 'pill', 'card', 'outline', 'soft', 'glass', 'gradient', 'elevated', 'glow', 'cut', 'underline', 'double', 'sticker', 'gradient-outline', 'neon', 'dashed', 'tag', 'corner', 'inset'].includes(item.menuStyle) ? item.menuStyle : 'pill';
   const color = /^#[0-9a-fA-F]{6}$/.test(item.menuBackgroundColor || '') ? item.menuBackgroundColor : '#35604a';
   const endColor = /^#[0-9a-fA-F]{6}$/.test(item.menuBackgroundEndColor || '') ? item.menuBackgroundEndColor : null;
   const textColor = /^#[0-9a-fA-F]{6}$/.test(item.menuTextColor || '') ? item.menuTextColor : '#ffffff';
   const background = endColor ? `linear-gradient(110deg,${color},${endColor})` : color;
   const customStyle = style === 'link' ? '' : ` style="--menu-bg:${background};--menu-bg-start:${color};--menu-bg-end:${endColor || color};--menu-text:${textColor}"`;
   const glyph = getMenuGlyph(item.menuIcon);
-  const animation = ['ice', 'pulse', 'float', 'glow', 'bounce', 'sweep'].includes(item.menuAnimation) ? ` menu-effect--${item.menuAnimation}` : '';
+  const animation = ['ice', 'pulse', 'float', 'glow', 'bounce', 'sweep', 'shine', 'tilt', 'orbit', 'twinkle', 'wave', 'pop'].includes(item.menuAnimation) ? ` menu-effect--${item.menuAnimation}` : '';
   const design = style === 'link' ? '' : ` menu-style--${style}`;
   return `<li data-configured-menu-item><a class="mobile-nav__link mobile-nav__link--${style}${design}${animation}" href="${href}"${customStyle}><span class="menu-button__content">${glyph ? `<span class="menu-button__icon" aria-hidden="true">${glyph}</span>` : ''}<span class="menu-button__label">${label}</span></span></a></li>`;
 }
 
 function getMenuGlyph(name) {
-  return ({ sparkle: '✦', star: '★', heart: '♥', arrow: '→', leaf: '❧', diamond: '◆', bolt: 'ϟ', flower: '✿', crown: '♛', dot: '•' })[name] || '';
+  return ({ sparkle: '✦', star: '★', heart: '♥', arrow: '→', leaf: '❧', diamond: '◆', bolt: 'ϟ', flower: '✿', crown: '♛', dot: '•', sun: '☼', moon: '☾', wave: '〰', check: '✓', smile: '☺', plus: '+', ribbon: '♧', flame: '♨' })[name] || '';
 }
 
 function escapeMenuText(value) {
