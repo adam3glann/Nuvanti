@@ -106,6 +106,15 @@
 .primary-nav__link[aria-current="page"]::after {
   transform: scaleX(1);
 }
+.primary-nav__link[href*="collection="] {
+  transition: color var(--dur-fast) var(--ease-editorial), scale var(--dur-fast) var(--ease-editorial);
+}
+.primary-nav__link[href*="collection="]::after {
+  display: none;
+}
+.primary-nav__link[href*="collection="]:hover {
+  scale: 1.04;
+}
 .primary-nav__link--summer {
   background: var(--gradient-brand);
   color: var(--color-white) !important;
