@@ -3,6 +3,7 @@ import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import multer from 'multer';
+import rateLimit from 'express-rate-limit';
 import { query, transaction } from '../lib/db.js';
 import { productPayload, toAdminProduct, toPublicProduct } from '../lib/catalog.js';
 import { hasPermission, requirePermission } from '../lib/permissions.js';
@@ -12,6 +13,13 @@ import { adminPublicOrigin, storePublicOrigin } from '../lib/publicOrigins.js';
 import { restoreOrderInventory } from '../lib/orderLifecycle.js';
 import { restoreStoreBackup, validateStoreBackup } from '../lib/maintenanceBackup.js';
 const router = Router();
+const adminPresenceLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 180,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'The live visitor count is refreshing too often. Retry shortly.' },
+});
 const asyncRoute = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
 const MANAGEABLE_ROLES = ['staff', 'manager', 'admin', 'super_admin'];
 const RESETTABLE_ROLES = ['admin', 'super_admin'];
@@ -96,7 +104,7 @@ const homepageSlideInput = z.object({
   isActive: z.boolean().default(true),
 }).refine((slide) => !slide.secondaryLabel || slide.secondaryHref, { message: 'Add a link for the secondary button.' });
 const homepageSlideColumns = 'id::text, image_url AS "imageUrl", mobile_image_url AS "mobileImageUrl", eyebrow, title, description, cta_label AS "ctaLabel", cta_href AS "ctaHref", secondary_label AS "secondaryLabel", secondary_href AS "secondaryHref", position, duration_seconds AS "durationSeconds", text_color AS "textColor", eyebrow_color AS "eyebrowColor", title_color AS "titleColor", description_color AS "descriptionColor", button_text_color AS "buttonTextColor", text_gradients AS "textGradients", text_fonts AS "textFonts", is_active AS "isActive"';
-router.get('/store-presence', asyncRoute(async (req, res) => {
+router.get('/store-presence', adminPresenceLimiter, asyncRoute(async (req, res) => {
   const { rows } = await query(`SELECT count(DISTINCT visitor_id)::int AS "activeVisitors",
       COALESCE((SELECT total_views FROM storefront_metrics WHERE id = 1), 0)::text AS "totalViews"
     FROM storefront_presence WHERE last_seen_at >= NOW() - INTERVAL '12 seconds'`);
@@ -504,6 +512,17 @@ router.patch('/collections/:id', requirePermission('products.edit'), async (req,
   res.json({ ...rows[0], status: rows[0].isActive ? 'published' : 'draft' });
 });
 router.delete('/collections/:id', requirePermission('products.delete'), async (req, res) => { const result = await query('DELETE FROM collections WHERE id = $1', [req.params.id]); if (!result.rowCount) return res.status(404).json({ error: 'Collection not found.' }); await logAudit({ req, action: 'collection.deleted', targetType: 'collection', targetId: req.params.id }); res.status(204).end(); });
+router.patch('/collections/:id/products', requirePermission('products.edit'), asyncRoute(async (req, res) => {
+  const input = z.object({ productIds: z.array(z.string().regex(/^\d+$/)).max(3500) }).parse(req.body);
+  const collection = await query('SELECT slug FROM collections WHERE id = $1', [req.params.id]);
+  if (!collection.rows[0]) return res.status(404).json({ error: 'Collection not found.' });
+  const { rows } = await query(`UPDATE products
+    SET collection = CASE WHEN id = ANY($2::bigint[]) THEN $1 ELSE NULL END, updated_at = NOW()
+    WHERE collection = $1 OR id = ANY($2::bigint[])
+    RETURNING id::text`, [collection.rows[0].slug, input.productIds]);
+  await logAudit({ req, action: 'collection.products.updated', targetType: 'collection', targetId: req.params.id, metadata: { assignedCount: input.productIds.length, changedCount: rows.length } });
+  res.json({ updatedCount: rows.length });
+}));
 router.post('/products', requirePermission('products.create'), async (req, res) => { const p = productPayload(productInput.parse(req.body)); try { const { rows } = await query(`INSERT INTO products (slug,name,description,price_cents,category,collection,images,colors,sizes,inventory,is_active,metadata) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9::jsonb,$10,$11,$12::jsonb) RETURNING ${columns}`, [p.slug,p.name,p.description,p.priceCents,p.category,p.collection,JSON.stringify(p.images),JSON.stringify(p.colors),JSON.stringify(p.sizes),p.inventory,p.isActive,JSON.stringify(p.metadata)]); res.status(201).json(toAdminProduct(rows[0])); } catch (error) { if (error.code === '23505') return res.status(409).json({ error: 'A product with that slug already exists.' }); throw error; } });
 router.patch('/products/:id', requirePermission('products.edit'), async (req, res) => { const existing = await query(`SELECT ${columns} FROM products WHERE id = $1`, [req.params.id]); if (!existing.rows[0]) return res.status(404).json({ error: 'Product not found.' }); const current = toAdminProduct(existing.rows[0]); const patch = productFields.partial().parse(req.body); const merged = { ...current, ...patch }; // The public product includes both EGP and cents; drop the stale counterpart when either is explicitly changed.
   if (patch.priceCents !== undefined && patch.price === undefined) merged.price = undefined;

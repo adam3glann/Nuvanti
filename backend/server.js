@@ -120,6 +120,14 @@ const trustProxy = process.env.TRUST_PROXY
     : 0;
 if (!Number.isInteger(trustProxy) || trustProxy < 0)
   throw new Error("TRUST_PROXY must be a non-negative integer.");
+const adminApiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 1800,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  keyGenerator: (req) => `admin:${req.user.id}`,
+  message: { error: "Admin request limit reached. Wait a few minutes and retry." },
+});
 if (process.env.NODE_ENV === "production") {
   if (
     !process.env.JWT_SECRET ||
@@ -171,7 +179,12 @@ app.use(
     limit: 300,
     standardHeaders: "draft-7",
     legacyHeaders: false,
-    skip: (req) => ["/api/storefront/presence", "/api/storefront/page-view"].includes(req.path),
+    // Presence is polled by the authenticated admin header every 2 seconds.
+    // Give that endpoint its own tighter limiter after admin authentication so
+    // it cannot exhaust the shared API budget and block catalog work.
+    skip: (req) => ["/api/storefront/presence", "/api/storefront/page-view"].includes(req.path)
+      || req.path === "/api/admin"
+      || req.path.startsWith("/api/admin/"),
   }),
 );
 // Signed gateway callbacks are verified by their HMAC and cannot carry a
@@ -205,7 +218,7 @@ app.use("/api/newsletter", newsletterRouter);
 app.use("/api/orders", ordersRouter);
 app.use("/api/addresses", addressesRouter);
 app.use("/api/contact", contactRouter);
-app.use("/api/admin", requireUnblockedAdminIp, requireAuth, requireRole(...STAFF_ROLES), adminRouter);
+app.use("/api/admin", requireUnblockedAdminIp, requireAuth, requireRole(...STAFF_ROLES), adminApiLimiter, adminRouter);
 app.use(
   "/api/admin/uploads",
   requireAuth,

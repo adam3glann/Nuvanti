@@ -8,9 +8,10 @@ import { escapeHtml, storeAssetSrc } from '../components/utils.js';
 import {
   fetchCategories, toggleCategoryStatus, deleteCategory, createCategory, editCategory, uploadCategoryImage,
   fetchCollections, toggleCollectionStatus, deleteCollection, createCollection, editCollection,
+  syncCollectionProducts,
 } from '../services/categoryService.js';
 import { startLiveRefresh } from '../services/liveRefresh.js';
-import { fetchAdminProducts, updateAdminProduct } from '../services/productService.js';
+import { fetchAdminProducts } from '../services/productService.js';
 
 const params = new URLSearchParams(location.search);
 let tab = params.get('tab') === 'collections' ? 'collections' : 'categories';
@@ -150,6 +151,7 @@ function openCategoryEditor(category = null) {
   const preview = modal.root.querySelector('#mCoverPreview');
   const fileInput = modal.root.querySelector('#mCoverFile');
   const saveButton = modal.root.querySelector('#mSave');
+  const initialSaveLabel = saveButton.textContent;
   const uploadStatus = modal.root.querySelector('#mUploadStatus');
   const previewStatus = modal.root.querySelector('#mPreviewStatus');
   let uploading = false;
@@ -193,13 +195,16 @@ function openCategoryEditor(category = null) {
       saveButton.disabled = false;
     }
   });
-  modal.root.querySelector('#mSave').addEventListener('click', async () => {
+  saveButton.addEventListener('click', async () => {
     if (uploading) return showAdminToast('Wait for the cover upload to finish.', 'info');
     const name = modal.root.querySelector('#mName').value.trim();
     if (name.length < 2) return showAdminToast('Category name must have at least 2 characters.', 'error');
     const rawSlug = modal.root.querySelector('#mSlug').value.trim();
     const slug = slugify(rawSlug || name);
     if (!slug) return showAdminToast('Enter a name or slug using letters and numbers.', 'error');
+    if (saveButton.disabled) return;
+    saveButton.disabled = true;
+    saveButton.textContent = 'Saving…';
     try {
       const data = { name, slug, description: modal.root.querySelector('#mDesc').value.trim(), imageUrl: imageUrl.value.trim() || null, ...readMenuAppearance(modal.root) };
       if (editing) await editCategory(category.id, data);
@@ -207,7 +212,11 @@ function openCategoryEditor(category = null) {
       modal.close();
       showAdminToast(editing ? 'Category updated.' : 'Category created.', 'success');
       render();
-    } catch (error) { showAdminToast(error.message, 'error'); }
+    } catch (error) {
+      saveButton.disabled = false;
+      saveButton.textContent = initialSaveLabel;
+      showAdminToast(error.message, 'error');
+    }
   });
   modal.open();
 }
@@ -255,31 +264,32 @@ async function openCollectionEditor(collection = null) {
   modal.root.querySelector('#mCollectionProducts').addEventListener('change', updateProductCount);
   updateProductCount();
   modal.root.querySelector('#mCancel').addEventListener('click', modal.close);
-  modal.root.querySelector('#mSave').addEventListener('click', async () => {
+  const saveButton = modal.root.querySelector('#mSave');
+  const initialSaveLabel = saveButton.textContent;
+  saveButton.addEventListener('click', async () => {
     const name = modal.root.querySelector('#mName').value.trim();
     if (name.length < 2) return showAdminToast('Collection name must have at least 2 characters.', 'error');
     const rawSlug = modal.root.querySelector('#mSlug').value.trim();
     const slug = slugify(rawSlug || name);
     if (!slug) return showAdminToast('Enter a name or slug using letters and numbers.', 'error');
+    if (saveButton.disabled) return;
+    saveButton.disabled = true;
+    saveButton.textContent = 'Saving…';
     try {
       const data = { name, slug, ...readMenuAppearance(modal.root) };
       let savedCollection;
       if (editing) savedCollection = await editCollection(collection.id, data);
       else savedCollection = await createCollection(data);
-      const selectedIds = new Set([...modal.root.querySelectorAll('[data-collection-product]:checked')].map((input) => input.dataset.collectionProduct));
-      const changes = products.filter((product) => {
-        const id = String(product.id);
-        return selectedIds.has(id) ? product.collection !== savedCollection.slug : initiallyAssigned.has(id);
-      });
-      for (let index = 0; index < changes.length; index += 5) {
-        await Promise.all(changes.slice(index, index + 5).map((product) => updateAdminProduct(product.id, {
-          collection: selectedIds.has(String(product.id)) ? savedCollection.slug : null,
-        })));
-      }
+      const selectedIds = [...modal.root.querySelectorAll('[data-collection-product]:checked')].map((input) => input.dataset.collectionProduct);
+      await syncCollectionProducts(savedCollection.id, selectedIds);
       modal.close();
-      showAdminToast(`${editing ? 'Collection updated' : 'Collection created'}${changes.length ? `; ${changes.length} product assignment${changes.length === 1 ? '' : 's'} saved` : ''}.`, 'success');
+      showAdminToast(`${editing ? 'Collection updated' : 'Collection created'}; ${selectedIds.length} product${selectedIds.length === 1 ? '' : 's'} assigned.`, 'success');
       render();
-    } catch (error) { showAdminToast(error.message, 'error'); }
+    } catch (error) {
+      saveButton.disabled = false;
+      saveButton.textContent = initialSaveLabel;
+      showAdminToast(error.message, 'error');
+    }
   });
   modal.open();
 }
