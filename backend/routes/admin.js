@@ -36,12 +36,12 @@ const categoryImage = z.string().trim().max(1000).refine((value) => {
 const menuAppearance = z.object({
   menuShow: z.boolean().optional(),
   menuLabel: z.string().trim().max(80).nullable().optional(),
-  menuStyle: z.enum(['link', 'pill', 'card', 'outline', 'soft', 'glass']).optional(),
+  menuStyle: z.enum(['link', 'pill', 'card', 'outline', 'soft', 'glass', 'gradient', 'elevated', 'glow', 'cut', 'underline']).optional(),
   menuBackgroundColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
   menuBackgroundEndColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
   menuTextColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
-  menuIcon: z.enum(['none', 'sparkle', 'star', 'heart', 'arrow']).optional(),
-  menuAnimation: z.enum(['none', 'ice', 'pulse', 'float']).optional(),
+  menuIcon: z.enum(['none', 'sparkle', 'star', 'heart', 'arrow', 'leaf', 'diamond', 'bolt', 'flower', 'crown', 'dot']).optional(),
+  menuAnimation: z.enum(['none', 'ice', 'pulse', 'float', 'glow', 'bounce', 'sweep']).optional(),
 });
 const categoryInput = z.object({ name: z.string().trim().min(2).max(80), slug: z.string().trim().regex(/^[a-z0-9-]+$/).max(80), description: z.string().max(1000).optional(), imageUrl: categoryImage.nullable().optional() }).extend(menuAppearance.shape);
 const collectionInput = z.object({ name: z.string().trim().min(2).max(80), slug: z.string().trim().regex(/^[a-z0-9-]+$/).max(80) }).extend(menuAppearance.shape);
