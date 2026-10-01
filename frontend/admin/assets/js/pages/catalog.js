@@ -297,17 +297,19 @@ async function openCollectionEditor(collection = null) {
 function menuAppearanceFields(item = null) {
   const profile = (device) => {
     const saved = item?.[device === 'desktop' ? 'menuDesktopAppearance' : 'menuMobileAppearance'] || {};
-    const fallback = { style: item?.menuStyle || 'pill', backgroundColor: item?.menuBackgroundColor || '#35604a', backgroundEndColor: item?.menuBackgroundEndColor || '', textColor: item?.menuTextColor || '#ffffff', icon: item?.menuIcon || 'none', animation: item?.menuAnimation || 'none' };
+    const fallback = { style: item?.menuStyle || 'pill', shape: 'design', backgroundColor: item?.menuBackgroundColor || '#35604a', backgroundEndColor: item?.menuBackgroundEndColor || '', gradientDirection: '110deg', textColor: item?.menuTextColor || '#ffffff', icon: item?.menuIcon || 'none', iconPosition: 'left', animation: item?.menuAnimation || 'none' };
     const value = { ...fallback, ...saved };
     const id = (field) => `mMenu-${device}-${field}`;
     const styles = [['link','Simple link'],['pill','Classic pill'],['card','Featured card'],['outline','Outlined'],['soft','Soft color'],['glass','Frosted glass'],['gradient','Gradient blend'],['elevated','Raised button'],['glow','Glow edge'],['cut','Cut corner'],['underline','Underline'],['double','Double border'],['sticker','Sticker'],['gradient-outline','Gradient outline'],['neon','Neon edge'],['dashed','Dashed outline'],['tag','Tag'],['corner','Folded corner'],['inset','Inset'],['bevel','Bevel'],['bubble','Bubble'],['ribbon','Ribbon'],['hollow','Hollow'],['gloss','Gloss'],['aurora','Aurora glass'],['frost','Ice crystal'],['chrome','Liquid chrome'],['rainbow-edge','Rainbow edge'],['satin','Satin ribbon'],['ticket','Ticket stub'],['pixel','Pixel frame'],['mesh','Color mesh'],['halo','Halo ring'],['stamp','Wax stamp'],['arch','Arch top'],['notched','Notched'],['pearl','Pearl shine'],['slime','Liquid gel'],['starlight','Starlight'],['ice-glass','Ice glass'],['ice-border','Ice border'],['prism','Prism'],['foil','Metal foil'],['split','Split color'],['frost-corner','Frost corner'],['badge','Badge'],['orbit','Orbit ring'],['paper','Paper label']];
+    const shapes = [['design','Use design shape'],['pill','Pill'],['rounded','Rounded box'],['square','Square box'],['cut','Cut corner'],['arch','Arch'],['capsule','Capsule'],['organic','Organic']];
+    const directions = [['110deg','Diagonal'],['135deg','Diagonal (reverse)'],['to bottom','Vertical'],['circle','Radial']];
     const icons = [['none','No detail'],['sparkle','Sparkle'],['star','Star'],['heart','Heart'],['arrow','Arrow'],['leaf','Leaf'],['diamond','Diamond'],['bolt','Bolt'],['flower','Flower'],['crown','Crown'],['dot','Dot'],['sun','Sun'],['moon','Moon'],['wave','Wave'],['check','Check'],['smile','Smile'],['plus','Plus'],['ribbon','Ribbon'],['flame','Flame'],['music','Music note'],['infinity','Infinity'],['clover','Clover'],['flag','Flag'],['snowflake','Snowflake'],['ice-crystal','Ice crystal'],['comet','Comet'],['planet','Planet'],['butterfly','Butterfly'],['lightning','Lightning'],['sparkles','Double sparkle'],['flower-star','Flower star'],['eye','Eye'],['mountain','Mountain'],['sunrise','Sunrise'],['cloud','Cloud'],['drop','Water drop'],['circular-arrow','Refresh'],['check-circle','Check badge'],['cross','Plus cross'],['crown-small','Mini crown'],['peace','Peace'],['diamond-ring','Diamond ring'],['crescent','Crescent'],['snowman','Snowman'],['asterisk','Asterisk'],['ice-cube','Ice cube'],['icicle','Icicle'],['frost-star','Frost star'],['snowfall','Snowfall'],['iceberg','Iceberg'],['mittens','Mittens'],['mountain-snow','Snowy mountain'],['evergreen','Evergreen'],['north-star','North star']];
     const animations = [['none','None'],['ice','Ice shine'],['ice-rain','Ice rain'],['icicle-drop','Dropping icicles'],['ice-drip','Ice drip'],['snowfall','Falling snow'],['snowstorm','Snowstorm'],['blizzard','Blizzard'],['sleet','Sleet'],['snowflake-spin','Spinning snowflakes'],['ice-crack','Ice crackle'],['frost','Frost pulse'],['glacier-glow','Glacier glow'],['polar-lights','Polar lights'],['frozen','Freeze shimmer'],['aurora','Aurora drift'],['comet-trail','Comet trail'],['confetti','Confetti pop'],['spark-rain','Spark rain'],['pulse','Soft pulse'],['float','Gentle float'],['glow','Glow breathe'],['bounce','Soft bounce'],['sweep','Light sweep'],['shine','Quick shimmer'],['tilt','Tiny tilt'],['orbit','Orbiting detail'],['twinkle','Twinkle'],['wave','Wave motion'],['pop','Pop'],['wiggle','Wiggle'],['heartbeat','Heartbeat'],['spin','Spinning detail'],['jelly','Jelly bounce'],['ripple','Ripple ring'],['neon-flicker','Neon flicker'],['flame','Flame flicker'],['shimmer','Prism shimmer'],['drift','Slow drift'],['march','Dashed march'],['breathe','Soft breathe'],['sparkle-burst','Sparkle burst'],['swing','Swing'],['flip','Tiny flip'],['magnet','Magnetic pull'],['glitch','Glitch flash'],['rainbow','Rainbow shift']];
     const select = (field, label, options) => `<div class="field"><label for="${id(field)}">${label}</label><select id="${id(field)}">${options.map(([v, text]) => `<option value="${v}" ${value[field] === v ? 'selected' : ''}>${text}</option>`).join('')}</select></div>`;
     return `<section class="menu-device-panel" data-menu-device="${device}" ${device === 'mobile' ? 'hidden' : ''}>
-      <div class="menu-device-grid">${select('style','Button design',styles)}${select('icon','Button detail',icons)}${select('animation','Button animation',animations)}</div>
-      <label class="menu-gradient-toggle"><input id="${id('gradient')}" type="checkbox" ${value.backgroundEndColor ? 'checked' : ''}> Use a two-color gradient</label>
-      <div class="menu-device-grid menu-device-colors"><div class="field"><label for="${id('backgroundColor')}">Start color</label><input id="${id('backgroundColor')}" type="color" value="${escapeHtml(value.backgroundColor)}"></div><div class="field"><label for="${id('backgroundEndColor')}">End color</label><input id="${id('backgroundEndColor')}" type="color" value="${escapeHtml(value.backgroundEndColor || value.backgroundColor)}" ${value.backgroundEndColor ? '' : 'disabled'}></div><div class="field"><label for="${id('textColor')}">Text color</label><input id="${id('textColor')}" type="color" value="${escapeHtml(value.textColor)}"></div></div>
+      <div class="menu-device-grid">${select('shape','Button shape',shapes)}${select('style','Surface design',styles)}${select('icon','Inside detail',icons)}${select('iconPosition','Detail position', [['left','Left of text'],['right','Right of text'],['top','Above text']])}${select('animation','Inside animation',animations)}</div>
+      <label class="menu-gradient-toggle"><input id="${id('gradient')}" type="checkbox" ${value.backgroundEndColor ? 'checked' : ''}> Blend two background colors</label>
+      <div class="menu-device-grid menu-device-colors"><div class="field"><label for="${id('backgroundColor')}">First color</label><input id="${id('backgroundColor')}" type="color" value="${escapeHtml(value.backgroundColor)}"></div><div class="field"><label for="${id('backgroundEndColor')}">Second color</label><input id="${id('backgroundEndColor')}" type="color" value="${escapeHtml(value.backgroundEndColor || value.backgroundColor)}" ${value.backgroundEndColor ? '' : 'disabled'}></div>${select('gradientDirection','Color blend direction', directions)}<div class="field"><label for="${id('textColor')}">Text color</label><input id="${id('textColor')}" type="color" value="${escapeHtml(value.textColor)}"></div></div>
       <div class="menu-preview-row"><span class="hint">${device === 'desktop' ? 'Desktop' : 'Mobile'} preview</span><span id="${id('preview')}" class="menu-button-preview" data-profile="${device}"><span class="menu-button-preview__icon" aria-hidden="true"></span><span class="menu-button-preview__label"></span></span></div>
     </section>`;
   };
@@ -326,25 +328,33 @@ function bindMenuAppearancePreview(root) {
     const get = (field) => root.querySelector(`#mMenu-${device}-${field}`);
     const preview = get('preview');
     const style = get('style').value;
+    const shape = get('shape').value;
+    const iconPosition = get('iconPosition').value;
     const start = get('backgroundColor').value;
     const end = get('gradient').checked ? get('backgroundEndColor').value : start;
     const text = get('textColor').value;
-    const fill = get('gradient').checked ? `linear-gradient(110deg,${start},${end})` : start;
+    const direction = get('gradientDirection').value;
+    const fill = get('gradient').checked ? (direction === 'circle' ? `radial-gradient(circle,${start},${end})` : `linear-gradient(${direction},${start},${end})`) : start;
     const label = root.querySelector('#mMenuLabel').value.trim() || root.querySelector('#mName').value.trim() || 'SUMMER \'26';
     get('backgroundEndColor').disabled = !get('gradient').checked;
+    get('gradientDirection').disabled = !get('gradient').checked;
     preview.dataset.style = style;
+    preview.dataset.shape = shape;
+    preview.dataset.iconPosition = iconPosition;
     preview.dataset.animation = get('animation').value;
     preview.querySelector('.menu-button-preview__label').textContent = label;
     preview.querySelector('.menu-button-preview__icon').textContent = glyphs[get('icon').value] || '';
     preview.style.setProperty('--preview-fill', fill);
     preview.style.setProperty('--preview-start', start);
     preview.style.setProperty('--preview-end', end);
+    preview.style.setProperty('--preview-text', text);
     preview.style.background = ['link','outline','underline','dashed','double','hollow'].includes(style) ? 'transparent' : fill;
     if (style === 'soft') preview.style.background = `color-mix(in srgb,${start} 18%,var(--a-surface))`;
     if (style === 'glass') preview.style.background = `color-mix(in srgb,${start} 28%,transparent)`;
     if (style === 'inset') preview.style.background = `color-mix(in srgb,${start} 12%,var(--a-surface))`;
     if (style === 'gradient-outline') preview.style.background = `linear-gradient(var(--a-surface),var(--a-surface)) padding-box,${fill} border-box`;
-    preview.style.color = ['soft','underline','gradient-outline','dashed','inset','hollow'].includes(style) ? start : style === 'link' ? 'var(--a-text)' : text;
+    // Every profile exposes its own text color, including link and outline styles.
+    preview.style.color = text;
     preview.style.border = ['outline','glow','glass','neon','inset','bevel','hollow'].includes(style) ? `1px solid ${start}` : style === 'double' ? `3px double ${start}` : style === 'dashed' ? `2px dashed ${start}` : style === 'gradient-outline' ? '2px solid transparent' : '1px solid transparent';
     preview.style.borderRadius = ['card','ribbon'].includes(style) ? '8px' : ['cut','corner','bevel'].includes(style) ? '4px' : style === 'tag' ? '6px 999px 999px 6px' : style === 'bubble' ? '16px 16px 16px 4px' : style === 'underline' ? '0' : '999px';
     preview.style.padding = ['link','underline'].includes(style) ? '.35rem .15rem' : '.45rem 1rem';
@@ -354,7 +364,7 @@ function bindMenuAppearancePreview(root) {
     preview.style.transform = style === 'sticker' ? 'rotate(-3deg)' : 'none';
   };
   ['desktop','mobile'].forEach((device) => {
-    ['style','icon','animation','gradient','backgroundColor','backgroundEndColor','textColor'].forEach((field) => {
+      ['shape','style','icon','iconPosition','animation','gradient','gradientDirection','backgroundColor','backgroundEndColor','textColor'].forEach((field) => {
       const node = root.querySelector(`#mMenu-${device}-${field}`);
       node.addEventListener(node.type === 'select-one' || node.type === 'checkbox' ? 'change' : 'input', () => update(device));
     });
@@ -371,7 +381,7 @@ function bindMenuAppearancePreview(root) {
 function readMenuAppearance(root) {
   const readProfile = (device) => {
     const get = (field) => root.querySelector(`#mMenu-${device}-${field}`);
-    return { style: get('style').value, backgroundColor: get('backgroundColor').value, backgroundEndColor: get('gradient').checked ? get('backgroundEndColor').value : null, textColor: get('textColor').value, icon: get('icon').value, animation: get('animation').value };
+    return { style: get('style').value, shape: get('shape').value, backgroundColor: get('backgroundColor').value, backgroundEndColor: get('gradient').checked ? get('backgroundEndColor').value : null, gradientDirection: get('gradientDirection').value, textColor: get('textColor').value, icon: get('icon').value, iconPosition: get('iconPosition').value, animation: get('animation').value };
   };
   return {
     menuShow: root.querySelector('#mMenuShow').checked,

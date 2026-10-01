@@ -112,7 +112,7 @@ export function renderHeader({ transparentOnHero = false, currentPage = '' } = {
       if (!list || list.dataset.menuItemsSignature === signature) return;
       if (Array.isArray(items)) list.querySelectorAll('[data-default-menu-link]').forEach((item) => item.remove());
       list.querySelectorAll('[data-configured-menu-item]').forEach((item) => item.remove());
-      const groupItems = Array.isArray(items) ? items.filter((item) => item.type === type) : [];
+      const groupItems = Array.isArray(items) ? items.filter((item) => item.type === type && item.menuShow === true) : [];
       if (groupItems.length) {
         list.insertAdjacentHTML('beforeend', groupItems.map(renderMenuItem).join(''));
       }
@@ -156,28 +156,30 @@ function syncPrimaryCollectionStyles(items) {
     const animation = appearance.animation;
     link.classList.remove(...menuAnimations.map((name) => `menu-effect--${name}`));
     link.classList.remove(...menuStyles.map((name) => `menu-style--${name}`));
+    link.classList.remove(...menuShapes.map((name) => `menu-shape--${name}`));
+    link.classList.remove(...menuIconPositions.map((name) => `menu-icon-position--${name}`));
+    if (item) link.classList.remove('primary-nav__link--summer');
     if (animation !== 'none') link.classList.add(`menu-effect--${animation}`);
-    link.innerHTML = `<span class="menu-button__content">${glyph ? `<span class="menu-button__icon" aria-hidden="true">${glyph}</span>` : ''}<span class="menu-button__label">${label}</span></span>`;
+    const detail = glyph ? `<span class="menu-button__icon" aria-hidden="true">${glyph}</span>` : '';
+    link.innerHTML = `<span class="menu-button__content">${appearance.iconPosition === 'right' ? `<span class="menu-button__label">${label}</span>${detail}` : `${detail}<span class="menu-button__label">${label}</span>`}</span>`;
     ['background', 'color', 'border-radius', 'padding', '--menu-bg', '--menu-bg-start', '--menu-bg-end', '--menu-text'].forEach((property) => link.style.removeProperty(property));
     const style = appearance.style;
-    if (style === 'link') return;
-
     const start = appearance.backgroundColor;
     const end = appearance.backgroundEndColor || null;
-    const background = end ? `linear-gradient(110deg,${start},${end})` : start;
+    const background = menuFill(start, end, appearance.gradientDirection);
     const text = appearance.textColor;
-    link.classList.add(`menu-style--${style}`);
     link.style.setProperty('--menu-bg', background);
     link.style.setProperty('--menu-bg-start', start);
     link.style.setProperty('--menu-bg-end', end || start);
     link.style.setProperty('--menu-text', text);
-    link.style.setProperty('color', ['soft', 'underline', 'gradient-outline', 'dashed', 'inset'].includes(style) ? start : text, 'important');
-    link.style.borderRadius = ['card', 'ribbon'].includes(style) ? '10px'
-      : ['cut', 'corner'].includes(style) ? '4px'
-        : style === 'sticker' ? '9px 15px 10px 14px'
-          : style === 'tag' ? '6px 999px 999px 6px'
-              : style === 'bubble' ? '16px 16px 16px 4px'
-            : style === 'underline' ? '0' : '999px';
+    link.style.setProperty('color', text, 'important');
+    if (appearance.shape !== 'design') link.classList.add(`menu-shape--${appearance.shape}`);
+    link.classList.add(`menu-icon-position--${appearance.iconPosition}`);
+    if (style === 'link') {
+      if (item) link.style.background = 'transparent';
+      return;
+    }
+    link.classList.add(`menu-style--${style}`);
     link.style.padding = style === 'underline' ? '.35rem .15rem'
       : style === 'tag' ? '.45rem 1.45rem .45rem 1.25rem' : '.45rem 1rem';
   });
@@ -205,12 +207,19 @@ function renderMenuItem(item) {
   const color = appearance.backgroundColor;
   const endColor = appearance.backgroundEndColor || null;
   const textColor = appearance.textColor;
-  const background = endColor ? `linear-gradient(110deg,${color},${endColor})` : color;
-  const customStyle = style === 'link' ? '' : ` style="--menu-bg:${background};--menu-bg-start:${color};--menu-bg-end:${endColor || color};--menu-text:${textColor}"`;
+  const customStyle = ` style="--menu-bg:${menuFill(color, endColor, appearance.gradientDirection)};--menu-bg-start:${color};--menu-bg-end:${endColor || color};--menu-text:${textColor};color:${textColor}!important"`;
   const glyph = getMenuGlyph(appearance.icon);
   const animation = appearance.animation !== 'none' ? ` menu-effect--${appearance.animation}` : '';
   const design = style === 'link' ? '' : ` menu-style--${style}`;
-  return `<li data-configured-menu-item><a class="mobile-nav__link mobile-nav__link--${style}${design}${animation}" href="${href}"${customStyle}><span class="menu-button__content">${glyph ? `<span class="menu-button__icon" aria-hidden="true">${glyph}</span>` : ''}<span class="menu-button__label">${label}</span></span></a></li>`;
+  const shape = appearance.shape === 'design' ? '' : ` menu-shape--${appearance.shape}`;
+  const detail = glyph ? `<span class="menu-button__icon" aria-hidden="true">${glyph}</span>` : '';
+  const contents = appearance.iconPosition === 'right' ? `<span class="menu-button__label">${label}</span>${detail}` : `${detail}<span class="menu-button__label">${label}</span>`;
+  return `<li data-configured-menu-item><a class="mobile-nav__link mobile-nav__link--${style}${design}${shape} menu-icon-position--${appearance.iconPosition}${animation}" href="${href}"${customStyle}><span class="menu-button__content">${contents}</span></a></li>`;
+}
+
+function menuFill(start, end, direction) {
+  if (!end) return start;
+  return direction === 'circle' ? `radial-gradient(circle,${start},${end})` : `linear-gradient(${['110deg', '135deg', 'to bottom'].includes(direction) ? direction : '110deg'},${start},${end})`;
 }
 
 function getMenuGlyph(name) {
@@ -218,6 +227,8 @@ function getMenuGlyph(name) {
 }
 
 const menuStyles = ['link','pill','card','outline','soft','glass','gradient','elevated','glow','cut','underline','double','sticker','gradient-outline','neon','dashed','tag','corner','inset','bevel','bubble','ribbon','hollow','gloss','aurora','frost','chrome','rainbow-edge','satin','ticket','pixel','mesh','halo','stamp','arch','notched','pearl','slime','starlight','ice-glass','ice-border','prism','foil','split','frost-corner','badge','orbit','paper'];
+const menuShapes = ['pill','rounded','square','cut','arch','capsule','organic'];
+const menuIconPositions = ['left','right','top'];
 const menuAnimations = ['ice','ice-rain','icicle-drop','ice-drip','snowfall','snowstorm','blizzard','sleet','snowflake-spin','ice-crack','frost','glacier-glow','polar-lights','frozen','aurora','comet-trail','confetti','spark-rain','pulse','float','glow','bounce','sweep','shine','tilt','orbit','twinkle','wave','pop','wiggle','heartbeat','spin','jelly','ripple','neon-flicker','flame','shimmer','drift','march','breathe','sparkle-burst','swing','flip','magnet','glitch','rainbow'];
 const menuIcons = ['none','sparkle','star','heart','arrow','leaf','diamond','bolt','flower','crown','dot','sun','moon','wave','check','smile','plus','ribbon','flame','music','infinity','clover','flag','snowflake','ice-crystal','comet','planet','butterfly','lightning','sparkles','flower-star','eye','mountain','sunrise','cloud','drop','circular-arrow','check-circle','cross','crown-small','peace','diamond-ring','crescent','snowman','asterisk','ice-cube','icicle','frost-star','snowfall','iceberg','mittens','mountain-snow','evergreen','north-star'];
 function menuAppearanceFor(item, device) {
@@ -228,10 +239,13 @@ function menuAppearanceFor(item, device) {
   const color = (value, fallback) => /^#[0-9a-fA-F]{6}$/.test(value || '') ? value : fallback;
   return {
     style: menuStyles.includes(profile.style) ? profile.style : (device === 'desktop' || !item ? 'link' : 'pill'),
+    shape: ['design', ...menuShapes].includes(profile.shape) ? profile.shape : 'design',
     backgroundColor: color(profile.backgroundColor, '#35604a'),
     backgroundEndColor: color(profile.backgroundEndColor, ''),
+    gradientDirection: ['110deg', '135deg', 'to bottom', 'circle'].includes(profile.gradientDirection) ? profile.gradientDirection : '110deg',
     textColor: color(profile.textColor, '#ffffff'),
     icon: menuIcons.includes(profile.icon) ? profile.icon : 'none',
+    iconPosition: menuIconPositions.includes(profile.iconPosition) ? profile.iconPosition : 'left',
     animation: menuAnimations.includes(profile.animation) ? profile.animation : 'none',
   };
 }

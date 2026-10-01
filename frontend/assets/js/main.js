@@ -1,4 +1,4 @@
-import { renderHeader, refreshHeaderCounts } from './components/header.js';
+import { renderHeader, refreshHeaderCounts } from './components/header.js?v=menu-custom-controls-1';
 import { renderFooter } from './components/footer.js';
 import { mountCartDrawer, refreshCartDrawer } from './components/cartDrawer.js';
 import { mountSearchOverlay } from './components/searchOverlay.js';

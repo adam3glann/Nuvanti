@@ -46,10 +46,13 @@ const menuIcons = ['none', 'sparkle', 'star', 'heart', 'arrow', 'leaf', 'diamond
 const menuAnimations = ['none', 'ice', 'ice-rain', 'icicle-drop', 'ice-drip', 'snowfall', 'snowstorm', 'blizzard', 'sleet', 'snowflake-spin', 'ice-crack', 'frost', 'glacier-glow', 'polar-lights', 'frozen', 'aurora', 'comet-trail', 'confetti', 'spark-rain', 'pulse', 'float', 'glow', 'bounce', 'sweep', 'shine', 'tilt', 'orbit', 'twinkle', 'wave', 'pop', 'wiggle', 'heartbeat', 'spin', 'jelly', 'ripple', 'neon-flicker', 'flame', 'shimmer', 'drift', 'march', 'breathe', 'sparkle-burst', 'swing', 'flip', 'magnet', 'glitch', 'rainbow'];
 const menuAppearanceVariant = z.object({
   style: z.enum(menuStyles),
+  shape: z.enum(['design', 'pill', 'rounded', 'square', 'cut', 'arch', 'capsule', 'organic']).optional(),
   backgroundColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   backgroundEndColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable(),
+  gradientDirection: z.enum(['110deg', '135deg', 'to bottom', 'circle']).optional(),
   textColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   icon: z.enum(menuIcons),
+  iconPosition: z.enum(['left', 'right', 'top']).optional(),
   animation: z.enum(menuAnimations),
 });
 const menuAppearance = z.object({
