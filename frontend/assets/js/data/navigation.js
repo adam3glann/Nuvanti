@@ -1,10 +1,6 @@
-// Navigation data — mirrors the live Nuvanti site's nav: Home, Shop,
-// SUMMER '26, Men's Collection, Women's Collection.
+// Static navigation entries. Collection links are loaded from the live catalog.
 export const mainNav = [
   { label: 'Shop', href: 'shop.html' },
-  { label: "SUMMER '26", href: 'shop.html?collection=unisex' },
-  { label: "Men's Collection", href: 'shop.html?collection=mens' },
-  { label: "Women's Collection", href: 'shop.html?collection=womens' },
 ];
 
 export const footerNav = {

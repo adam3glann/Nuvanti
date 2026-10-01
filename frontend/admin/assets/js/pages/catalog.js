@@ -136,7 +136,7 @@ function openCategoryEditor(category = null) {
     title: editing ? 'Edit Category' : 'New Category',
     bodyHTML: `
       <div class="field"><label for="mName">Name</label><input id="mName" maxlength="80" value="${escapeHtml(category?.name || '')}" /></div>
-      <div class="field"><label for="mSlug">Slug</label><input id="mSlug" maxlength="80" value="${escapeHtml(category?.slug || '')}" ${editing ? 'readonly' : ''} /></div>
+      <div class="field"><label for="mSlug">Slug</label><input id="mSlug" maxlength="80" pattern="[a-z0-9-]+" autocomplete="off" value="${escapeHtml(category?.slug || '')}" /><span class="hint">Lowercase letters, numbers, and hyphens. Existing products keep their category when you change this.</span></div>
       <div class="field"><label for="mDesc">Description</label><textarea id="mDesc" rows="3" maxlength="1000">${escapeHtml(category?.description || '')}</textarea></div>
       <div class="field"><label for="mCoverFile">Cover photo</label><input id="mCoverFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" aria-describedby="mUploadHint mUploadStatus" /><span class="hint" id="mUploadHint">JPEG, PNG, WebP, or GIF up to 5 MB. Uploaded securely to Cloudinary.</span><span class="hint" id="mUploadStatus" role="status" aria-live="polite"></span></div>
       <div class="field"><label for="mImageUrl">Image URL</label><input id="mImageUrl" type="url" maxlength="1000" placeholder="Upload a cover or paste an HTTPS image URL" value="${escapeHtml(category?.imageUrl || '')}" /></div>
@@ -236,7 +236,7 @@ async function openCollectionEditor(collection = null) {
     title: editing ? 'Edit Collection' : 'New Collection',
     bodyHTML: `
       <div class="field"><label for="mName">Name</label><input id="mName" maxlength="80" value="${escapeHtml(collection?.name || '')}" /></div>
-      <div class="field"><label for="mSlug">Slug</label><input id="mSlug" maxlength="80" value="${escapeHtml(collection?.slug || '')}" ${editing ? 'readonly' : ''} /></div>
+      <div class="field"><label for="mSlug">Slug</label><input id="mSlug" maxlength="80" pattern="[a-z0-9-]+" autocomplete="off" value="${escapeHtml(collection?.slug || '')}" /><span class="hint">Lowercase letters, numbers, and hyphens. Existing products keep their collection when you change this.</span></div>
       ${menuAppearanceFields(collection)}
       <fieldset style="border:1px solid var(--a-border);border-radius:10px;padding:1rem;margin:1rem 0">
         <legend style="padding:0 .35rem;font-weight:600">Products in this collection</legend>
@@ -350,7 +350,7 @@ function bindMenuAppearancePreview(root) {
     preview.style.setProperty('--preview-start', start);
     preview.style.setProperty('--preview-end', end);
     preview.style.setProperty('--preview-text', text);
-    const naturallyTransparent = ['link','outline','underline','dashed','double','hollow','gradient-outline'].includes(style);
+    const naturallyTransparent = ['link','outline','underline','dashed','double','hollow','gradient-outline','pixel','halo','stamp','arch','notched','ice-border','badge','orbit','paper'].includes(style);
     preview.style.background = naturallyTransparent && !get('fill').checked ? 'transparent' : fill;
     if (style === 'soft') preview.style.background = `color-mix(in srgb,${start} 18%,var(--a-surface))`;
     if (style === 'glass') preview.style.background = `color-mix(in srgb,${start} 28%,transparent)`;

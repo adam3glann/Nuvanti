@@ -103,6 +103,13 @@ export function renderHeader({ transparentOnHero = false, currentPage = '' } = {
   const refreshMenuLinks = async () => {
     const items = await fetchMenuLinks();
     const signature = JSON.stringify(items);
+    const primaryList = document.querySelector('.primary-nav__list');
+    if (primaryList && primaryList.dataset.primaryCollectionsSignature !== signature) {
+      primaryList.querySelectorAll('[data-configured-primary-collection]').forEach((item) => item.remove());
+      const collections = Array.isArray(items) ? items.filter((item) => item.type === 'collection') : [];
+      primaryList.insertAdjacentHTML('beforeend', collections.map((item) => renderPrimaryCollectionItem(item, currentPage)).join(''));
+      primaryList.dataset.primaryCollectionsSignature = signature;
+    }
     syncPrimaryCollectionStyles(items);
     [
       ['collection', 'mobile'], ['category', 'mobile'],
@@ -121,7 +128,7 @@ export function renderHeader({ transparentOnHero = false, currentPage = '' } = {
     });
   };
   refreshMenuLinks().catch((error) => console.warn('Store menu links unavailable:', error));
-  startLiveRefresh(refreshMenuLinks, 15000);
+  startLiveRefresh(refreshMenuLinks, 5000);
 
   document.getElementById('openCart').addEventListener('click', () => openCartDrawer());
   document.getElementById('openSearch').addEventListener('click', () => openSearchOverlay());
@@ -140,6 +147,15 @@ export function renderHeader({ transparentOnHero = false, currentPage = '' } = {
   }
 
   refreshHeaderCounts();
+}
+
+function renderPrimaryCollectionItem(item) {
+  if (!/^[a-z0-9-]{1,80}$/.test(item.slug || '')) return '';
+  const label = escapeMenuText(item.menuLabel || item.name);
+  const href = `shop.html?collection=${encodeURIComponent(item.slug)}`;
+  const currentSlug = new URLSearchParams(window.location.search).get('collection');
+  const isActive = currentSlug === item.slug;
+  return `<li data-configured-primary-collection><a class="primary-nav__link" href="${href}"${isActive ? ' aria-current="page"' : ''}>${label}</a></li>`;
 }
 
 function syncPrimaryCollectionStyles(items) {
@@ -232,7 +248,7 @@ function getMenuGlyph(name) {
 const menuStyles = ['link','pill','card','outline','soft','glass','gradient','elevated','glow','cut','underline','double','sticker','gradient-outline','neon','dashed','tag','corner','inset','bevel','bubble','ribbon','hollow','gloss','aurora','frost','chrome','rainbow-edge','satin','ticket','pixel','mesh','halo','stamp','arch','notched','pearl','slime','starlight','ice-glass','ice-border','prism','foil','split','frost-corner','badge','orbit','paper'];
 const menuShapes = ['pill','rounded','square','cut','arch','capsule','organic'];
 const menuIconPositions = ['left','right','top'];
-const menuTransparentStyles = ['link','outline','underline','double','gradient-outline','dashed','hollow'];
+const menuTransparentStyles = ['link','outline','underline','double','gradient-outline','dashed','hollow','pixel','halo','stamp','arch','notched','ice-border','badge','orbit','paper'];
 const menuAnimations = ['ice','ice-rain','icicle-drop','ice-drip','snowfall','snowstorm','blizzard','sleet','snowflake-spin','ice-crack','frost','glacier-glow','polar-lights','frozen','aurora','comet-trail','confetti','spark-rain','pulse','float','glow','bounce','sweep','shine','tilt','orbit','twinkle','wave','pop','wiggle','heartbeat','spin','jelly','ripple','neon-flicker','flame','shimmer','drift','march','breathe','sparkle-burst','swing','flip','magnet','glitch','rainbow'];
 const menuIcons = ['none','sparkle','star','heart','arrow','leaf','diamond','bolt','flower','crown','dot','sun','moon','wave','check','smile','plus','ribbon','flame','music','infinity','clover','flag','snowflake','ice-crystal','comet','planet','butterfly','lightning','sparkles','flower-star','eye','mountain','sunrise','cloud','drop','circular-arrow','check-circle','cross','crown-small','peace','diamond-ring','crescent','snowman','asterisk','ice-cube','icicle','frost-star','snowfall','iceberg','mittens','mountain-snow','evergreen','north-star'];
 function menuAppearanceFor(item, device) {

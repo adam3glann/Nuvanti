@@ -486,11 +486,6 @@ router.post('/categories', requirePermission('products.create'), async (req, res
 });
 router.patch('/categories/:id', requirePermission('products.edit'), async (req, res) => {
   const patch = categoryInput.partial().extend({ isActive: z.boolean().optional() }).parse(req.body);
-  if (patch.slug !== undefined) {
-    const current = await query('SELECT slug FROM categories WHERE id = $1', [req.params.id]);
-    if (!current.rows[0]) return res.status(404).json({ error: 'Category not found.' });
-    if (patch.slug !== current.rows[0].slug) return res.status(400).json({ error: 'A category slug cannot be changed because products are linked to it.' });
-  }
   const columns = { name: 'name', slug: 'slug', description: 'description', imageUrl: 'image_url', isActive: 'is_active', menuShow: 'menu_show', menuLabel: 'menu_label', menuStyle: 'menu_style', menuBackgroundColor: 'menu_background_color', menuBackgroundEndColor: 'menu_background_end_color', menuTextColor: 'menu_text_color', menuIcon: 'menu_icon', menuAnimation: 'menu_animation', menuDesktopAppearance: 'menu_desktop_appearance', menuMobileAppearance: 'menu_mobile_appearance' };
   const values = [];
   const assignments = [];
@@ -501,32 +496,56 @@ router.patch('/categories/:id', requirePermission('products.edit'), async (req, 
     }
   }
   if (!assignments.length) return res.status(400).json({ error: 'Provide a category field to update.' });
-  values.push(req.params.id);
-  const { rows } = await query(`UPDATE categories SET ${assignments.join(', ')} WHERE id = $${values.length}
-    RETURNING id::text, name, slug, description, image_url AS "imageUrl", is_active AS "isActive"`, values);
-  if (!rows[0]) return res.status(404).json({ error: 'Category not found.' });
-  await logAudit({ req, action: 'category.updated', targetType: 'category', targetId: rows[0].id, metadata: { name: rows[0].name, hasImage: Boolean(rows[0].imageUrl) } });
-  res.json({ ...rows[0], status: rows[0].isActive ? 'active' : 'disabled' });
+  try {
+    const rows = await transaction(async (client) => {
+      const current = await client.query('SELECT slug FROM categories WHERE id = $1 FOR UPDATE', [req.params.id]);
+      if (!current.rows[0]) return [];
+      const oldSlug = current.rows[0].slug;
+      values.push(req.params.id);
+      const updated = await client.query(`UPDATE categories SET ${assignments.join(', ')} WHERE id = $${values.length}
+        RETURNING id::text, name, slug, description, image_url AS "imageUrl", is_active AS "isActive"`, values);
+      if (patch.slug && patch.slug !== oldSlug) {
+        await client.query('UPDATE products SET category = $1, updated_at = NOW() WHERE category = $2', [patch.slug, oldSlug]);
+      }
+      return updated.rows;
+    });
+    if (!rows[0]) return res.status(404).json({ error: 'Category not found.' });
+    await logAudit({ req, action: 'category.updated', targetType: 'category', targetId: rows[0].id, metadata: { name: rows[0].name, slug: rows[0].slug, hasImage: Boolean(rows[0].imageUrl) } });
+    res.json({ ...rows[0], status: rows[0].isActive ? 'active' : 'disabled' });
+  } catch (error) {
+    if (error.code === '23505') return res.status(409).json({ error: 'A category with that slug already exists.' });
+    throw error;
+  }
 });
 router.delete('/categories/:id', requirePermission('products.delete'), async (req, res) => { const result = await query('DELETE FROM categories WHERE id = $1', [req.params.id]); if (!result.rowCount) return res.status(404).json({ error: 'Category not found.' }); await logAudit({ req, action: 'category.deleted', targetType: 'category', targetId: req.params.id }); res.status(204).end(); });
 router.get('/collections', requirePermission('products.view'), async (req, res) => { const { rows } = await query(`SELECT c.id::text, c.name, c.slug, c.is_active AS "isActive", c.menu_show AS "menuShow", c.menu_label AS "menuLabel", c.menu_style AS "menuStyle", c.menu_background_color AS "menuBackgroundColor", c.menu_background_end_color AS "menuBackgroundEndColor", c.menu_text_color AS "menuTextColor", c.menu_icon AS "menuIcon", c.menu_animation AS "menuAnimation", c.menu_desktop_appearance AS "menuDesktopAppearance", c.menu_mobile_appearance AS "menuMobileAppearance", count(p.id)::int AS "productCount" FROM collections c LEFT JOIN products p ON p.collection = c.slug GROUP BY c.id ORDER BY c.name`); res.json(rows.map((c) => ({ ...c, status: c.isActive ? 'published' : 'draft' }))); });
 router.post('/collections', requirePermission('products.create'), async (req, res) => { const c = collectionInput.parse(req.body); const { rows } = await query('INSERT INTO collections (name, slug, menu_show, menu_label, menu_style, menu_background_color, menu_background_end_color, menu_text_color, menu_icon, menu_animation, menu_desktop_appearance, menu_mobile_appearance) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12::jsonb) RETURNING id::text, name, slug, is_active AS "isActive"', [c.name, c.slug, c.menuShow || false, c.menuLabel || null, c.menuStyle || 'link', c.menuBackgroundColor || null, c.menuBackgroundEndColor || null, c.menuTextColor || null, c.menuIcon || 'none', c.menuAnimation || 'none', JSON.stringify(c.menuDesktopAppearance || {}), JSON.stringify(c.menuMobileAppearance || {})]); await logAudit({ req, action: 'collection.created', targetType: 'collection', targetId: rows[0].id, metadata: { name: c.name, slug: c.slug } }); res.status(201).json({ ...rows[0], productCount: 0, status: 'published' }); });
 router.patch('/collections/:id', requirePermission('products.edit'), async (req, res) => {
   const patch = collectionInput.partial().extend({ isActive: z.boolean().optional() }).parse(req.body);
-  if (patch.slug !== undefined) {
-    const current = await query('SELECT slug FROM collections WHERE id = $1', [req.params.id]);
-    if (!current.rows[0]) return res.status(404).json({ error: 'Collection not found.' });
-    if (patch.slug !== current.rows[0].slug) return res.status(400).json({ error: 'A collection slug cannot be changed because products are linked to it.' });
-  }
   const columns = { name: 'name', slug: 'slug', isActive: 'is_active', menuShow: 'menu_show', menuLabel: 'menu_label', menuStyle: 'menu_style', menuBackgroundColor: 'menu_background_color', menuBackgroundEndColor: 'menu_background_end_color', menuTextColor: 'menu_text_color', menuIcon: 'menu_icon', menuAnimation: 'menu_animation', menuDesktopAppearance: 'menu_desktop_appearance', menuMobileAppearance: 'menu_mobile_appearance' };
   const values = []; const assignments = [];
   for (const [key, column] of Object.entries(columns)) if (patch[key] !== undefined) { values.push(key === 'menuDesktopAppearance' || key === 'menuMobileAppearance' ? JSON.stringify(patch[key]) : patch[key]); assignments.push(`${column} = $${values.length}${key === 'menuDesktopAppearance' || key === 'menuMobileAppearance' ? '::jsonb' : ''}`); }
   if (!assignments.length) return res.status(400).json({ error: 'Provide a collection field to update.' });
-  values.push(req.params.id);
-  const { rows } = await query(`UPDATE collections SET ${assignments.join(', ')} WHERE id = $${values.length} RETURNING id::text, name, slug, is_active AS "isActive", menu_show AS "menuShow", menu_label AS "menuLabel", menu_style AS "menuStyle", menu_background_color AS "menuBackgroundColor", menu_background_end_color AS "menuBackgroundEndColor", menu_text_color AS "menuTextColor", menu_icon AS "menuIcon", menu_animation AS "menuAnimation", menu_desktop_appearance AS "menuDesktopAppearance", menu_mobile_appearance AS "menuMobileAppearance"`, values);
-  if (!rows[0]) return res.status(404).json({ error: 'Collection not found.' });
-  await logAudit({ req, action: 'collection.updated', targetType: 'collection', targetId: rows[0].id, metadata: { name: rows[0].name, menuShow: rows[0].menuShow } });
-  res.json({ ...rows[0], status: rows[0].isActive ? 'published' : 'draft' });
+  try {
+    const rows = await transaction(async (client) => {
+      const current = await client.query('SELECT slug FROM collections WHERE id = $1 FOR UPDATE', [req.params.id]);
+      if (!current.rows[0]) return [];
+      const oldSlug = current.rows[0].slug;
+      values.push(req.params.id);
+      const updated = await client.query(`UPDATE collections SET ${assignments.join(', ')} WHERE id = $${values.length}
+        RETURNING id::text, name, slug, is_active AS "isActive", menu_show AS "menuShow", menu_label AS "menuLabel", menu_style AS "menuStyle", menu_background_color AS "menuBackgroundColor", menu_background_end_color AS "menuBackgroundEndColor", menu_text_color AS "menuTextColor", menu_icon AS "menuIcon", menu_animation AS "menuAnimation", menu_desktop_appearance AS "menuDesktopAppearance", menu_mobile_appearance AS "menuMobileAppearance"`, values);
+      if (patch.slug && patch.slug !== oldSlug) {
+        await client.query('UPDATE products SET collection = $1, updated_at = NOW() WHERE collection = $2', [patch.slug, oldSlug]);
+      }
+      return updated.rows;
+    });
+    if (!rows[0]) return res.status(404).json({ error: 'Collection not found.' });
+    await logAudit({ req, action: 'collection.updated', targetType: 'collection', targetId: rows[0].id, metadata: { name: rows[0].name, slug: rows[0].slug, menuShow: rows[0].menuShow } });
+    res.json({ ...rows[0], status: rows[0].isActive ? 'published' : 'draft' });
+  } catch (error) {
+    if (error.code === '23505') return res.status(409).json({ error: 'A collection with that slug already exists.' });
+    throw error;
+  }
 });
 router.delete('/collections/:id', requirePermission('products.delete'), async (req, res) => { const result = await query('DELETE FROM collections WHERE id = $1', [req.params.id]); if (!result.rowCount) return res.status(404).json({ error: 'Collection not found.' }); await logAudit({ req, action: 'collection.deleted', targetType: 'collection', targetId: req.params.id }); res.status(204).end(); });
 router.patch('/collections/:id/products', requirePermission('products.edit'), asyncRoute(async (req, res) => {
