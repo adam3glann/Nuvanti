@@ -1,4 +1,4 @@
-import { initShell } from '../main.js';
+import { initShell } from '../main.js?v=store-theme-1';
 import { API_ORIGIN } from '../config.js';
 import { showToast } from '../components/toast.js';
 

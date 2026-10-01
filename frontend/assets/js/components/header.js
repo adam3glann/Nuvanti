@@ -6,6 +6,7 @@ import { openCartDrawer } from './cartDrawer.js';
 import { openSearchOverlay } from './searchOverlay.js';
 import { fetchMenuLinks } from '../services/productService.js';
 import { startLiveRefresh } from '../services/liveRefresh.js';
+import { getStoreTheme, toggleStoreTheme } from '../services/storeThemeService.js';
 
 export function renderHeader({ transparentOnHero = false, currentPage = '' } = {}) {
   const mount = document.getElementById('site-header');
@@ -27,6 +28,7 @@ export function renderHeader({ transparentOnHero = false, currentPage = '' } = {
         <a href="index.html" class="site-logo" aria-label="Nuvanti — Home"><img src="assets/img/brand/nuvanti-logo.png" alt="Nuvanti" class="site-logo__mark" id="headerLogoImg" /></a>
         <div class="site-header__side site-header__side--end">
           <button class="icon-btn" id="openSearch" aria-label="Search">${icon('search')}</button>
+          <button class="icon-btn store-theme-toggle" type="button" data-store-theme-toggle aria-label="Switch to dark mode" title="Switch to dark mode"></button>
           <a class="icon-btn" href="account.html" aria-label="Account">${icon('user')}</a>
           <a class="icon-btn" href="wishlist.html" aria-label="Wishlist" style="position:relative">
             ${icon('heart')}
@@ -55,6 +57,7 @@ export function renderHeader({ transparentOnHero = false, currentPage = '' } = {
       <div class="mobile-nav__foot">
         <a href="account.html" class="btn btn-outline btn-block">Account</a>
         <a href="wishlist.html" class="btn btn-text">Wishlist</a>
+        <button class="btn btn-outline btn-block store-theme-toggle--mobile" type="button" data-store-theme-toggle><span data-store-theme-icon></span><span data-store-theme-label>Dark mode</span></button>
       </div>
     </nav>
   `;
@@ -99,6 +102,26 @@ export function renderHeader({ transparentOnHero = false, currentPage = '' } = {
     group.dataset.open = String(!isOpen);
     button.setAttribute('aria-expanded', String(!isOpen));
   }));
+  const updateThemeToggle = () => {
+    const dark = getStoreTheme() === 'dark';
+    const label = dark ? 'Switch to light mode' : 'Switch to dark mode';
+    document.querySelectorAll('[data-store-theme-toggle]').forEach((button) => {
+      button.setAttribute('aria-label', label);
+      button.setAttribute('title', label);
+      button.setAttribute('aria-pressed', String(dark));
+      const iconTarget = button.querySelector('[data-store-theme-icon]');
+      if (iconTarget) {
+        iconTarget.innerHTML = icon(dark ? 'sun' : 'moon');
+        button.querySelector('[data-store-theme-label]').textContent = dark ? 'Light mode' : 'Dark mode';
+      } else button.innerHTML = icon(dark ? 'sun' : 'moon');
+    });
+    updateHeaderLogoTheme();
+  };
+  document.querySelectorAll('[data-store-theme-toggle]').forEach((button) => button.addEventListener('click', () => {
+    toggleStoreTheme();
+    updateThemeToggle();
+  }));
+  updateThemeToggle();
 
   const refreshMenuLinks = async () => {
     const items = await fetchMenuLinks();
@@ -138,15 +161,24 @@ export function renderHeader({ transparentOnHero = false, currentPage = '' } = {
     const onScroll = () => {
       const scrolled = window.scrollY > 40;
       header.classList.toggle('is-scrolled', scrolled);
-      if (logoImg) logoImg.src = scrolled ? 'assets/img/brand/nuvanti-logo.png' : 'assets/img/brand/nuvanti-logo-white.png';
+      updateHeaderLogoTheme();
     };
     window.addEventListener('scroll', onScroll, { passive: true });
     onScroll();
   } else {
     header.classList.add('is-scrolled');
+    updateHeaderLogoTheme();
   }
 
   refreshHeaderCounts();
+
+  function updateHeaderLogoTheme() {
+    const image = document.getElementById('headerLogoImg');
+    if (!image) return;
+    const dark = getStoreTheme() === 'dark';
+    const useWhiteMark = dark || (transparentOnHero && window.scrollY <= 40);
+    image.src = `assets/img/brand/nuvanti-logo${useWhiteMark ? '-white' : ''}.png`;
+  }
 }
 
 function renderPrimaryCollectionItem(item) {

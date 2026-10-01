@@ -1,4 +1,4 @@
-import { initShell } from '../main.js';
+import { initShell } from '../main.js?v=store-theme-1';
 import { formatPrice, escapeHtml } from '../components/productCard.js';
 
 initShell({ currentPage: '' });

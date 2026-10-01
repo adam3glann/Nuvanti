@@ -1,4 +1,4 @@
-import { initShell } from '../main.js';
+import { initShell } from '../main.js?v=store-theme-1';
 import { formatPrice } from '../components/productCard.js';
 import { getCart, cartSubtotal, clearCart, syncCartWithProducts } from '../services/cartService.js';
 import { createOrder } from '../services/orderService.js';

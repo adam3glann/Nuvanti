@@ -423,6 +423,23 @@
   margin-inline: auto;
   padding-block: var(--space-8);
 }
+.password-input-wrap { position: relative; }
+.password-input-wrap input { padding-right: 3.25rem; }
+.password-visibility {
+  position: absolute; right: .45rem; top: 50%; transform: translateY(-50%);
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 2.35rem; height: 2.35rem; border-radius: 50%; color: var(--color-muted);
+}
+.password-visibility:hover { color: var(--color-text); background: var(--color-accent-tint); }
+.password-visibility:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+.password-visibility .icon svg { width: 19px; height: 19px; }
+.auth-field-error { display: block; margin-top: -.25rem; }
+.field.is-invalid input { border-color: var(--color-error); }
+.auth-form-error {
+  margin-top: 1rem; padding: .8rem 1rem; border-radius: var(--radius-sm);
+  border-left: 3px solid var(--color-error); background: color-mix(in srgb, var(--color-error) 10%, var(--color-surface));
+  color: var(--color-error); font-size: var(--fs-small);
+}
 .auth-switch {
   text-align: center;
   margin-top: var(--space-5);

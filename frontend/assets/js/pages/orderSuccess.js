@@ -1,4 +1,4 @@
-import { initShell } from '../main.js';
+import { initShell } from '../main.js?v=store-theme-1';
 import { icon } from '../components/icons.js';
 import { formatPrice } from '../components/productCard.js';
 import { fetchOrderPaymentStatus, getLastOrder } from '../services/orderService.js';

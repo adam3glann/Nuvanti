@@ -1,4 +1,4 @@
-import { renderHeader, refreshHeaderCounts } from './components/header.js?v=live-collections-1';
+import { renderHeader, refreshHeaderCounts } from './components/header.js?v=store-theme-1';
 import { renderFooter } from './components/footer.js';
 import { mountCartDrawer, refreshCartDrawer } from './components/cartDrawer.js';
 import { mountSearchOverlay } from './components/searchOverlay.js';
@@ -9,8 +9,10 @@ import { loadStoreSettings, refreshStoreSettings } from './services/storeSetting
 import { configureFreeShippingThreshold } from './services/cartService.js';
 import { startStorePresence } from './services/presenceService.js';
 import { startLiveRefresh } from './services/liveRefresh.js';
+import { applyStoreTheme } from './services/storeThemeService.js';
 
 export function initShell({ transparentHeader = false, currentPage = '' } = {}) {
+  applyStoreTheme();
   startStorePresence();
   renderHeader({ transparentOnHero: transparentHeader, currentPage });
   renderFooter();

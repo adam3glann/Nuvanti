@@ -1,9 +1,10 @@
-import { initShell } from '../main.js';
+import { initShell } from '../main.js?v=store-theme-1';
 import { formatPrice } from '../components/productCard.js';
 import { getSession, getCurrentUser, updateProfile, login, register, logout, requestPasswordReset, confirmPasswordReset, confirmEmailVerification, requestEmailVerification } from '../services/authService.js';
 import { fetchMyOrders } from '../services/orderService.js';
 import { fetchAddresses, createAddress, deleteAddress } from '../services/addressService.js';
 import { showToast } from '../components/toast.js';
+import { icon } from '../components/icons.js';
 
 initShell({ currentPage: 'account' });
 
@@ -61,84 +62,96 @@ function renderAuthForm() {
   if (authView === 'login') {
     wrap.innerHTML = `
       <form id="loginForm" novalidate>
-        <div class="field"><label for="loginEmail">Email</label><input type="email" id="loginEmail" required /></div>
-        <div class="field"><label for="loginPassword">Password</label><input type="password" id="loginPassword" required minlength="8" /></div>
+        <div class="field"><label for="loginEmail">Email</label><input type="email" id="loginEmail" autocomplete="email" aria-describedby="loginEmailError" required /><span class="error auth-field-error" id="loginEmailError" data-field-error="loginEmail" role="alert" hidden></span></div>
+        ${passwordField('loginPassword', 'Password', { autocomplete: 'current-password', minlength: 8 })}
         <button class="btn btn-primary btn-block" type="submit">Sign In</button>
+        <p class="auth-form-error" data-form-error role="alert" hidden></p>
       </form>
       <p style="text-align:center;margin-top:1rem"><button class="btn-text" id="toForgot" style="font-size:.85rem">Forgot password?</button></p>
     `;
     switchEl.innerHTML = `Don't have an account? <button class="btn-text" id="toRegister">Create one</button>`;
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
+      clearAuthErrors(e.target);
       if (!checkValid(e.target)) return;
       try { await login(document.getElementById('loginEmail').value, document.getElementById('loginPassword').value); continueAfterAuth(); }
-      catch (error) { showAuthError(error.message); }
+      catch (error) { showAuthError(error.message, /email/i.test(error.message) && !/password/i.test(error.message) ? 'loginEmail' : 'loginPassword'); }
     });
+    bindAuthForm(document.getElementById('loginForm'));
     document.getElementById('toForgot').addEventListener('click', () => { authView = 'forgot'; renderAuthForm(); });
     document.getElementById('toRegister').addEventListener('click', () => { authView = 'register'; renderAuthForm(); });
   } else if (authView === 'register') {
     wrap.innerHTML = `
       <form id="registerForm" novalidate>
-        <div class="field"><label for="regName">Full Name</label><input type="text" id="regName" autocomplete="name" minlength="2" maxlength="100" required /></div>
-        <div class="field"><label for="regEmail">Email</label><input type="email" id="regEmail" autocomplete="email" maxlength="254" required /></div>
-        <div class="field"><label for="regPassword">Password</label><input type="password" id="regPassword" autocomplete="new-password" required minlength="12" maxlength="128" /><span class="hint">At least 12 characters.</span></div>
-        <div class="field"><label for="regPasswordConfirm">Confirm Password</label><input type="password" id="regPasswordConfirm" autocomplete="new-password" required minlength="12" maxlength="128" /></div>
+        <div class="field"><label for="regName">Full Name</label><input type="text" id="regName" autocomplete="name" minlength="2" maxlength="100" aria-describedby="regNameError" required /><span class="error auth-field-error" id="regNameError" data-field-error="regName" role="alert" hidden></span></div>
+        <div class="field"><label for="regEmail">Email</label><input type="email" id="regEmail" autocomplete="email" maxlength="254" aria-describedby="regEmailError" required /><span class="error auth-field-error" id="regEmailError" data-field-error="regEmail" role="alert" hidden></span></div>
+        ${passwordField('regPassword', 'Password', { autocomplete: 'new-password', minlength: 12, hint: 'At least 12 characters.' })}
+        ${passwordField('regPasswordConfirm', 'Confirm Password', { autocomplete: 'new-password', minlength: 12 })}
         <button class="btn btn-primary btn-block" type="submit">Create Account</button>
+        <p class="auth-form-error" data-form-error role="alert" hidden></p>
       </form>
     `;
     switchEl.innerHTML = `Already have an account? <button class="btn-text" id="toLogin">Sign in</button>`;
     document.getElementById('registerForm').addEventListener('submit', async (e) => {
       e.preventDefault();
+      clearAuthErrors(e.target);
       if (!checkValid(e.target)) return;
       const password = document.getElementById('regPassword').value;
-      if (password !== document.getElementById('regPasswordConfirm').value) return showAuthError('Passwords do not match.');
+      if (password !== document.getElementById('regPasswordConfirm').value) return showAuthError('Passwords do not match.', 'regPasswordConfirm');
       const button = e.target.querySelector('button[type="submit"]');
       button.disabled = true; button.textContent = 'Creating account…';
       try { await register(document.getElementById('regName').value.trim(), document.getElementById('regEmail').value, password); continueAfterAuth(); }
-      catch (error) { showAuthError(error.message); button.disabled = false; button.textContent = 'Create Account'; }
+      catch (error) { showAuthError(error.message, /email|account already exists/i.test(error.message) ? 'regEmail' : /password/i.test(error.message) ? 'regPassword' : ''); button.disabled = false; button.textContent = 'Create Account'; }
     });
+    bindAuthForm(document.getElementById('registerForm'));
     document.getElementById('toLogin').addEventListener('click', () => { authView = 'login'; renderAuthForm(); });
   } else if (authView === 'forgot') {
     wrap.innerHTML = `
       <form id="forgotForm" novalidate>
         <p class="text-muted" style="margin-bottom:1rem;font-size:var(--fs-small)">Enter your account email and we'll send a link to reset your password.</p>
-        <div class="field"><label for="forgotEmail">Email</label><input type="email" id="forgotEmail" required /></div>
+        <div class="field"><label for="forgotEmail">Email</label><input type="email" id="forgotEmail" autocomplete="email" aria-describedby="forgotEmailError" required /><span class="error auth-field-error" id="forgotEmailError" data-field-error="forgotEmail" role="alert" hidden></span></div>
         <button class="btn btn-primary btn-block" type="submit">Send Reset Link</button>
+        <p class="auth-form-error" data-form-error role="alert" hidden></p>
       </form>
     `;
     switchEl.innerHTML = `<button class="btn-text" id="toLogin">Back to sign in</button>`;
     document.getElementById('forgotForm').addEventListener('submit', async (e) => {
       e.preventDefault();
+      clearAuthErrors(e.target);
       if (!checkValid(e.target)) return;
       const btn = e.target.querySelector('button');
       btn.disabled = true;
       try {
         await requestPasswordReset(document.getElementById('forgotEmail').value);
         wrap.innerHTML = `<div class="state-block"><h3>Check your email</h3><p>If an account exists for that address, a reset link is on its way. It expires in 30 minutes.</p></div>`;
-      } catch (error) { showAuthError(error.message); btn.disabled = false; }
+      } catch (error) { showAuthError(error.message, 'forgotEmail'); btn.disabled = false; }
     });
+    bindAuthForm(document.getElementById('forgotForm'));
     document.getElementById('toLogin').addEventListener('click', () => { authView = 'login'; renderAuthForm(); });
   } else {
     wrap.innerHTML = `
       <form id="resetForm" novalidate>
-        <div class="field"><label for="resetPassword">New Password</label><input type="password" id="resetPassword" required minlength="12" /><span class="hint">At least 12 characters.</span></div>
-        <div class="field"><label for="resetConfirm">Confirm New Password</label><input type="password" id="resetConfirm" required minlength="12" /></div>
+        ${passwordField('resetPassword', 'New Password', { autocomplete: 'new-password', minlength: 12, hint: 'At least 12 characters.' })}
+        ${passwordField('resetConfirm', 'Confirm New Password', { autocomplete: 'new-password', minlength: 12 })}
         <button class="btn btn-primary btn-block" type="submit">Set New Password</button>
+        <p class="auth-form-error" data-form-error role="alert" hidden></p>
       </form>
     `;
     switchEl.innerHTML = `<button class="btn-text" id="toLogin">Back to sign in</button>`;
     document.getElementById('resetForm').addEventListener('submit', async (e) => {
       e.preventDefault();
+      clearAuthErrors(e.target);
       if (!checkValid(e.target)) return;
       const next = document.getElementById('resetPassword').value;
-      if (next !== document.getElementById('resetConfirm').value) return showAuthError('Passwords do not match.');
+      if (next !== document.getElementById('resetConfirm').value) return showAuthError('Passwords do not match.', 'resetConfirm');
       try {
         await confirmPasswordReset(params.get('reset'), next);
         history.replaceState(null, '', 'account.html');
         wrap.innerHTML = `<div class="state-block"><h3>Password updated</h3><p>You can now sign in with your new password.</p><a href="account.html" class="btn btn-primary">Sign In</a></div>`;
         switchEl.innerHTML = '';
-      } catch (error) { showAuthError(error.message); }
+      } catch (error) { showAuthError(error.message, /password/i.test(error.message) ? 'resetPassword' : ''); }
     });
+    bindAuthForm(document.getElementById('resetForm'));
     document.getElementById('toLogin').addEventListener('click', () => { history.replaceState(null, '', 'account.html'); authView = 'login'; renderAuthForm(); });
   }
 }
@@ -146,9 +159,85 @@ function renderAuthForm() {
 function checkValid(form) {
   const inputs = form.querySelectorAll('input[required]');
   for (const input of inputs) {
-    if (!input.checkValidity()) { input.reportValidity(); return false; }
+    if (!input.checkValidity()) {
+      const message = input.validity.valueMissing ? 'Please fill out this field.'
+        : input.validity.typeMismatch ? 'Enter a valid email address.'
+          : input.validity.tooShort ? `Use at least ${input.minLength} characters.`
+            : input.validationMessage;
+      showFieldError(input, message);
+      input.focus();
+      return false;
+    }
   }
   return true;
+}
+
+function passwordField(id, label, { autocomplete = 'new-password', minlength = 12, maxlength = 128, hint = '' } = {}) {
+  const hintId = hint ? `${id}Hint` : '';
+  const describedBy = [hintId, `${id}Error`].filter(Boolean).join(' ');
+  return `<div class="field"><label for="${id}">${label}</label><div class="password-input-wrap"><input type="password" id="${id}" autocomplete="${autocomplete}" required minlength="${minlength}" maxlength="${maxlength}" aria-describedby="${describedBy}" /><button class="password-visibility" type="button" data-toggle-password="${id}" aria-label="Show password" aria-pressed="false">${icon('eye')}</button></div>${hint ? `<span class="hint" id="${hintId}">${hint}</span>` : ''}<span class="error auth-field-error" id="${id}Error" data-field-error="${id}" role="alert" hidden></span></div>`;
+}
+
+function bindAuthForm(form) {
+  form.querySelectorAll('[data-toggle-password]').forEach((button) => button.addEventListener('click', () => {
+    const input = document.getElementById(button.dataset.togglePassword);
+    if (!input) return;
+    const visible = input.type === 'password';
+    input.type = visible ? 'text' : 'password';
+    button.innerHTML = icon(visible ? 'eyeOff' : 'eye');
+    button.setAttribute('aria-label', visible ? 'Hide password' : 'Show password');
+    button.setAttribute('aria-pressed', String(visible));
+  }));
+  form.querySelectorAll('input').forEach((input) => input.addEventListener('input', () => {
+    clearFieldError(input);
+    const formError = form.querySelector('[data-form-error]');
+    if (formError) { formError.hidden = true; formError.textContent = ''; }
+  }));
+}
+
+function clearAuthErrors(form) {
+  form.querySelectorAll('input').forEach(clearFieldError);
+  const formError = form.querySelector('[data-form-error]');
+  if (formError) { formError.hidden = true; formError.textContent = ''; }
+}
+
+function clearFieldError(input) {
+  input.removeAttribute('aria-invalid');
+  input.closest('.field')?.classList.remove('is-invalid');
+  const error = input.closest('.field')?.querySelector(`[data-field-error="${input.id}"]`);
+  if (error) { error.hidden = true; error.textContent = ''; }
+}
+
+function showFieldError(input, message) {
+  const field = input.closest('.field');
+  const error = field?.querySelector(`[data-field-error="${input.id}"]`);
+  if (!field || !error) return false;
+  error.textContent = message;
+  error.hidden = false;
+  input.setAttribute('aria-invalid', 'true');
+  error.id ||= `${input.id}Error`;
+  const describedBy = new Set((input.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean));
+  describedBy.add(error.id);
+  input.setAttribute('aria-describedby', [...describedBy].join(' '));
+  field.classList.add('is-invalid');
+  return true;
+}
+
+function showAuthError(message, fieldId = '') {
+  const input = fieldId ? document.getElementById(fieldId) : null;
+  if (input && showFieldError(input, message)) return;
+  const form = document.querySelector('#authFormWrap form');
+  if (!form) return;
+  let error = form.querySelector('[data-form-error]');
+  if (!error) {
+    error = document.createElement('p');
+    error.className = 'auth-form-error';
+    error.dataset.formError = '';
+    error.setAttribute('role', 'alert');
+    form.append(error);
+  }
+  error.textContent = message;
+  error.hidden = false;
 }
 
 const STATUS_LABELS = { pending: 'Order Received', paid: 'Payment Received', processing: 'Being Prepared', shipped: 'Shipped', out_for_delivery: 'Out for Delivery', fulfilled: 'Delivered', cancelled: 'Cancelled' };
@@ -281,14 +370,6 @@ async function renderAddresses(panel) {
 function continueAfterAuth() {
   if (params.get('next') === 'checkout') location.href = 'checkout.html';
   else render();
-}
-
-function showAuthError(message) {
-  const existing = document.getElementById('authError');
-  if (existing) existing.remove();
-  const error = document.createElement('p');
-  error.id = 'authError'; error.className = 'form-error'; error.textContent = message;
-  document.getElementById('authFormWrap').prepend(error);
 }
 
 function escapeHtml(value) {

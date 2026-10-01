@@ -137,6 +137,7 @@ h3, .h3 { font-family: var(--font-display); font-size: var(--fs-h3); line-height
 .icon-btn:hover { background: var(--color-accent-tint); transform: translateY(-1px) scale(1.06); }
 .icon-btn[aria-pressed="true"] { background: var(--color-ink); color: var(--color-text-inverse); }
 .icon-btn svg { width: 20px; height: 20px; }
+.store-theme-toggle--mobile { display: inline-flex; align-items: center; gap: .65rem; }
 .icon { display: inline-flex; align-items: center; justify-content: center; }
 .icon svg { width: 1.15em; height: 1.15em; display: block; }
 .plus { display: inline-flex; width: 18px; height: 18px; flex-shrink: 0; }

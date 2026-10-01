@@ -1749,6 +1749,7 @@
 }
 
 @media (max-width: 899px) {
+  .site-header__side--end > .store-theme-toggle { display: none; }
   .editorial-section .editorial-split {
     grid-template-columns: 1fr;
     gap: var(--space-6);
