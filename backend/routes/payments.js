@@ -9,11 +9,12 @@ import { restoreOrderInventory } from '../lib/orderLifecycle.js';
 
 const router = Router();
 const webhookLimiter = rateLimit({ windowMs: 60 * 1000, limit: 120, standardHeaders: 'draft-7', legacyHeaders: false });
+const asyncRoute = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
 router.get('/config', (req, res) => res.json({ onlinePaymentEnabled: paymobReady() }));
 
-// Paymob must reach this endpoint directly, so it is mounted before the
-// browser same-origin/CSRF middleware. HMAC is mandatory before any DB write.
-router.post('/paymob/webhook', webhookLimiter, async (req, res) => {
+// Paymob cannot send a browser Origin. The server's Origin middleware exempts
+// only this path, and the HMAC is verified before any database write.
+router.post('/paymob/webhook', webhookLimiter, asyncRoute(async (req, res) => {
   const obj = req.body?.obj;
   const signature = req.query.hmac || req.body?.hmac;
   if (req.body?.type !== 'TRANSACTION' || !verifyPaymobCallback(obj, signature)) {
@@ -72,7 +73,7 @@ router.post('/paymob/webhook', webhookLimiter, async (req, res) => {
       shippingAddress: order.shipping, trackingUrl }).catch((error) => console.error(`Paid order email failed for NV-${order.id}:`, error));
   }
   res.status(200).json({ received: true });
-});
+}));
 
 router.get('/:id/status', requireAuth, async (req, res) => {
   const id = String(req.params.id);
@@ -80,7 +81,7 @@ router.get('/:id/status', requireAuth, async (req, res) => {
   const { rows } = await query(`SELECT id, status, payment_status AS "paymentStatus", payment_method AS "paymentMethod"
     FROM orders WHERE id = $1 AND user_id = $2`, [id, req.user.sub]);
   if (!rows[0]) return res.status(404).json({ error: 'Order not found.' });
-  res.json(rows[0]);
+  res.set('Cache-Control', 'no-store').json(rows[0]);
 });
 
 export default router;

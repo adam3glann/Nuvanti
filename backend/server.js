@@ -170,7 +170,7 @@ const markPrivateResponse = (req, res, next) => {
   next();
 };
 app.use(
-  ["/api/auth", "/api/admin", "/api/addresses", "/api/orders/mine"],
+  ["/api/auth", "/api/admin", "/api/addresses", "/api/orders/mine", "/api/orders/track", "/api/payments"],
   markPrivateResponse,
 );
 app.use(
@@ -187,10 +187,9 @@ app.use(
       || req.path.startsWith("/api/admin/"),
   }),
 );
-// Signed gateway callbacks are verified by their HMAC and cannot carry a
-// browser Origin header, so mount their handler before same-origin checks.
+// Only the HMAC-verified payment callback skips the browser Origin check.
+app.use(sameOrigin({ storeOrigin, storeOrigins, storePreviewOrigin, adminOrigin, signedWebhookPath: "/api/payments/paymob/webhook" }));
 app.use("/api/payments", paymentsRouter);
-app.use(sameOrigin({ storeOrigin, storeOrigins, storePreviewOrigin, adminOrigin }));
 app.use(
   "/api/auth",
   rateLimit({

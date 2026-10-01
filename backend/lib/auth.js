@@ -2,14 +2,20 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { query } from './db.js';
 
-const cookieName = 'nuvanti_session';
-const challengeCookieName = 'nuvanti_mfa_challenge';
-const emailChallengeCookieName = 'nuvanti_admin_email_challenge';
+const secureCookies = process.env.NODE_ENV === 'production';
+// __Host- cookies cannot be set for sibling domains or weaker paths. In local
+// HTTP development, use unprefixed names because browsers require Secure for
+// the __Host- prefix.
+const cookiePrefix = secureCookies ? '__Host-' : '';
+const cookieName = `${cookiePrefix}nuvanti_session`;
+const challengeCookieName = `${cookiePrefix}nuvanti_mfa_challenge`;
+const emailChallengeCookieName = `${cookiePrefix}nuvanti_admin_email_challenge`;
 // Both frontends call the API through same-origin routes (Railway for admin,
 // Cloudflare Pages Functions for the store). Lax keeps these cookies first-party
 // on mobile browsers while blocking cross-site cookie attachment.
 const cookieSameSite = 'lax';
 const staffRoles = ['staff', 'manager', 'admin', 'super_admin'];
+const cookieOptions = (maxAge) => ({ httpOnly: true, secure: secureCookies, sameSite: cookieSameSite, maxAge, path: '/' });
 
 function secret() {
   const value = process.env.JWT_SECRET;
@@ -46,7 +52,7 @@ export function readSession(req) {
 }
 
 export function setSessionCookie(res, token) {
-  res.cookie(cookieName, token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: cookieSameSite, maxAge: 8 * 60 * 60 * 1000, path: '/', ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}) });
+  res.cookie(cookieName, token, cookieOptions(8 * 60 * 60 * 1000));
 }
 
 export function setMfaChallengeCookie(res, user) {
@@ -55,11 +61,11 @@ export function setMfaChallengeCookie(res, user) {
     secret(),
     { expiresIn: '5m', issuer: 'nuvanti-api', audience: 'nuvanti-mfa' },
   );
-  res.cookie(challengeCookieName, token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: cookieSameSite, maxAge: 5 * 60 * 1000, path: '/', ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}) });
+  res.cookie(challengeCookieName, token, cookieOptions(5 * 60 * 1000));
 }
 
 export function clearMfaChallengeCookie(res) {
-  res.clearCookie(challengeCookieName, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: cookieSameSite, path: '/', ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}) });
+  res.clearCookie(challengeCookieName, cookieOptions());
 }
 
 export function setAdminEmailChallengeCookie(res, user, challengeId) {
@@ -68,7 +74,7 @@ export function setAdminEmailChallengeCookie(res, user, challengeId) {
     secret(),
     { expiresIn: '10m', issuer: 'nuvanti-api', audience: 'nuvanti-admin-email' },
   );
-  res.cookie(emailChallengeCookieName, token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: cookieSameSite, maxAge: 10 * 60 * 1000, path: '/', ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}) });
+  res.cookie(emailChallengeCookieName, token, cookieOptions(10 * 60 * 1000));
 }
 
 export function readAdminEmailChallenge(req) {
@@ -81,7 +87,7 @@ export function readAdminEmailChallenge(req) {
 }
 
 export function clearAdminEmailChallengeCookie(res) {
-  res.clearCookie(emailChallengeCookieName, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: cookieSameSite, path: '/', ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}) });
+  res.clearCookie(emailChallengeCookieName, cookieOptions());
 }
 
 export function readMfaChallenge(req) {
@@ -94,7 +100,7 @@ export function readMfaChallenge(req) {
 }
 
 export function clearSession(res) {
-  const options = { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: cookieSameSite, path: '/', ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}) };
+  const options = cookieOptions();
   res.clearCookie(cookieName, options);
   res.clearCookie(challengeCookieName, options);
   res.clearCookie(emailChallengeCookieName, options);

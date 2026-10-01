@@ -1,8 +1,11 @@
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
-export function sameOrigin({ storeOrigin, storeOrigins = [], storePreviewOrigin, adminOrigin }) {
+export function sameOrigin({ storeOrigin, storeOrigins = [], storePreviewOrigin, adminOrigin, signedWebhookPath }) {
   const allowed = new Set([...storeOrigins, storeOrigin, storePreviewOrigin, adminOrigin].filter(Boolean));
   return (req, res, next) => {
+    // Payment providers cannot send a browser Origin. Keep this exception
+    // limited to the single callback protected by its provider HMAC.
+    if (req.method === 'POST' && signedWebhookPath && req.path === signedWebhookPath) return next();
     if (SAFE_METHODS.has(req.method)) return next();
     const origin = req.get('origin');
     let sameRequestHost = false;

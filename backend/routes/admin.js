@@ -41,9 +41,9 @@ const categoryImage = z.string().trim().max(1000).refine((value) => {
   }
   return /^\/?assets\/[\w./-]+(?:\?[\w%=&.-]*)?$/.test(value) && !value.includes('..');
 }, 'Use an HTTPS image URL or an image path under assets.');
-const menuStyles = ['link', 'pill', 'card', 'outline', 'soft', 'glass', 'gradient', 'elevated', 'glow', 'cut', 'underline', 'double', 'sticker', 'gradient-outline', 'neon', 'dashed', 'tag', 'corner', 'inset', 'bevel', 'bubble', 'ribbon', 'hollow', 'gloss'];
-const menuIcons = ['none', 'sparkle', 'star', 'heart', 'arrow', 'leaf', 'diamond', 'bolt', 'flower', 'crown', 'dot', 'sun', 'moon', 'wave', 'check', 'smile', 'plus', 'ribbon', 'flame', 'music', 'infinity', 'clover', 'flag'];
-const menuAnimations = ['none', 'ice', 'pulse', 'float', 'glow', 'bounce', 'sweep', 'shine', 'tilt', 'orbit', 'twinkle', 'wave', 'pop', 'wiggle', 'heartbeat', 'spin', 'jelly'];
+const menuStyles = ['link', 'pill', 'card', 'outline', 'soft', 'glass', 'gradient', 'elevated', 'glow', 'cut', 'underline', 'double', 'sticker', 'gradient-outline', 'neon', 'dashed', 'tag', 'corner', 'inset', 'bevel', 'bubble', 'ribbon', 'hollow', 'gloss', 'aurora', 'frost', 'chrome', 'rainbow-edge', 'satin', 'ticket', 'pixel', 'mesh', 'halo', 'stamp', 'arch', 'notched', 'pearl', 'slime', 'starlight'];
+const menuIcons = ['none', 'sparkle', 'star', 'heart', 'arrow', 'leaf', 'diamond', 'bolt', 'flower', 'crown', 'dot', 'sun', 'moon', 'wave', 'check', 'smile', 'plus', 'ribbon', 'flame', 'music', 'infinity', 'clover', 'flag', 'snowflake', 'ice-crystal', 'comet', 'planet', 'butterfly', 'lightning', 'sparkles', 'flower-star', 'eye', 'mountain', 'sunrise', 'cloud', 'drop', 'circular-arrow', 'check-circle', 'cross', 'crown-small', 'peace', 'diamond-ring', 'crescent', 'snowman', 'asterisk'];
+const menuAnimations = ['none', 'ice', 'ice-rain', 'snowfall', 'frost', 'aurora', 'comet-trail', 'confetti', 'spark-rain', 'pulse', 'float', 'glow', 'bounce', 'sweep', 'shine', 'tilt', 'orbit', 'twinkle', 'wave', 'pop', 'wiggle', 'heartbeat', 'spin', 'jelly', 'ripple', 'neon-flicker', 'flame', 'shimmer', 'drift', 'march', 'breathe', 'sparkle-burst', 'swing', 'flip', 'magnet', 'glitch', 'rainbow'];
 const menuAppearanceVariant = z.object({
   style: z.enum(menuStyles),
   backgroundColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
@@ -55,12 +55,12 @@ const menuAppearanceVariant = z.object({
 const menuAppearance = z.object({
   menuShow: z.boolean().optional(),
   menuLabel: z.string().trim().max(80).nullable().optional(),
-  menuStyle: z.enum(['link', 'pill', 'card', 'outline', 'soft', 'glass', 'gradient', 'elevated', 'glow', 'cut', 'underline', 'double', 'sticker', 'gradient-outline', 'neon', 'dashed', 'tag', 'corner', 'inset']).optional(),
+  menuStyle: z.enum(menuStyles).optional(),
   menuBackgroundColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
   menuBackgroundEndColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
   menuTextColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
-  menuIcon: z.enum(['none', 'sparkle', 'star', 'heart', 'arrow', 'leaf', 'diamond', 'bolt', 'flower', 'crown', 'dot', 'sun', 'moon', 'wave', 'check', 'smile', 'plus', 'ribbon', 'flame']).optional(),
-  menuAnimation: z.enum(['none', 'ice', 'pulse', 'float', 'glow', 'bounce', 'sweep', 'shine', 'tilt', 'orbit', 'twinkle', 'wave', 'pop']).optional(),
+  menuIcon: z.enum(menuIcons).optional(),
+  menuAnimation: z.enum(menuAnimations).optional(),
   menuDesktopAppearance: menuAppearanceVariant.optional(),
   menuMobileAppearance: menuAppearanceVariant.optional(),
 });

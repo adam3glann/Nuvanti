@@ -209,7 +209,7 @@ router.get('/track/:id', trackLimiter, async (req, res) => {
   const matches = validLength && crypto.timingSafeEqual(Buffer.from(order.trackingToken), tokenBuf);
   if (!order || !matches) return res.status(404).json({ error: 'Order not found. Check the link and try again.' });
   const { rows: items } = await query('SELECT product_name AS "name", quantity, color, size, image_url AS "image" FROM order_items WHERE order_id = $1', [id]);
-  res.json({
+  res.set({ 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' }).json({
     id: order.id,
     status: order.status,
     paymentStatus: order.paymentStatus,

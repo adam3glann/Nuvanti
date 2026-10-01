@@ -214,12 +214,12 @@ function renderMenuItem(item) {
 }
 
 function getMenuGlyph(name) {
-  return ({ sparkle: '✦', star: '★', heart: '♥', arrow: '→', leaf: '❧', diamond: '◆', bolt: 'ϟ', flower: '✿', crown: '♛', dot: '•', sun: '☼', moon: '☾', wave: '〰', check: '✓', smile: '☺', plus: '+', ribbon: '♧', flame: '♨', music: '♫', infinity: '∞', clover: '☘', flag: '⚑' })[name] || '';
+  return ({ sparkle: '✦', star: '★', heart: '♥', arrow: '→', leaf: '❧', diamond: '◆', bolt: 'ϟ', flower: '✿', crown: '♛', dot: '•', sun: '☼', moon: '☾', wave: '〰', check: '✓', smile: '☺', plus: '+', ribbon: '♧', flame: '♨', music: '♫', infinity: '∞', clover: '☘', flag: '⚑', snowflake: '❄', 'ice-crystal': '❈', comet: '☄', planet: '♄', butterfly: '🦋', lightning: 'ϟ', sparkles: '✨', 'flower-star': '❋', eye: '◉', mountain: '▲', sunrise: '☀', cloud: '☁', drop: '◆', 'circular-arrow': '⟳', 'check-circle': '●✓', cross: '✚', 'crown-small': '♕', peace: '☮', 'diamond-ring': '◇', crescent: '☽', snowman: '☃', asterisk: '✳' })[name] || '';
 }
 
-const menuStyles = ['link','pill','card','outline','soft','glass','gradient','elevated','glow','cut','underline','double','sticker','gradient-outline','neon','dashed','tag','corner','inset','bevel','bubble','ribbon','hollow','gloss'];
-const menuAnimations = ['ice','pulse','float','glow','bounce','sweep','shine','tilt','orbit','twinkle','wave','pop','wiggle','heartbeat','spin','jelly'];
-const menuIcons = ['none','sparkle','star','heart','arrow','leaf','diamond','bolt','flower','crown','dot','sun','moon','wave','check','smile','plus','ribbon','flame','music','infinity','clover','flag'];
+const menuStyles = ['link','pill','card','outline','soft','glass','gradient','elevated','glow','cut','underline','double','sticker','gradient-outline','neon','dashed','tag','corner','inset','bevel','bubble','ribbon','hollow','gloss','aurora','frost','chrome','rainbow-edge','satin','ticket','pixel','mesh','halo','stamp','arch','notched','pearl','slime','starlight'];
+const menuAnimations = ['ice','ice-rain','snowfall','frost','aurora','comet-trail','confetti','spark-rain','pulse','float','glow','bounce','sweep','shine','tilt','orbit','twinkle','wave','pop','wiggle','heartbeat','spin','jelly','ripple','neon-flicker','flame','shimmer','drift','march','breathe','sparkle-burst','swing','flip','magnet','glitch','rainbow'];
+const menuIcons = ['none','sparkle','star','heart','arrow','leaf','diamond','bolt','flower','crown','dot','sun','moon','wave','check','smile','plus','ribbon','flame','music','infinity','clover','flag','snowflake','ice-crystal','comet','planet','butterfly','lightning','sparkles','flower-star','eye','mountain','sunrise','cloud','drop','circular-arrow','check-circle','cross','crown-small','peace','diamond-ring','crescent','snowman','asterisk'];
 function menuAppearanceFor(item, device) {
   const saved = item?.[device === 'desktop' ? 'menuDesktopAppearance' : 'menuMobileAppearance'];
   const profile = saved && typeof saved === 'object' && !Array.isArray(saved) && Object.keys(saved).length
