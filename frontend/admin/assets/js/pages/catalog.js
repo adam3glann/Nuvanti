@@ -295,80 +295,88 @@ async function openCollectionEditor(collection = null) {
 }
 
 function menuAppearanceFields(item = null) {
-  return `
-    <fieldset style="border:1px solid var(--a-border);border-radius:10px;padding:1rem;margin:1rem 0">
-      <legend style="padding:0 .35rem;font-weight:600">${tab === 'categories' ? 'Categories menu' : 'Collections menu'}</legend>
-      <label style="display:flex;align-items:center;gap:.6rem;margin-bottom:.85rem"><input id="mMenuShow" type="checkbox" ${item?.menuShow ? 'checked' : ''} /> Show under ${tab === 'categories' ? 'Categories' : 'Collections'}</label>
-      <div class="field"><label for="mMenuLabel">Menu label <span class="hint">(optional)</span></label><input id="mMenuLabel" maxlength="80" placeholder="Use the ${tab === 'categories' ? 'category' : 'collection'} name" value="${escapeHtml(item?.menuLabel || '')}" /></div>
-      <div class="field"><label for="mMenuStyle">Button design</label><select id="mMenuStyle"><option value="link" ${item?.menuStyle === 'link' ? 'selected' : ''}>Simple link</option><option value="pill" ${item?.menuStyle === 'pill' || !item?.menuStyle ? 'selected' : ''}>Classic pill</option><option value="outline" ${item?.menuStyle === 'outline' ? 'selected' : ''}>Outlined</option><option value="soft" ${item?.menuStyle === 'soft' ? 'selected' : ''}>Soft color</option><option value="glass" ${item?.menuStyle === 'glass' ? 'selected' : ''}>Frosted glass</option><option value="card" ${item?.menuStyle === 'card' ? 'selected' : ''}>Featured card</option><option value="gradient" ${item?.menuStyle === 'gradient' ? 'selected' : ''}>Gradient blend</option><option value="elevated" ${item?.menuStyle === 'elevated' ? 'selected' : ''}>Raised button</option><option value="glow" ${item?.menuStyle === 'glow' ? 'selected' : ''}>Glow edge</option><option value="cut" ${item?.menuStyle === 'cut' ? 'selected' : ''}>Cut corner</option><option value="underline" ${item?.menuStyle === 'underline' ? 'selected' : ''}>Underline</option><option value="double" ${item?.menuStyle === 'double' ? 'selected' : ''}>Double border</option><option value="sticker" ${item?.menuStyle === 'sticker' ? 'selected' : ''}>Sticker</option><option value="gradient-outline" ${item?.menuStyle === 'gradient-outline' ? 'selected' : ''}>Gradient outline</option><option value="neon" ${item?.menuStyle === 'neon' ? 'selected' : ''}>Neon edge</option><option value="dashed" ${item?.menuStyle === 'dashed' ? 'selected' : ''}>Dashed outline</option><option value="tag" ${item?.menuStyle === 'tag' ? 'selected' : ''}>Tag</option><option value="corner" ${item?.menuStyle === 'corner' ? 'selected' : ''}>Folded corner</option><option value="inset" ${item?.menuStyle === 'inset' ? 'selected' : ''}>Inset</option></select></div>
-      <label style="display:flex;align-items:center;gap:.6rem;margin:.75rem 0"><input id="mMenuGradient" type="checkbox" ${item?.menuBackgroundEndColor ? 'checked' : ''} /> Use a two-color gradient</label>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem"><div class="field"><label for="mMenuBackground">Start color</label><input id="mMenuBackground" type="color" value="${escapeHtml(item?.menuBackgroundColor || '#35604a')}" /></div><div class="field"><label for="mMenuBackgroundEnd">End color</label><input id="mMenuBackgroundEnd" type="color" value="${escapeHtml(item?.menuBackgroundEndColor || '#849274')}" ${item?.menuBackgroundEndColor ? '' : 'disabled'} /></div><div class="field"><label for="mMenuText">Text color</label><input id="mMenuText" type="color" value="${escapeHtml(item?.menuTextColor || '#ffffff')}" /></div></div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1rem"><div class="field"><label for="mMenuIcon">Button detail</label><select id="mMenuIcon"><option value="none">No icon</option><option value="sparkle" ${item?.menuIcon === 'sparkle' ? 'selected' : ''}>Sparkle</option><option value="star" ${item?.menuIcon === 'star' ? 'selected' : ''}>Star</option><option value="heart" ${item?.menuIcon === 'heart' ? 'selected' : ''}>Heart</option><option value="arrow" ${item?.menuIcon === 'arrow' ? 'selected' : ''}>Arrow</option><option value="leaf" ${item?.menuIcon === 'leaf' ? 'selected' : ''}>Leaf</option><option value="diamond" ${item?.menuIcon === 'diamond' ? 'selected' : ''}>Diamond</option><option value="bolt" ${item?.menuIcon === 'bolt' ? 'selected' : ''}>Bolt</option><option value="flower" ${item?.menuIcon === 'flower' ? 'selected' : ''}>Flower</option><option value="crown" ${item?.menuIcon === 'crown' ? 'selected' : ''}>Crown</option><option value="dot" ${item?.menuIcon === 'dot' ? 'selected' : ''}>Dot</option><option value="sun" ${item?.menuIcon === 'sun' ? 'selected' : ''}>Sun</option><option value="moon" ${item?.menuIcon === 'moon' ? 'selected' : ''}>Moon</option><option value="wave" ${item?.menuIcon === 'wave' ? 'selected' : ''}>Wave</option><option value="check" ${item?.menuIcon === 'check' ? 'selected' : ''}>Check</option><option value="smile" ${item?.menuIcon === 'smile' ? 'selected' : ''}>Smile</option><option value="plus" ${item?.menuIcon === 'plus' ? 'selected' : ''}>Plus</option><option value="ribbon" ${item?.menuIcon === 'ribbon' ? 'selected' : ''}>Ribbon</option><option value="flame" ${item?.menuIcon === 'flame' ? 'selected' : ''}>Flame</option></select></div><div class="field"><label for="mMenuAnimation">Button animation</label><select id="mMenuAnimation"><option value="none">None</option><option value="ice" ${item?.menuAnimation === 'ice' ? 'selected' : ''}>Ice shine</option><option value="pulse" ${item?.menuAnimation === 'pulse' ? 'selected' : ''}>Soft pulse</option><option value="float" ${item?.menuAnimation === 'float' ? 'selected' : ''}>Gentle float</option><option value="glow" ${item?.menuAnimation === 'glow' ? 'selected' : ''}>Glow breathe</option><option value="bounce" ${item?.menuAnimation === 'bounce' ? 'selected' : ''}>Soft bounce</option><option value="sweep" ${item?.menuAnimation === 'sweep' ? 'selected' : ''}>Light sweep</option><option value="shine" ${item?.menuAnimation === 'shine' ? 'selected' : ''}>Quick shimmer</option><option value="tilt" ${item?.menuAnimation === 'tilt' ? 'selected' : ''}>Tiny tilt</option><option value="orbit" ${item?.menuAnimation === 'orbit' ? 'selected' : ''}>Orbiting detail</option><option value="twinkle" ${item?.menuAnimation === 'twinkle' ? 'selected' : ''}>Twinkle</option><option value="wave" ${item?.menuAnimation === 'wave' ? 'selected' : ''}>Wave motion</option><option value="pop" ${item?.menuAnimation === 'pop' ? 'selected' : ''}>Pop</option></select></div></div>
-      <div style="display:flex;align-items:center;gap:.75rem;margin:.75rem 0 1rem"><span class="hint">Live preview</span><span id="mMenuPreview" class="menu-button-preview" style="--preview-text:${escapeHtml(item?.menuTextColor || '#ffffff')}"><span class="menu-button-preview__icon" aria-hidden="true"></span><span class="menu-button-preview__label">${escapeHtml(item?.menuLabel || item?.name || 'SUMMER \'26')}</span></span></div>
-      <p class="hint">${tab === 'collections' ? 'This item appears inside the main Collections menu. Choose its label, button style, and colors; select any number of products below.' : 'This item appears inside the main Categories menu. Choose its label, button style, and colors.'}</p>
-    </fieldset>`;
+  const profile = (device) => {
+    const saved = item?.[device === 'desktop' ? 'menuDesktopAppearance' : 'menuMobileAppearance'] || {};
+    const fallback = { style: item?.menuStyle || 'pill', backgroundColor: item?.menuBackgroundColor || '#35604a', backgroundEndColor: item?.menuBackgroundEndColor || '', textColor: item?.menuTextColor || '#ffffff', icon: item?.menuIcon || 'none', animation: item?.menuAnimation || 'none' };
+    const value = { ...fallback, ...saved };
+    const id = (field) => `mMenu-${device}-${field}`;
+    const styles = [['link','Simple link'],['pill','Classic pill'],['card','Featured card'],['outline','Outlined'],['soft','Soft color'],['glass','Frosted glass'],['gradient','Gradient blend'],['elevated','Raised button'],['glow','Glow edge'],['cut','Cut corner'],['underline','Underline'],['double','Double border'],['sticker','Sticker'],['gradient-outline','Gradient outline'],['neon','Neon edge'],['dashed','Dashed outline'],['tag','Tag'],['corner','Folded corner'],['inset','Inset'],['bevel','Bevel'],['bubble','Bubble'],['ribbon','Ribbon'],['hollow','Hollow'],['gloss','Gloss']];
+    const icons = [['none','No detail'],['sparkle','Sparkle'],['star','Star'],['heart','Heart'],['arrow','Arrow'],['leaf','Leaf'],['diamond','Diamond'],['bolt','Bolt'],['flower','Flower'],['crown','Crown'],['dot','Dot'],['sun','Sun'],['moon','Moon'],['wave','Wave'],['check','Check'],['smile','Smile'],['plus','Plus'],['ribbon','Ribbon'],['flame','Flame'],['music','Music note'],['infinity','Infinity'],['clover','Clover'],['flag','Flag']];
+    const animations = [['none','None'],['ice','Ice shine'],['pulse','Soft pulse'],['float','Gentle float'],['glow','Glow breathe'],['bounce','Soft bounce'],['sweep','Light sweep'],['shine','Quick shimmer'],['tilt','Tiny tilt'],['orbit','Orbiting detail'],['twinkle','Twinkle'],['wave','Wave motion'],['pop','Pop'],['wiggle','Wiggle'],['heartbeat','Heartbeat'],['spin','Spinning detail'],['jelly','Jelly bounce']];
+    const select = (field, label, options) => `<div class="field"><label for="${id(field)}">${label}</label><select id="${id(field)}">${options.map(([v, text]) => `<option value="${v}" ${value[field] === v ? 'selected' : ''}>${text}</option>`).join('')}</select></div>`;
+    return `<section class="menu-device-panel" data-menu-device="${device}" ${device === 'mobile' ? 'hidden' : ''}>
+      <div class="menu-device-grid">${select('style','Button design',styles)}${select('icon','Button detail',icons)}${select('animation','Button animation',animations)}</div>
+      <label class="menu-gradient-toggle"><input id="${id('gradient')}" type="checkbox" ${value.backgroundEndColor ? 'checked' : ''}> Use a two-color gradient</label>
+      <div class="menu-device-grid menu-device-colors"><div class="field"><label for="${id('backgroundColor')}">Start color</label><input id="${id('backgroundColor')}" type="color" value="${escapeHtml(value.backgroundColor)}"></div><div class="field"><label for="${id('backgroundEndColor')}">End color</label><input id="${id('backgroundEndColor')}" type="color" value="${escapeHtml(value.backgroundEndColor || value.backgroundColor)}" ${value.backgroundEndColor ? '' : 'disabled'}></div><div class="field"><label for="${id('textColor')}">Text color</label><input id="${id('textColor')}" type="color" value="${escapeHtml(value.textColor)}"></div></div>
+      <div class="menu-preview-row"><span class="hint">${device === 'desktop' ? 'Desktop' : 'Mobile'} preview</span><span id="${id('preview')}" class="menu-button-preview" data-profile="${device}"><span class="menu-button-preview__icon" aria-hidden="true"></span><span class="menu-button-preview__label"></span></span></div>
+    </section>`;
+  };
+  return `<fieldset class="menu-appearance-editor"><legend>${tab === 'categories' ? 'Categories menu' : 'Collections menu'}</legend>
+    <label class="menu-gradient-toggle"><input id="mMenuShow" type="checkbox" ${item?.menuShow ? 'checked' : ''}> Show under ${tab === 'categories' ? 'Categories' : 'Collections'}</label>
+    <div class="field"><label for="mMenuLabel">Menu label <span class="hint">(optional)</span></label><input id="mMenuLabel" maxlength="80" placeholder="Use the ${tab === 'categories' ? 'category' : 'collection'} name" value="${escapeHtml(item?.menuLabel || '')}"></div>
+    <div class="menu-device-tabs" role="tablist" aria-label="Menu device appearance"><button type="button" class="is-active" role="tab" aria-selected="true" data-menu-device-tab="desktop">Desktop</button><button type="button" role="tab" aria-selected="false" data-menu-device-tab="mobile">Mobile</button></div>
+    ${profile('desktop')}${profile('mobile')}
+    <p class="hint">${tab === 'collections' ? 'Choose separate desktop and mobile designs. Select any number of products below.' : 'Choose separate desktop and mobile designs for this category button.'}</p>
+  </fieldset>`;
 }
 
 function bindMenuAppearancePreview(root) {
-  const preview = root.querySelector('#mMenuPreview');
-  const fields = ['#mName', '#mMenuLabel', '#mMenuStyle', '#mMenuBackground', '#mMenuBackgroundEnd', '#mMenuGradient', '#mMenuText', '#mMenuIcon', '#mMenuAnimation'];
-  const update = () => {
+  const glyphs = { sparkle: '✦', star: '★', heart: '♥', arrow: '→', leaf: '❧', diamond: '◆', bolt: 'ϟ', flower: '✿', crown: '♛', dot: '•', sun: '☼', moon: '☾', wave: '〰', check: '✓', smile: '☺', plus: '+', ribbon: '♧', flame: '♨', music: '♫', infinity: '∞', clover: '☘', flag: '⚑' };
+  const update = (device) => {
+    const get = (field) => root.querySelector(`#mMenu-${device}-${field}`);
+    const preview = get('preview');
+    const style = get('style').value;
+    const start = get('backgroundColor').value;
+    const end = get('gradient').checked ? get('backgroundEndColor').value : start;
+    const text = get('textColor').value;
+    const fill = get('gradient').checked ? `linear-gradient(110deg,${start},${end})` : start;
     const label = root.querySelector('#mMenuLabel').value.trim() || root.querySelector('#mName').value.trim() || 'SUMMER \'26';
-    const style = root.querySelector('#mMenuStyle').value;
-    const useGradient = root.querySelector('#mMenuGradient').checked;
-    const startColor = root.querySelector('#mMenuBackground').value;
-    const endColor = root.querySelector('#mMenuBackgroundEnd').value;
-    const textColor = root.querySelector('#mMenuText').value;
-    root.querySelector('#mMenuBackgroundEnd').disabled = !useGradient;
-    const glyphs = { sparkle: '✦', star: '★', heart: '♥', arrow: '→', leaf: '❧', diamond: '◆', bolt: 'ϟ', flower: '✿', crown: '♛', dot: '•', sun: '☼', moon: '☾', wave: '〰', check: '✓', smile: '☺', plus: '+', ribbon: '♧', flame: '♨' };
-    preview.querySelector('.menu-button-preview__label').textContent = label;
-    preview.querySelector('.menu-button-preview__icon').textContent = glyphs[root.querySelector('#mMenuIcon').value] || '';
-    preview.dataset.animation = root.querySelector('#mMenuAnimation').value;
+    get('backgroundEndColor').disabled = !get('gradient').checked;
     preview.dataset.style = style;
-    preview.style.setProperty('--preview-fill', useGradient ? `linear-gradient(110deg, ${startColor}, ${endColor})` : startColor);
-    preview.style.setProperty('--preview-start', startColor);
-    preview.style.setProperty('--preview-end', useGradient ? endColor : startColor);
-    preview.style.color = style === 'link' ? 'var(--a-text)' : ['soft', 'underline', 'gradient-outline', 'dashed', 'inset'].includes(style) ? startColor : textColor;
-    preview.style.borderRadius = style === 'card' ? '10px' : ['cut', 'corner'].includes(style) ? '4px' : style === 'tag' ? '6px 999px 999px 6px' : '999px';
-    preview.style.padding = style === 'link' ? '.35rem .15rem' : '.45rem 1rem';
-    preview.style.border = style === 'double' ? `3px double ${startColor}` : style === 'dashed' ? `2px dashed ${startColor}`
-      : style === 'sticker' ? `2px solid color-mix(in srgb, ${useGradient ? endColor : startColor} 75%, transparent)`
-        : ['outline', 'glow', 'glass', 'neon', 'inset'].includes(style) ? `1px solid ${startColor}` : '1px solid transparent';
-    if (style === 'double') preview.style.border = `3px double ${startColor}`;
+    preview.dataset.animation = get('animation').value;
+    preview.querySelector('.menu-button-preview__label').textContent = label;
+    preview.querySelector('.menu-button-preview__icon').textContent = glyphs[get('icon').value] || '';
+    preview.style.setProperty('--preview-fill', fill);
+    preview.style.setProperty('--preview-start', start);
+    preview.style.setProperty('--preview-end', end);
+    preview.style.background = ['link','outline','underline','dashed','double','hollow'].includes(style) ? 'transparent' : fill;
+    if (style === 'soft') preview.style.background = `color-mix(in srgb,${start} 18%,var(--a-surface))`;
+    if (style === 'glass') preview.style.background = `color-mix(in srgb,${start} 28%,transparent)`;
+    if (style === 'inset') preview.style.background = `color-mix(in srgb,${start} 12%,var(--a-surface))`;
+    if (style === 'gradient-outline') preview.style.background = `linear-gradient(var(--a-surface),var(--a-surface)) padding-box,${fill} border-box`;
+    preview.style.color = ['soft','underline','gradient-outline','dashed','inset','hollow'].includes(style) ? start : style === 'link' ? 'var(--a-text)' : text;
+    preview.style.border = ['outline','glow','glass','neon','inset','bevel','hollow'].includes(style) ? `1px solid ${start}` : style === 'double' ? `3px double ${start}` : style === 'dashed' ? `2px dashed ${start}` : style === 'gradient-outline' ? '2px solid transparent' : '1px solid transparent';
+    preview.style.borderRadius = ['card','ribbon'].includes(style) ? '8px' : ['cut','corner','bevel'].includes(style) ? '4px' : style === 'tag' ? '6px 999px 999px 6px' : style === 'bubble' ? '16px 16px 16px 4px' : style === 'underline' ? '0' : '999px';
+    preview.style.padding = ['link','underline'].includes(style) ? '.35rem .15rem' : '.45rem 1rem';
+    preview.style.boxShadow = ['glow','neon'].includes(style) ? `0 0 0 1px ${start},0 0 14px ${start}99` : style === 'elevated' ? `0 5px 0 ${start}88,0 8px 16px #0003` : ['inset','bevel'].includes(style) ? `inset 0 2px 6px ${start}55` : style === 'sticker' ? `3px 4px 0 ${start}77` : style === 'gloss' ? 'inset 0 1px 1px #fff9,0 4px 12px #0003' : 'none';
     preview.style.backdropFilter = style === 'glass' ? 'blur(8px)' : 'none';
-    preview.style.background = ['link', 'outline', 'underline', 'dashed', 'double'].includes(style) ? 'transparent'
-      : style === 'gradient-outline' ? `linear-gradient(var(--a-surface),var(--a-surface)) padding-box, ${preview.style.getPropertyValue('--preview-fill')} border-box`
-      : style === 'soft' ? `color-mix(in srgb, ${startColor} 16%, var(--a-surface))`
-        : ['glass', 'glow', 'neon'].includes(style) ? `color-mix(in srgb, ${startColor} 25%, transparent)`
-          : style === 'inset' ? `color-mix(in srgb, ${startColor} 12%, var(--a-surface))`
-          : preview.style.getPropertyValue('--preview-fill');
-    preview.style.boxShadow = style === 'elevated' ? `0 5px 0 color-mix(in srgb, ${startColor} 55%, #111), 0 8px 16px rgba(0,0,0,.16)`
-      : ['glow', 'neon'].includes(style) ? `0 0 0 1px ${startColor}, 0 0 14px color-mix(in srgb, ${startColor} 65%, transparent)`
-        : style === 'inset' ? `inset 0 2px 6px color-mix(in srgb, ${startColor} 30%, transparent)`
-          : style === 'sticker' ? `3px 4px 0 color-mix(in srgb, ${startColor} 45%, #222)` : 'none';
-    preview.style.clipPath = ['cut', 'corner'].includes(style) ? 'polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px))' : 'none';
-    preview.style.borderBottom = style === 'underline' ? `2px solid ${startColor}` : 'none';
+    preview.style.clipPath = ['cut','corner'].includes(style) ? 'polygon(0 0,calc(100% - 10px) 0,100% 10px,100% 100%,10px 100%,0 calc(100% - 10px))' : 'none';
     preview.style.transform = style === 'sticker' ? 'rotate(-3deg)' : 'none';
-    if (style === 'gradient-outline') preview.style.border = '2px solid transparent';
-    if (style === 'cut') preview.style.borderRadius = '4px';
-    if (style === 'underline') preview.style.padding = '.35rem .15rem';
   };
-  fields.forEach((selector) => root.querySelector(selector).addEventListener('input', update));
-  ['#mMenuStyle', '#mMenuGradient', '#mMenuIcon', '#mMenuAnimation'].forEach((selector) => {
-    root.querySelector(selector).addEventListener('change', update);
+  ['desktop','mobile'].forEach((device) => {
+    ['style','icon','animation','gradient','backgroundColor','backgroundEndColor','textColor'].forEach((field) => {
+      const node = root.querySelector(`#mMenu-${device}-${field}`);
+      node.addEventListener(node.type === 'select-one' || node.type === 'checkbox' ? 'change' : 'input', () => update(device));
+    });
+    update(device);
   });
-  update();
+  root.querySelectorAll('[data-menu-device-tab]').forEach((button) => button.addEventListener('click', () => {
+    const device = button.dataset.menuDeviceTab;
+    root.querySelectorAll('[data-menu-device-tab]').forEach((tabButton) => { const active = tabButton === button; tabButton.classList.toggle('is-active', active); tabButton.setAttribute('aria-selected', String(active)); });
+    root.querySelectorAll('[data-menu-device]').forEach((panel) => { panel.hidden = panel.dataset.menuDevice !== device; });
+  }));
+  ['#mName','#mMenuLabel'].forEach((selector) => root.querySelector(selector).addEventListener('input', () => ['desktop','mobile'].forEach(update)));
 }
 
 function readMenuAppearance(root) {
+  const readProfile = (device) => {
+    const get = (field) => root.querySelector(`#mMenu-${device}-${field}`);
+    return { style: get('style').value, backgroundColor: get('backgroundColor').value, backgroundEndColor: get('gradient').checked ? get('backgroundEndColor').value : null, textColor: get('textColor').value, icon: get('icon').value, animation: get('animation').value };
+  };
   return {
     menuShow: root.querySelector('#mMenuShow').checked,
     menuLabel: root.querySelector('#mMenuLabel').value.trim() || null,
-    menuStyle: root.querySelector('#mMenuStyle').value,
-    menuBackgroundColor: root.querySelector('#mMenuBackground').value,
-    menuBackgroundEndColor: root.querySelector('#mMenuGradient').checked ? root.querySelector('#mMenuBackgroundEnd').value : null,
-    menuTextColor: root.querySelector('#mMenuText').value,
-    menuIcon: root.querySelector('#mMenuIcon').value,
-    menuAnimation: root.querySelector('#mMenuAnimation').value,
+    menuDesktopAppearance: readProfile('desktop'),
+    menuMobileAppearance: readProfile('mobile'),
   };
 }
