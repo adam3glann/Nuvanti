@@ -111,7 +111,7 @@
 .menu-button-preview[data-style="bevel"] { box-shadow:inset 0 1px #ffffff80,inset 0 -2px #0002,0 3px 8px #0002!important; }
 .menu-button-preview[data-style="bubble"] { border-radius:16px 16px 16px 4px!important; box-shadow:0 5px 14px color-mix(in srgb,var(--preview-start) 26%,transparent)!important; }
 .menu-button-preview[data-style="ribbon"] { clip-path:polygon(0 0,100% 0,94% 50%,100% 100%,0 100%,6% 50%); }
-.menu-button-preview[data-style="hollow"] { background:transparent!important; }
+.menu-button-preview[data-style="hollow"]:not([data-fill="true"]) { background:transparent!important; }
 .menu-button-preview[data-style="gloss"] { background:linear-gradient(165deg,color-mix(in srgb,var(--preview-end) 75%,#fff),var(--preview-start) 52%,color-mix(in srgb,var(--preview-start) 75%,#000))!important; box-shadow:inset 0 1px #ffffffa8,0 4px 12px #0003!important; }
 .menu-appearance-editor { border:1px solid var(--a-border); border-radius:10px; padding:1rem; margin:1rem 0; }
 .menu-appearance-editor legend { padding:0 .35rem; font-weight:600; }

@@ -297,7 +297,7 @@ async function openCollectionEditor(collection = null) {
 function menuAppearanceFields(item = null) {
   const profile = (device) => {
     const saved = item?.[device === 'desktop' ? 'menuDesktopAppearance' : 'menuMobileAppearance'] || {};
-    const fallback = { style: item?.menuStyle || 'pill', shape: 'design', backgroundColor: item?.menuBackgroundColor || '#35604a', backgroundEndColor: item?.menuBackgroundEndColor || '', gradientDirection: '110deg', textColor: item?.menuTextColor || '#ffffff', icon: item?.menuIcon || 'none', iconPosition: 'left', animation: item?.menuAnimation || 'none' };
+    const fallback = { style: item?.menuStyle || 'pill', shape: 'design', fill: true, backgroundColor: item?.menuBackgroundColor || '#35604a', backgroundEndColor: item?.menuBackgroundEndColor || '', gradientDirection: '110deg', textColor: item?.menuTextColor || '#ffffff', icon: item?.menuIcon || 'none', iconPosition: 'left', animation: item?.menuAnimation || 'none' };
     const value = { ...fallback, ...saved };
     const id = (field) => `mMenu-${device}-${field}`;
     const styles = [['link','Simple link'],['pill','Classic pill'],['card','Featured card'],['outline','Outlined'],['soft','Soft color'],['glass','Frosted glass'],['gradient','Gradient blend'],['elevated','Raised button'],['glow','Glow edge'],['cut','Cut corner'],['underline','Underline'],['double','Double border'],['sticker','Sticker'],['gradient-outline','Gradient outline'],['neon','Neon edge'],['dashed','Dashed outline'],['tag','Tag'],['corner','Folded corner'],['inset','Inset'],['bevel','Bevel'],['bubble','Bubble'],['ribbon','Ribbon'],['hollow','Hollow'],['gloss','Gloss'],['aurora','Aurora glass'],['frost','Ice crystal'],['chrome','Liquid chrome'],['rainbow-edge','Rainbow edge'],['satin','Satin ribbon'],['ticket','Ticket stub'],['pixel','Pixel frame'],['mesh','Color mesh'],['halo','Halo ring'],['stamp','Wax stamp'],['arch','Arch top'],['notched','Notched'],['pearl','Pearl shine'],['slime','Liquid gel'],['starlight','Starlight'],['ice-glass','Ice glass'],['ice-border','Ice border'],['prism','Prism'],['foil','Metal foil'],['split','Split color'],['frost-corner','Frost corner'],['badge','Badge'],['orbit','Orbit ring'],['paper','Paper label']];
@@ -308,6 +308,7 @@ function menuAppearanceFields(item = null) {
     const select = (field, label, options) => `<div class="field"><label for="${id(field)}">${label}</label><select id="${id(field)}">${options.map(([v, text]) => `<option value="${v}" ${value[field] === v ? 'selected' : ''}>${text}</option>`).join('')}</select></div>`;
     return `<section class="menu-device-panel" data-menu-device="${device}" ${device === 'mobile' ? 'hidden' : ''}>
       <div class="menu-device-grid">${select('shape','Button shape',shapes)}${select('style','Surface design',styles)}${select('icon','Inside detail',icons)}${select('iconPosition','Detail position', [['left','Left of text'],['right','Right of text'],['top','Above text']])}${select('animation','Inside animation',animations)}</div>
+      <label class="menu-gradient-toggle"><input id="${id('fill')}" type="checkbox" ${value.fill !== false ? 'checked' : ''}> Fill the box with the selected colors</label>
       <label class="menu-gradient-toggle"><input id="${id('gradient')}" type="checkbox" ${value.backgroundEndColor ? 'checked' : ''}> Blend two background colors</label>
       <div class="menu-device-grid menu-device-colors"><div class="field"><label for="${id('backgroundColor')}">First color</label><input id="${id('backgroundColor')}" type="color" value="${escapeHtml(value.backgroundColor)}"></div><div class="field"><label for="${id('backgroundEndColor')}">Second color</label><input id="${id('backgroundEndColor')}" type="color" value="${escapeHtml(value.backgroundEndColor || value.backgroundColor)}" ${value.backgroundEndColor ? '' : 'disabled'}></div>${select('gradientDirection','Color blend direction', directions)}<div class="field"><label for="${id('textColor')}">Text color</label><input id="${id('textColor')}" type="color" value="${escapeHtml(value.textColor)}"></div></div>
       <div class="menu-preview-row"><span class="hint">${device === 'desktop' ? 'Desktop' : 'Mobile'} preview</span><span id="${id('preview')}" class="menu-button-preview" data-profile="${device}"><span class="menu-button-preview__icon" aria-hidden="true"></span><span class="menu-button-preview__label"></span></span></div>
@@ -340,6 +341,7 @@ function bindMenuAppearancePreview(root) {
     get('gradientDirection').disabled = !get('gradient').checked;
     preview.dataset.style = style;
     preview.dataset.shape = shape;
+    preview.dataset.fill = String(get('fill').checked);
     preview.dataset.iconPosition = iconPosition;
     preview.dataset.animation = get('animation').value;
     preview.querySelector('.menu-button-preview__label').textContent = label;
@@ -348,7 +350,8 @@ function bindMenuAppearancePreview(root) {
     preview.style.setProperty('--preview-start', start);
     preview.style.setProperty('--preview-end', end);
     preview.style.setProperty('--preview-text', text);
-    preview.style.background = ['link','outline','underline','dashed','double','hollow'].includes(style) ? 'transparent' : fill;
+    const naturallyTransparent = ['link','outline','underline','dashed','double','hollow','gradient-outline'].includes(style);
+    preview.style.background = naturallyTransparent && !get('fill').checked ? 'transparent' : fill;
     if (style === 'soft') preview.style.background = `color-mix(in srgb,${start} 18%,var(--a-surface))`;
     if (style === 'glass') preview.style.background = `color-mix(in srgb,${start} 28%,transparent)`;
     if (style === 'inset') preview.style.background = `color-mix(in srgb,${start} 12%,var(--a-surface))`;
@@ -364,7 +367,7 @@ function bindMenuAppearancePreview(root) {
     preview.style.transform = style === 'sticker' ? 'rotate(-3deg)' : 'none';
   };
   ['desktop','mobile'].forEach((device) => {
-      ['shape','style','icon','iconPosition','animation','gradient','gradientDirection','backgroundColor','backgroundEndColor','textColor'].forEach((field) => {
+      ['shape','style','fill','icon','iconPosition','animation','gradient','gradientDirection','backgroundColor','backgroundEndColor','textColor'].forEach((field) => {
       const node = root.querySelector(`#mMenu-${device}-${field}`);
       node.addEventListener(node.type === 'select-one' || node.type === 'checkbox' ? 'change' : 'input', () => update(device));
     });
@@ -381,7 +384,7 @@ function bindMenuAppearancePreview(root) {
 function readMenuAppearance(root) {
   const readProfile = (device) => {
     const get = (field) => root.querySelector(`#mMenu-${device}-${field}`);
-    return { style: get('style').value, shape: get('shape').value, backgroundColor: get('backgroundColor').value, backgroundEndColor: get('gradient').checked ? get('backgroundEndColor').value : null, gradientDirection: get('gradientDirection').value, textColor: get('textColor').value, icon: get('icon').value, iconPosition: get('iconPosition').value, animation: get('animation').value };
+    return { style: get('style').value, shape: get('shape').value, fill: get('fill').checked, backgroundColor: get('backgroundColor').value, backgroundEndColor: get('gradient').checked ? get('backgroundEndColor').value : null, gradientDirection: get('gradientDirection').value, textColor: get('textColor').value, icon: get('icon').value, iconPosition: get('iconPosition').value, animation: get('animation').value };
   };
   return {
     menuShow: root.querySelector('#mMenuShow').checked,

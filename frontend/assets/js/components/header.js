@@ -158,6 +158,7 @@ function syncPrimaryCollectionStyles(items) {
     link.classList.remove(...menuStyles.map((name) => `menu-style--${name}`));
     link.classList.remove(...menuShapes.map((name) => `menu-shape--${name}`));
     link.classList.remove(...menuIconPositions.map((name) => `menu-icon-position--${name}`));
+    link.classList.remove('menu-box-fill');
     if (item) link.classList.remove('primary-nav__link--summer');
     if (animation !== 'none') link.classList.add(`menu-effect--${animation}`);
     const detail = glyph ? `<span class="menu-button__icon" aria-hidden="true">${glyph}</span>` : '';
@@ -175,6 +176,7 @@ function syncPrimaryCollectionStyles(items) {
     link.style.setProperty('color', text, 'important');
     if (appearance.shape !== 'design') link.classList.add(`menu-shape--${appearance.shape}`);
     link.classList.add(`menu-icon-position--${appearance.iconPosition}`);
+    if (appearance.fill && menuTransparentStyles.includes(style)) link.classList.add('menu-box-fill');
     if (style === 'link') {
       if (item) link.style.background = 'transparent';
       return;
@@ -212,9 +214,10 @@ function renderMenuItem(item) {
   const animation = appearance.animation !== 'none' ? ` menu-effect--${appearance.animation}` : '';
   const design = style === 'link' ? '' : ` menu-style--${style}`;
   const shape = appearance.shape === 'design' ? '' : ` menu-shape--${appearance.shape}`;
+  const fill = appearance.fill && menuTransparentStyles.includes(style) ? ' menu-box-fill' : '';
   const detail = glyph ? `<span class="menu-button__icon" aria-hidden="true">${glyph}</span>` : '';
   const contents = appearance.iconPosition === 'right' ? `<span class="menu-button__label">${label}</span>${detail}` : `${detail}<span class="menu-button__label">${label}</span>`;
-  return `<li data-configured-menu-item><a class="mobile-nav__link mobile-nav__link--${style}${design}${shape} menu-icon-position--${appearance.iconPosition}${animation}" href="${href}"${customStyle}><span class="menu-button__content">${contents}</span></a></li>`;
+  return `<li data-configured-menu-item><a class="mobile-nav__link mobile-nav__link--${style}${design}${shape}${fill} menu-icon-position--${appearance.iconPosition}${animation}" href="${href}"${customStyle}><span class="menu-button__content">${contents}</span></a></li>`;
 }
 
 function menuFill(start, end, direction) {
@@ -229,6 +232,7 @@ function getMenuGlyph(name) {
 const menuStyles = ['link','pill','card','outline','soft','glass','gradient','elevated','glow','cut','underline','double','sticker','gradient-outline','neon','dashed','tag','corner','inset','bevel','bubble','ribbon','hollow','gloss','aurora','frost','chrome','rainbow-edge','satin','ticket','pixel','mesh','halo','stamp','arch','notched','pearl','slime','starlight','ice-glass','ice-border','prism','foil','split','frost-corner','badge','orbit','paper'];
 const menuShapes = ['pill','rounded','square','cut','arch','capsule','organic'];
 const menuIconPositions = ['left','right','top'];
+const menuTransparentStyles = ['link','outline','underline','double','gradient-outline','dashed','hollow'];
 const menuAnimations = ['ice','ice-rain','icicle-drop','ice-drip','snowfall','snowstorm','blizzard','sleet','snowflake-spin','ice-crack','frost','glacier-glow','polar-lights','frozen','aurora','comet-trail','confetti','spark-rain','pulse','float','glow','bounce','sweep','shine','tilt','orbit','twinkle','wave','pop','wiggle','heartbeat','spin','jelly','ripple','neon-flicker','flame','shimmer','drift','march','breathe','sparkle-burst','swing','flip','magnet','glitch','rainbow'];
 const menuIcons = ['none','sparkle','star','heart','arrow','leaf','diamond','bolt','flower','crown','dot','sun','moon','wave','check','smile','plus','ribbon','flame','music','infinity','clover','flag','snowflake','ice-crystal','comet','planet','butterfly','lightning','sparkles','flower-star','eye','mountain','sunrise','cloud','drop','circular-arrow','check-circle','cross','crown-small','peace','diamond-ring','crescent','snowman','asterisk','ice-cube','icicle','frost-star','snowfall','iceberg','mittens','mountain-snow','evergreen','north-star'];
 function menuAppearanceFor(item, device) {
@@ -240,6 +244,7 @@ function menuAppearanceFor(item, device) {
   return {
     style: menuStyles.includes(profile.style) ? profile.style : (device === 'desktop' || !item ? 'link' : 'pill'),
     shape: ['design', ...menuShapes].includes(profile.shape) ? profile.shape : 'design',
+    fill: profile.fill !== false,
     backgroundColor: color(profile.backgroundColor, '#35604a'),
     backgroundEndColor: color(profile.backgroundEndColor, ''),
     gradientDirection: ['110deg', '135deg', 'to bottom', 'circle'].includes(profile.gradientDirection) ? profile.gradientDirection : '110deg',

@@ -47,6 +47,7 @@ const menuAnimations = ['none', 'ice', 'ice-rain', 'icicle-drop', 'ice-drip', 's
 const menuAppearanceVariant = z.object({
   style: z.enum(menuStyles),
   shape: z.enum(['design', 'pill', 'rounded', 'square', 'cut', 'arch', 'capsule', 'organic']).optional(),
+  fill: z.boolean().optional(),
   backgroundColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   backgroundEndColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable(),
   gradientDirection: z.enum(['110deg', '135deg', 'to bottom', 'circle']).optional(),
