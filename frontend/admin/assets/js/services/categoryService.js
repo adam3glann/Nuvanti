@@ -17,6 +17,7 @@ export const toggleCategoryStatus = async (id) => { const category = (await fetc
 export const deleteCategory = (id) => request(`/api/admin/categories/${id}`, { method: 'DELETE' });
 export const createCategory = (data) => request('/api/admin/categories', { method: 'POST', body: JSON.stringify(data) });
 export const editCategory = (id, data) => request(`/api/admin/categories/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(data) });
+export const reorderCategories = (ids) => request('/api/admin/categories/order', { method: 'PUT', body: JSON.stringify({ ids }) });
 export async function uploadCategoryImage(file, options = {}) {
   return uploadAdminImage(file, { endpoint: '/api/admin/uploads/category-image', ...options });
 }
@@ -25,4 +26,5 @@ export const toggleCollectionStatus = async (id) => { const collection = (await 
 export const deleteCollection = (id) => request(`/api/admin/collections/${id}`, { method: 'DELETE' });
 export const createCollection = (data) => request('/api/admin/collections', { method: 'POST', body: JSON.stringify(data) });
 export const editCollection = (id, data) => request(`/api/admin/collections/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(data) });
+export const reorderCollections = (ids) => request('/api/admin/collections/order', { method: 'PUT', body: JSON.stringify({ ids }) });
 export const syncCollectionProducts = (id, productIds) => request(`/api/admin/collections/${encodeURIComponent(id)}/products`, { method: 'PATCH', body: JSON.stringify({ productIds }) });

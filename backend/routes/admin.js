@@ -140,8 +140,8 @@ router.get('/maintenance/backup', requireStoreMaintenanceRole, asyncRoute(async 
       read(`SELECT id::text, email, name, is_active AS "isActive", email_verified_at AS "emailVerifiedAt", created_at AS "createdAt" FROM users WHERE role = 'customer' ORDER BY id`),
       read(`SELECT id::text, email, name, role, is_active AS "isActive", created_at AS "createdAt" FROM users WHERE role <> 'customer' ORDER BY id`),
       read(`SELECT id::text, slug, name, description, price_cents AS "priceCents", category, collection, images, colors, sizes, inventory, is_active AS "isActive", metadata, created_at AS "createdAt", updated_at AS "updatedAt" FROM products ORDER BY id`),
-      read(`SELECT id::text, slug, name, description, image_url AS "imageUrl", is_active AS "isActive", menu_show AS "menuShow", menu_label AS "menuLabel", menu_style AS "menuStyle", menu_background_color AS "menuBackgroundColor", menu_background_end_color AS "menuBackgroundEndColor", menu_text_color AS "menuTextColor", menu_icon AS "menuIcon", menu_animation AS "menuAnimation", menu_desktop_appearance AS "menuDesktopAppearance", menu_mobile_appearance AS "menuMobileAppearance", created_at AS "createdAt" FROM categories ORDER BY id`),
-      read(`SELECT id::text, slug, name, is_active AS "isActive", menu_show AS "menuShow", menu_label AS "menuLabel", menu_style AS "menuStyle", menu_background_color AS "menuBackgroundColor", menu_background_end_color AS "menuBackgroundEndColor", menu_text_color AS "menuTextColor", menu_icon AS "menuIcon", menu_animation AS "menuAnimation", menu_desktop_appearance AS "menuDesktopAppearance", menu_mobile_appearance AS "menuMobileAppearance", created_at AS "createdAt" FROM collections ORDER BY id`),
+      read(`SELECT id::text, slug, name, description, image_url AS "imageUrl", is_active AS "isActive", menu_position AS "menuPosition", menu_show AS "menuShow", menu_label AS "menuLabel", menu_style AS "menuStyle", menu_background_color AS "menuBackgroundColor", menu_background_end_color AS "menuBackgroundEndColor", menu_text_color AS "menuTextColor", menu_icon AS "menuIcon", menu_animation AS "menuAnimation", menu_desktop_appearance AS "menuDesktopAppearance", menu_mobile_appearance AS "menuMobileAppearance", created_at AS "createdAt" FROM categories ORDER BY id`),
+      read(`SELECT id::text, slug, name, is_active AS "isActive", menu_position AS "menuPosition", menu_show AS "menuShow", menu_label AS "menuLabel", menu_style AS "menuStyle", menu_background_color AS "menuBackgroundColor", menu_background_end_color AS "menuBackgroundEndColor", menu_text_color AS "menuTextColor", menu_icon AS "menuIcon", menu_animation AS "menuAnimation", menu_desktop_appearance AS "menuDesktopAppearance", menu_mobile_appearance AS "menuMobileAppearance", created_at AS "createdAt" FROM collections ORDER BY id`),
       read(`SELECT * FROM homepage_slides ORDER BY position, id`),
       read(`SELECT * FROM store_settings ORDER BY id`),
       read(`SELECT id::text, code, type, value, min_subtotal_cents AS "minSubtotalCents", usage_limit AS "usageLimit", used_count AS "usedCount", is_active AS "isActive", expires_at AS "expiresAt", created_at AS "createdAt" FROM discounts ORDER BY id`),
@@ -472,7 +472,21 @@ router.patch('/orders/:id', requirePermission('orders.edit'), async (req, res) =
       .catch((error) => console.error('Order status email failed:', error));
   }
 });
-router.get('/categories', requirePermission('products.view'), async (req, res) => { const { rows } = await query(`SELECT c.id::text, c.name, c.slug, c.description, c.image_url AS "imageUrl", c.is_active AS "isActive", c.menu_show AS "menuShow", c.menu_label AS "menuLabel", c.menu_style AS "menuStyle", c.menu_background_color AS "menuBackgroundColor", c.menu_background_end_color AS "menuBackgroundEndColor", c.menu_text_color AS "menuTextColor", c.menu_icon AS "menuIcon", c.menu_animation AS "menuAnimation", c.menu_desktop_appearance AS "menuDesktopAppearance", c.menu_mobile_appearance AS "menuMobileAppearance", count(p.id)::int AS "productCount" FROM categories c LEFT JOIN products p ON p.category = c.slug GROUP BY c.id ORDER BY c.name`); res.json(rows.map((c) => ({ ...c, status: c.isActive ? 'active' : 'disabled' }))); });
+router.get('/categories', requirePermission('products.view'), async (req, res) => { const { rows } = await query(`SELECT c.id::text, c.name, c.slug, c.description, c.image_url AS "imageUrl", c.is_active AS "isActive", c.menu_position AS "menuPosition", c.menu_show AS "menuShow", c.menu_label AS "menuLabel", c.menu_style AS "menuStyle", c.menu_background_color AS "menuBackgroundColor", c.menu_background_end_color AS "menuBackgroundEndColor", c.menu_text_color AS "menuTextColor", c.menu_icon AS "menuIcon", c.menu_animation AS "menuAnimation", c.menu_desktop_appearance AS "menuDesktopAppearance", c.menu_mobile_appearance AS "menuMobileAppearance", count(p.id)::int AS "productCount" FROM categories c LEFT JOIN products p ON p.category = c.slug GROUP BY c.id ORDER BY c.menu_position, c.name`); res.json(rows.map((c) => ({ ...c, status: c.isActive ? 'active' : 'disabled' }))); });
+router.put('/categories/order', requirePermission('products.edit'), asyncRoute(async (req, res) => {
+  const { ids } = z.object({ ids: z.array(z.string().regex(/^\d+$/)).min(1).max(1000) }).parse(req.body);
+  if (new Set(ids).size !== ids.length) return res.status(400).json({ error: 'The category order contains duplicates.' });
+  const result = await transaction(async (client) => {
+    const current = await client.query('SELECT id::text FROM categories FOR UPDATE');
+    if (current.rows.length !== ids.length || current.rows.some((row) => !ids.includes(row.id))) return null;
+    return client.query(`UPDATE categories AS c SET menu_position = ordering.position * 100
+      FROM unnest($1::bigint[]) WITH ORDINALITY AS ordering(id, position)
+      WHERE c.id = ordering.id RETURNING c.id::text`, [ids]);
+  });
+  if (!result) return res.status(409).json({ error: 'Categories changed while saving the order. Reload and try again.' });
+  await logAudit({ req, action: 'category.order.updated', targetType: 'category', metadata: { count: ids.length } });
+  res.json({ updatedCount: result.rowCount });
+}));
 router.post('/categories', requirePermission('products.create'), async (req, res) => {
   const c = categoryInput.parse(req.body);
   try {
@@ -518,7 +532,21 @@ router.patch('/categories/:id', requirePermission('products.edit'), async (req, 
   }
 });
 router.delete('/categories/:id', requirePermission('products.delete'), async (req, res) => { const result = await query('DELETE FROM categories WHERE id = $1', [req.params.id]); if (!result.rowCount) return res.status(404).json({ error: 'Category not found.' }); await logAudit({ req, action: 'category.deleted', targetType: 'category', targetId: req.params.id }); res.status(204).end(); });
-router.get('/collections', requirePermission('products.view'), async (req, res) => { const { rows } = await query(`SELECT c.id::text, c.name, c.slug, c.is_active AS "isActive", c.menu_show AS "menuShow", c.menu_label AS "menuLabel", c.menu_style AS "menuStyle", c.menu_background_color AS "menuBackgroundColor", c.menu_background_end_color AS "menuBackgroundEndColor", c.menu_text_color AS "menuTextColor", c.menu_icon AS "menuIcon", c.menu_animation AS "menuAnimation", c.menu_desktop_appearance AS "menuDesktopAppearance", c.menu_mobile_appearance AS "menuMobileAppearance", count(p.id)::int AS "productCount" FROM collections c LEFT JOIN products p ON p.collection = c.slug GROUP BY c.id ORDER BY c.name`); res.json(rows.map((c) => ({ ...c, status: c.isActive ? 'published' : 'draft' }))); });
+router.get('/collections', requirePermission('products.view'), async (req, res) => { const { rows } = await query(`SELECT c.id::text, c.name, c.slug, c.is_active AS "isActive", c.menu_position AS "menuPosition", c.menu_show AS "menuShow", c.menu_label AS "menuLabel", c.menu_style AS "menuStyle", c.menu_background_color AS "menuBackgroundColor", c.menu_background_end_color AS "menuBackgroundEndColor", c.menu_text_color AS "menuTextColor", c.menu_icon AS "menuIcon", c.menu_animation AS "menuAnimation", c.menu_desktop_appearance AS "menuDesktopAppearance", c.menu_mobile_appearance AS "menuMobileAppearance", count(p.id)::int AS "productCount" FROM collections c LEFT JOIN products p ON p.collection = c.slug GROUP BY c.id ORDER BY c.menu_position, c.name`); res.json(rows.map((c) => ({ ...c, status: c.isActive ? 'published' : 'draft' }))); });
+router.put('/collections/order', requirePermission('products.edit'), asyncRoute(async (req, res) => {
+  const { ids } = z.object({ ids: z.array(z.string().regex(/^\d+$/)).min(1).max(1000) }).parse(req.body);
+  if (new Set(ids).size !== ids.length) return res.status(400).json({ error: 'The collection order contains duplicates.' });
+  const result = await transaction(async (client) => {
+    const current = await client.query('SELECT id::text FROM collections FOR UPDATE');
+    if (current.rows.length !== ids.length || current.rows.some((row) => !ids.includes(row.id))) return null;
+    return client.query(`UPDATE collections AS c SET menu_position = ordering.position * 100
+      FROM unnest($1::bigint[]) WITH ORDINALITY AS ordering(id, position)
+      WHERE c.id = ordering.id RETURNING c.id::text`, [ids]);
+  });
+  if (!result) return res.status(409).json({ error: 'Collections changed while saving the order. Reload and try again.' });
+  await logAudit({ req, action: 'collection.order.updated', targetType: 'collection', metadata: { count: ids.length } });
+  res.json({ updatedCount: result.rowCount });
+}));
 router.post('/collections', requirePermission('products.create'), async (req, res) => { const c = collectionInput.parse(req.body); const { rows } = await query('INSERT INTO collections (name, slug, menu_show, menu_label, menu_style, menu_background_color, menu_background_end_color, menu_text_color, menu_icon, menu_animation, menu_desktop_appearance, menu_mobile_appearance) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12::jsonb) RETURNING id::text, name, slug, is_active AS "isActive"', [c.name, c.slug, c.menuShow || false, c.menuLabel || null, c.menuStyle || 'link', c.menuBackgroundColor || null, c.menuBackgroundEndColor || null, c.menuTextColor || null, c.menuIcon || 'none', c.menuAnimation || 'none', JSON.stringify(c.menuDesktopAppearance || {}), JSON.stringify(c.menuMobileAppearance || {})]); await logAudit({ req, action: 'collection.created', targetType: 'collection', targetId: rows[0].id, metadata: { name: c.name, slug: c.slug } }); res.status(201).json({ ...rows[0], productCount: 0, status: 'published' }); });
 router.patch('/collections/:id', requirePermission('products.edit'), async (req, res) => {
   const patch = collectionInput.partial().extend({ isActive: z.boolean().optional() }).parse(req.body);

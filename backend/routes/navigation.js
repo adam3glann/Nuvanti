@@ -9,13 +9,13 @@ router.get('/', asyncRoute(async (req, res) => {
     query(`SELECT 'category' AS type, slug, name, menu_show AS "menuShow", menu_label AS "menuLabel", menu_style AS "menuStyle",
       menu_background_color AS "menuBackgroundColor", menu_background_end_color AS "menuBackgroundEndColor",
       menu_text_color AS "menuTextColor", menu_icon AS "menuIcon", menu_animation AS "menuAnimation",
-      menu_desktop_appearance AS "menuDesktopAppearance", menu_mobile_appearance AS "menuMobileAppearance"
-      FROM categories WHERE is_active = true ORDER BY name`),
+      menu_desktop_appearance AS "menuDesktopAppearance", menu_mobile_appearance AS "menuMobileAppearance",
+      menu_position AS "menuPosition" FROM categories WHERE is_active = true ORDER BY menu_position, name`),
     query(`SELECT 'collection' AS type, slug, name, menu_show AS "menuShow", menu_label AS "menuLabel", menu_style AS "menuStyle",
       menu_background_color AS "menuBackgroundColor", menu_background_end_color AS "menuBackgroundEndColor",
       menu_text_color AS "menuTextColor", menu_icon AS "menuIcon", menu_animation AS "menuAnimation",
-      menu_desktop_appearance AS "menuDesktopAppearance", menu_mobile_appearance AS "menuMobileAppearance"
-      FROM collections WHERE is_active = true ORDER BY name`),
+      menu_desktop_appearance AS "menuDesktopAppearance", menu_mobile_appearance AS "menuMobileAppearance",
+      menu_position AS "menuPosition" FROM collections WHERE is_active = true ORDER BY menu_position, name`),
   ]);
   res.set('Cache-Control', 'no-store').json([...collections.rows, ...categories.rows]);
 }));

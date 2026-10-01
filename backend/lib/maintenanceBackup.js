@@ -122,23 +122,23 @@ export async function restoreStoreBackup(client, backup) {
   ]);
 
   await insertRows(client, 'categories', [
-    'id', 'slug', 'name', 'description', 'image_url', 'is_active', 'menu_show', 'menu_label',
+    'id', 'slug', 'name', 'description', 'image_url', 'is_active', 'menu_position', 'menu_show', 'menu_label',
     'menu_style', 'menu_background_color', 'menu_background_end_color', 'menu_text_color',
     'menu_icon', 'menu_animation', 'menu_desktop_appearance', 'menu_mobile_appearance', 'created_at',
   ], backup.categories, (row) => [
     row.id, row.slug, row.name, row.description || '', row.imageUrl || null,
-    row.isActive !== false, row.menuShow === true, row.menuLabel || null, row.menuStyle || 'link',
+    row.isActive !== false, Number.isInteger(row.menuPosition) ? row.menuPosition : 2147483647, row.menuShow === true, row.menuLabel || null, row.menuStyle || 'link',
     row.menuBackgroundColor || null, row.menuBackgroundEndColor || null, row.menuTextColor || null,
     row.menuIcon || 'none', row.menuAnimation || 'none',
     json(row.menuDesktopAppearance, {}), json(row.menuMobileAppearance, {}), row.createdAt,
   ]);
 
   await insertRows(client, 'collections', [
-    'id', 'slug', 'name', 'is_active', 'menu_show', 'menu_label', 'menu_style',
+    'id', 'slug', 'name', 'is_active', 'menu_position', 'menu_show', 'menu_label', 'menu_style',
     'menu_background_color', 'menu_background_end_color', 'menu_text_color', 'menu_icon',
     'menu_animation', 'menu_desktop_appearance', 'menu_mobile_appearance', 'created_at',
   ], backup.collections, (row) => [
-    row.id, row.slug, row.name, row.isActive !== false, row.menuShow === true, row.menuLabel || null,
+    row.id, row.slug, row.name, row.isActive !== false, Number.isInteger(row.menuPosition) ? row.menuPosition : 2147483647, row.menuShow === true, row.menuLabel || null,
     row.menuStyle || 'link', row.menuBackgroundColor || null, row.menuBackgroundEndColor || null,
     row.menuTextColor || null, row.menuIcon || 'none', row.menuAnimation || 'none',
     json(row.menuDesktopAppearance, {}), json(row.menuMobileAppearance, {}), row.createdAt,

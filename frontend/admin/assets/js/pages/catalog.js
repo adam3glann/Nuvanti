@@ -8,7 +8,7 @@ import { escapeHtml, storeAssetSrc } from '../components/utils.js';
 import {
   fetchCategories, toggleCategoryStatus, deleteCategory, createCategory, editCategory, uploadCategoryImage,
   fetchCollections, toggleCollectionStatus, deleteCollection, createCollection, editCollection,
-  syncCollectionProducts,
+  syncCollectionProducts, reorderCategories, reorderCollections,
 } from '../services/categoryService.js';
 import { startLiveRefresh } from '../services/liveRefresh.js';
 import { fetchAdminProducts } from '../services/productService.js';
@@ -57,13 +57,13 @@ async function render() {
   try {
     await renderTable(body, headRow);
   } catch (error) {
-    body.innerHTML = `<tr><td colspan="${tab === 'categories' ? 6 : 5}"><div class="admin-empty"><h3>Couldn't load this data</h3><p>${escapeHtml(error.message)}</p></div></td></tr>`;
+    body.innerHTML = `<tr><td colspan="${tab === 'categories' ? 7 : 6}"><div class="admin-empty"><h3>Couldn't load this data</h3><p>${escapeHtml(error.message)}</p></div></td></tr>`;
   }
 }
 
 async function renderTable(body, headRow) {
   if (tab === 'categories') {
-    headRow.innerHTML = '<th>Cover</th><th>Name</th><th>Slug</th><th>Products</th><th>Status</th><th></th>';
+    headRow.innerHTML = '<th>Cover</th><th>Name</th><th>Slug</th><th>Products</th><th>Status</th><th>Order</th><th></th>';
     const cats = await fetchCategories();
     body.innerHTML = cats.map((c) => `
       <tr>
@@ -72,6 +72,7 @@ async function renderTable(body, headRow) {
         <td class="mono">${escapeHtml(c.slug)}</td>
         <td>${c.productCount}</td>
         <td>${statusBadge(c.status === 'active' ? 'active' : 'disabled')}</td>
+        <td><button class="btn btn-outline btn-sm" data-order-up="${escapeHtml(c.id)}" aria-label="Move ${escapeHtml(c.name)} earlier" title="Move earlier" ${cats[0] === c ? 'disabled' : ''}>↑</button> <button class="btn btn-outline btn-sm" data-order-down="${escapeHtml(c.id)}" aria-label="Move ${escapeHtml(c.name)} later" title="Move later" ${cats[cats.length - 1] === c ? 'disabled' : ''}>↓</button></td>
         <td style="text-align:right">
           <button class="btn btn-outline btn-sm" data-edit="${escapeHtml(c.id)}">Edit</button>
           <button class="btn btn-outline btn-sm" data-toggle="${c.id}">${c.status === 'active' ? 'Disable' : 'Enable'}</button>
@@ -80,7 +81,7 @@ async function renderTable(body, headRow) {
       </tr>`).join('');
     bindRows('category');
   } else {
-    headRow.innerHTML = '<th>Name</th><th>Slug</th><th>Products</th><th>Status</th><th></th>';
+    headRow.innerHTML = '<th>Name</th><th>Slug</th><th>Products</th><th>Status</th><th>Order</th><th></th>';
     const cols = await fetchCollections();
     body.innerHTML = cols.map((c) => `
       <tr>
@@ -88,6 +89,7 @@ async function renderTable(body, headRow) {
         <td class="mono">${escapeHtml(c.slug)}</td>
         <td>${c.productCount}</td>
         <td>${statusBadge(c.status)}</td>
+        <td><button class="btn btn-outline btn-sm" data-order-up="${escapeHtml(c.id)}" aria-label="Move ${escapeHtml(c.name)} earlier" title="Move earlier" ${cols[0] === c ? 'disabled' : ''}>↑</button> <button class="btn btn-outline btn-sm" data-order-down="${escapeHtml(c.id)}" aria-label="Move ${escapeHtml(c.name)} later" title="Move later" ${cols[cols.length - 1] === c ? 'disabled' : ''}>↓</button></td>
         <td style="text-align:right">
           <button class="btn btn-outline btn-sm" data-edit-collection="${escapeHtml(c.id)}">Edit</button>
           <button class="btn btn-outline btn-sm" data-toggle="${c.id}">${c.status === 'published' ? 'Unpublish' : 'Publish'}</button>
@@ -99,6 +101,10 @@ async function renderTable(body, headRow) {
 }
 
 function bindRows(kind) {
+  document.querySelectorAll('[data-order-up], [data-order-down]').forEach((button) => button.addEventListener('click', () => {
+    const direction = button.hasAttribute('data-order-up') ? -1 : 1;
+    moveCatalogItem(kind, button.dataset.orderUp || button.dataset.orderDown, direction);
+  }));
   if (kind === 'category') document.querySelectorAll('[data-edit]').forEach((btn) => btn.addEventListener('click', async () => {
     try {
       const category = (await fetchCategories()).find((item) => item.id === btn.dataset.edit);
@@ -128,6 +134,22 @@ function bindRows(kind) {
       render();
     } catch (error) { showAdminToast(error.message, 'error'); }
   }));
+}
+
+async function moveCatalogItem(kind, id, direction) {
+  try {
+    const items = kind === 'category' ? await fetchCategories() : await fetchCollections();
+    const from = items.findIndex((item) => item.id === id);
+    const to = from + direction;
+    if (from < 0 || to < 0 || to >= items.length) return;
+    [items[from], items[to]] = [items[to], items[from]];
+    if (kind === 'category') await reorderCategories(items.map((item) => item.id));
+    else await reorderCollections(items.map((item) => item.id));
+    await render();
+    showAdminToast(`${kind === 'category' ? 'Category' : 'Collection'} order saved.`, 'success');
+  } catch (error) {
+    showAdminToast(error.message, 'error');
+  }
 }
 
 function openCategoryEditor(category = null) {
