@@ -220,8 +220,10 @@ app.use("/api/contact", contactRouter);
 app.use("/api/admin", requireUnblockedAdminIp, requireAuth, requireRole(...STAFF_ROLES), adminApiLimiter, adminRouter);
 app.use(
   "/api/admin/uploads",
+  requireUnblockedAdminIp,
   requireAuth,
   requireRole(...STAFF_ROLES),
+  adminApiLimiter,
   (req, res, next) => {
     const canManageImages = ["products.create", "products.edit", "content.manage"]
       .some((permission) => hasPermission(req.user.role, permission));

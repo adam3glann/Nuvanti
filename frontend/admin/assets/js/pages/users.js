@@ -68,15 +68,20 @@ async function load() {
 }
 
 function openNewAdmin() {
+  const canCreateSuperAdmin = session.role === 'super_admin';
+  const creatableRoles = canCreateSuperAdmin
+    ? ['staff', 'manager', 'admin', 'super_admin']
+    : ['staff', 'manager', 'admin'];
   const modal = createAdminModal({
     title: 'Create Administrator',
     bodyHTML: `
       <div class="field"><label>Full Name</label><input id="uName" /></div>
       <div class="field"><label>Email</label><input type="email" id="uEmail" /></div>
       <div class="field"><label>Role</label>
-        <select id="uRole">${ROLES.filter((r) => r !== 'super_admin').map((r) => `<option value="${r}">${ROLE_LABELS[r]}</option>`).join('')}</select>
+        <select id="uRole">${creatableRoles.map((role) => `<option value="${role}">${ROLE_LABELS[role]}</option>`).join('')}</select>
       </div>
       <p class="hint">A setup link will be emailed to this address. They'll use it to set their own password — never set one for them here.</p>
+      ${canCreateSuperAdmin ? '<p class="hint" role="note">Super Admin accounts have full access, including permission to create or remove other administrators.</p>' : ''}
     `,
     footHTML: `<button class="btn btn-outline" id="mCancel">Cancel</button><button class="btn btn-primary" id="mSave">Create Administrator</button>`,
   });

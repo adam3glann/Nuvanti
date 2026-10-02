@@ -23,6 +23,7 @@ const adminPresenceLimiter = rateLimit({
 const asyncRoute = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
 const MANAGEABLE_ROLES = ['staff', 'manager', 'admin', 'super_admin'];
 const RESETTABLE_ROLES = ['admin', 'super_admin'];
+const SUPER_ADMIN_GUARD_LOCK = 724062;
 const restoreBackupUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024, files: 1 } });
 function requireStoreMaintenanceRole(req, res, next) {
   if (!RESETTABLE_ROLES.includes(req.user?.role)) return res.status(403).json({ error: 'Only an administrator can export or reset store data.' });
@@ -628,60 +629,92 @@ router.delete('/products/:id', requirePermission('products.delete'), async (req,
 // --- Administrator accounts (staff/manager/admin/super_admin) ---
 const adminUserCreateInput = z.object({ name: z.string().min(2).max(100), email: z.string().email().max(254).transform((v) => v.toLowerCase().trim()), role: z.enum(['staff', 'manager', 'admin', 'super_admin']) });
 
-async function countActiveSuperAdmins(excludeId) {
-  const { rows } = await query(`SELECT count(*)::int AS n FROM users WHERE role = 'super_admin' AND is_active = true AND id <> $1`, [excludeId || -1]);
-  return rows[0].n;
-}
-
 router.get('/admin-users', requirePermission('admins.view'), async (req, res) => {
   const { rows } = await query(`SELECT id::text, email, name, role, is_active AS "isActive", created_at AS "createdAt" FROM users WHERE role = ANY($1) ORDER BY created_at DESC`, [MANAGEABLE_ROLES]);
   res.json(rows);
 });
 
-router.post('/admin-users', requirePermission('admins.manage'), async (req, res) => {
+router.post('/admin-users', requirePermission('admins.manage'), asyncRoute(async (req, res) => {
   const input = adminUserCreateInput.parse(req.body);
+  if (input.role === 'super_admin' && req.user.role !== 'super_admin') {
+    await logAudit({ req, action: 'admin_user.super_admin_creation_denied', targetType: 'user', metadata: { email: input.email } });
+    return res.status(403).json({ error: 'Only a Super Admin can create another Super Admin.' });
+  }
   // The account starts with an unusable random password. The only way to
   // sign in is to set a real one via the emailed setup link — the same
   // token-based flow used for password resets.
   const randomPassword = crypto.randomBytes(24).toString('hex');
   const passwordHash = await bcrypt.hash(randomPassword, 12);
   try {
-    const { rows } = await query('INSERT INTO users (email, name, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id::text, email, name, role, is_active AS "isActive", created_at AS "createdAt"', [input.email, input.name, passwordHash, input.role]);
     const token = crypto.randomBytes(32).toString('hex');
     const hash = crypto.createHash('sha256').update(token).digest('hex');
-    await query(`INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, NOW() + INTERVAL '24 hours')`, [rows[0].id, hash]);
+    const createdUser = await transaction(async (client) => {
+      const { rows } = await client.query('INSERT INTO users (email, name, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id::text, email, name, role, is_active AS "isActive", created_at AS "createdAt"', [input.email, input.name, passwordHash, input.role]);
+      await client.query(`INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, NOW() + INTERVAL '24 hours')`, [rows[0].id, hash]);
+      return rows[0];
+    });
     const baseUrl = adminPublicOrigin();
-    await sendAdminWelcome({ to: rows[0].email, name: rows[0].name, resetUrl: `${baseUrl}/login.html?reset=${token}` });
-    await logAudit({ req, action: 'admin_user.created', targetType: 'user', targetId: rows[0].id, metadata: { email: input.email, role: input.role } });
-    res.status(201).json(rows[0]);
+    try {
+      await sendAdminWelcome({ to: createdUser.email, name: createdUser.name, resetUrl: `${baseUrl}/login.html?reset=${token}` });
+    } catch (error) {
+      await transaction(async (client) => {
+        await client.query('DELETE FROM password_reset_tokens WHERE user_id = $1', [createdUser.id]);
+        await client.query('DELETE FROM users WHERE id = $1 AND role = $2', [createdUser.id, input.role]);
+      });
+      await logAudit({ req, action: 'admin_user.invite_failed', targetType: 'user', targetId: createdUser.id, metadata: { role: input.role } });
+      console.error('Administrator invitation email failed:', error);
+      return res.status(503).json({ error: 'The setup email could not be sent, so no administrator account was created. Check email settings and retry.' });
+    }
+    await logAudit({ req, action: 'admin_user.created', targetType: 'user', targetId: createdUser.id, metadata: { email: input.email, role: input.role } });
+    res.status(201).json(createdUser);
   } catch (error) {
     if (error.code === '23505') return res.status(409).json({ error: 'An account already exists for this email.' });
     throw error;
   }
-});
+}));
 
-router.patch('/admin-users/:id', requirePermission('admins.manage'), async (req, res) => {
+router.patch('/admin-users/:id', requirePermission('admins.manage'), asyncRoute(async (req, res) => {
   const isActive = z.boolean().parse(req.body?.isActive);
-  if (String(req.user.sub) === req.params.id) return res.status(400).json({ error: 'You cannot change your own account status.' });
-  if (!isActive && (await countActiveSuperAdmins(req.params.id)) === 0) {
-    const target = await query(`SELECT role FROM users WHERE id = $1`, [req.params.id]);
-    if (target.rows[0]?.role === 'super_admin') return res.status(400).json({ error: 'At least one active Super Admin must remain.' });
-  }
-  const { rows } = await query(`UPDATE users SET is_active = $1, session_version = session_version + CASE WHEN is_active IS DISTINCT FROM $1 THEN 1 ELSE 0 END WHERE id = $2 AND role = ANY($3) RETURNING id::text, is_active AS "isActive"`, [isActive, req.params.id, MANAGEABLE_ROLES]);
-  if (!rows[0]) return res.status(404).json({ error: 'Administrator not found.' });
+  const outcome = await transaction(async (client) => {
+    await client.query('SELECT pg_advisory_xact_lock($1)', [SUPER_ADMIN_GUARD_LOCK]);
+    const { rows: targets } = await client.query('SELECT id::text, role, is_active AS "isActive" FROM users WHERE id = $1 AND role = ANY($2) FOR UPDATE', [req.params.id, MANAGEABLE_ROLES]);
+    const target = targets[0];
+    if (!target) return { missing: true };
+    if (String(req.user.sub) === req.params.id) return { self: true };
+    if (!isActive && target.role === 'super_admin' && target.isActive) {
+      const { rows } = await client.query(`SELECT count(*)::int AS n FROM users WHERE role = 'super_admin' AND is_active = true AND id <> $1`, [req.params.id]);
+      if (rows[0].n === 0) return { lastSuperAdmin: true };
+    }
+    const { rows } = await client.query(`UPDATE users SET is_active = $1, session_version = session_version + CASE WHEN is_active IS DISTINCT FROM $1 THEN 1 ELSE 0 END WHERE id = $2 AND role = ANY($3) RETURNING id::text, is_active AS "isActive"`, [isActive, req.params.id, MANAGEABLE_ROLES]);
+    return { user: rows[0] };
+  });
+  if (outcome.missing) return res.status(404).json({ error: 'Administrator not found.' });
+  if (outcome.self) return res.status(400).json({ error: 'You cannot change your own account status.' });
+  if (outcome.lastSuperAdmin) return res.status(400).json({ error: 'At least one active Super Admin must remain.' });
   await logAudit({ req, action: isActive ? 'admin_user.enabled' : 'admin_user.disabled', targetType: 'user', targetId: req.params.id });
-  res.json(rows[0]);
-});
+  res.json(outcome.user);
+}));
 
-router.delete('/admin-users/:id', requirePermission('admins.manage'), async (req, res) => {
-  if (String(req.user.sub) === req.params.id) return res.status(400).json({ error: 'You cannot delete your own account.' });
-  const target = await query(`SELECT role FROM users WHERE id = $1`, [req.params.id]);
-  if (target.rows[0]?.role === 'super_admin' && (await countActiveSuperAdmins(req.params.id)) === 0) return res.status(400).json({ error: 'At least one active Super Admin must remain.' });
-  const result = await query(`DELETE FROM users WHERE id = $1 AND role = ANY($2)`, [req.params.id, MANAGEABLE_ROLES]);
-  if (!result.rowCount) return res.status(404).json({ error: 'Administrator not found.' });
+router.delete('/admin-users/:id', requirePermission('admins.manage'), asyncRoute(async (req, res) => {
+  const outcome = await transaction(async (client) => {
+    await client.query('SELECT pg_advisory_xact_lock($1)', [SUPER_ADMIN_GUARD_LOCK]);
+    const { rows: targets } = await client.query('SELECT id::text, role, is_active AS "isActive" FROM users WHERE id = $1 AND role = ANY($2) FOR UPDATE', [req.params.id, MANAGEABLE_ROLES]);
+    const target = targets[0];
+    if (!target) return { missing: true };
+    if (String(req.user.sub) === req.params.id) return { self: true };
+    if (target.role === 'super_admin' && target.isActive) {
+      const { rows } = await client.query(`SELECT count(*)::int AS n FROM users WHERE role = 'super_admin' AND is_active = true AND id <> $1`, [req.params.id]);
+      if (rows[0].n === 0) return { lastSuperAdmin: true };
+    }
+    await client.query('DELETE FROM users WHERE id = $1 AND role = ANY($2)', [req.params.id, MANAGEABLE_ROLES]);
+    return { deleted: true };
+  });
+  if (outcome.missing) return res.status(404).json({ error: 'Administrator not found.' });
+  if (outcome.self) return res.status(400).json({ error: 'You cannot delete your own account.' });
+  if (outcome.lastSuperAdmin) return res.status(400).json({ error: 'At least one active Super Admin must remain.' });
   await logAudit({ req, action: 'admin_user.deleted', targetType: 'user', targetId: req.params.id });
   res.status(204).end();
-});
+}));
 
 // --- Audit log ---
 router.get('/audit-logs', requirePermission('audit.view'), async (req, res) => {
