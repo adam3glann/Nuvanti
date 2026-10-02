@@ -26,6 +26,13 @@ const checkout = z.object({
   discountCode: z.string().max(40).optional(),
 });
 
+function selectedCatalogImage(product, requestedImage) {
+  const images = Array.isArray(product?.images) ? product.images : [];
+  return typeof requestedImage === 'string' && images.includes(requestedImage)
+    ? requestedImage
+    : images[0] || null;
+}
+
 // Public discount preview: lets the storefront show the discount amount in
 // the cart/checkout summary before an order (and login) exist, without
 // consuming the code's usage count â€” only order creation above does that,
@@ -58,7 +65,7 @@ router.post('/', requireAuth, requireVerifiedEmail, asyncRoute(async (req, res) 
   const trackingToken = crypto.randomBytes(24).toString('hex');
   const { order, itemSummaries } = await transaction(async (client) => {
     const ids = [...new Set(items.map((item) => item.productId))];
-    const { rows: products } = await client.query(`SELECT id, name, price_cents, inventory, sizes, colors, metadata,
+    const { rows: products } = await client.query(`SELECT id, name, price_cents, inventory, sizes, colors, images, metadata,
       CASE WHEN metadata->'inventory' IS NULL OR metadata->'inventory' = '{}'::jsonb
         THEN jsonb_build_object('One Size', inventory) ELSE metadata->'inventory' END AS "stockBySize"
       FROM products WHERE id = ANY($1) AND is_active = true FOR UPDATE`, [ids]);
@@ -108,7 +115,7 @@ router.post('/', requireAuth, requireVerifiedEmail, asyncRoute(async (req, res) 
 
     const totalCents = Math.max(0, subtotal - discountCents) + shippingCents;
     const { rows } = await client.query('INSERT INTO orders (user_id, status, subtotal_cents, shipping_cents, total_cents, shipping_address, delivery, payment_method, payment_status, payment_provider, tracking_token, discount_code, discount_cents) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id, status, subtotal_cents AS "subtotalCents", shipping_cents AS "shippingCents", total_cents AS "totalCents", created_at AS "createdAt", discount_code AS "discountCode", discount_cents AS "discountCents"', [req.user.sub, 'pending', subtotal, shippingCents, totalCents, shipping, delivery, paymentMethod, 'pending', paymentMethod === 'paymob' ? 'paymob' : null, trackingToken, appliedCode, discountCents]);
-    for (const item of items) { const p = map.get(item.productId); await client.query('INSERT INTO order_items (order_id, product_id, product_name, unit_price_cents, unit_cost_cents, quantity, color, size, image_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)', [rows[0].id, p.id, p.name, p.price_cents, p.unitCostCents, item.quantity, item.color || null, item.size || null, item.image || null]); }
+    for (const item of items) { const p = map.get(item.productId); await client.query('INSERT INTO order_items (order_id, product_id, product_name, unit_price_cents, unit_cost_cents, quantity, color, size, image_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)', [rows[0].id, p.id, p.name, p.price_cents, p.unitCostCents, item.quantity, item.color || null, item.size || null, selectedCatalogImage(p, item.image)]); }
     for (const [productId, quantity] of productQuantities) {
       const product = map.get(productId);
       const nextStock = { ...product.stockBySize };
@@ -128,6 +135,7 @@ router.post('/', requireAuth, requireVerifiedEmail, asyncRoute(async (req, res) 
         quantity: item.quantity,
         color: item.color || '',
         size: item.size || '',
+        image: selectedCatalogImage(map.get(item.productId), item.image),
       })),
     };
   });
