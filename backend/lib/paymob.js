@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { storePublicOrigin } from './publicOrigins.js';
+import { apiPublicOrigin, storePublicOrigin } from './publicOrigins.js';
 
 const PAYMOB_API = 'https://accept.paymob.com/v1/intention/';
 
@@ -38,6 +38,10 @@ export async function createPaymobCheckout({ order, customer, shipping }) {
       },
       special_reference: `NV-${order.id}`,
       expiration: 1800,
+      // Paymob supports per-intention notifications for card integrations.
+      // Keep the integration-level processed callback configured as well for
+      // payment methods that do not support notification_url.
+      notification_url: `${apiPublicOrigin()}/api/payments/paymob/webhook`,
       redirection_url: `${storePublicOrigin()}/order-success.html?payment=return&order=${encodeURIComponent(order.id)}`,
       extras: { local_order_id: String(order.id) },
     }),
