@@ -86,14 +86,16 @@ async function initializeCheckout() {
       showToast('Your bag was updated to match current stock and prices. Please review the order summary.');
     }
     const latest = await refreshStoreSettings();
-    if (JSON.stringify(latest) === JSON.stringify(storeSettings)) return;
-    storeSettings = latest;
-    const subtotal = cartSubtotal();
-    const standard = document.querySelector('.delivery-option[data-value="standard"] .delivery-option__price');
-    const express = document.querySelector('.delivery-option[data-value="express"] .delivery-option__price');
-    if (standard) standard.textContent = subtotal >= storeSettings.freeShippingThresholdCents / 100 ? 'Free' : formatPrice(storeSettings.standardShippingCents / 100);
-    if (express) express.textContent = formatPrice(storeSettings.expressShippingCents / 100);
-    renderSummary();
+    if (JSON.stringify(latest) !== JSON.stringify(storeSettings)) {
+      storeSettings = latest;
+      const subtotal = cartSubtotal();
+      const standard = document.querySelector('.delivery-option[data-value="standard"] .delivery-option__price');
+      const express = document.querySelector('.delivery-option[data-value="express"] .delivery-option__price');
+      if (standard) standard.textContent = subtotal >= storeSettings.freeShippingThresholdCents / 100 ? 'Free' : formatPrice(storeSettings.standardShippingCents / 100);
+      if (express) express.textContent = formatPrice(storeSettings.expressShippingCents / 100);
+      renderSummary();
+    }
+    await refreshPaymentAvailability();
   }, 15000);
 }
 
@@ -150,16 +152,13 @@ function render() {
       </label>
     </section>
 
-    <section class="checkout-section" style="border-bottom:none">
+    <section class="checkout-section" id="paymentSection" style="border-bottom:none">
       <h3 class="h3" style="margin-bottom:1.25rem">Payment</h3>
       <label class="payment-option" data-active="true" data-value="cod">
         <input type="radio" name="payment" value="cod" checked style="margin-top:.2rem" />
         <div><strong>Cash on Delivery</strong><p class="text-muted" style="font-size:var(--fs-small)">Pay when your order arrives</p></div>
       </label>
-      ${onlinePaymentEnabled ? `<label class="payment-option" data-value="paymob" style="margin-top:.75rem">
-        <input type="radio" name="payment" value="paymob" style="margin-top:.2rem" />
-        <div><strong>Pay online securely</strong><p class="text-muted" style="font-size:var(--fs-small)">Card and other methods enabled by the payment provider</p></div>
-      </label>` : `<p class="text-muted" style="font-size:var(--fs-small);margin-top:1rem">Online payment is being set up. Cash on Delivery is available.</p>`}
+      ${paymentOptionsMarkup()}
     </section>
 
     <button class="btn btn-primary btn-block" id="placeOrderBtn" type="submit">Place Cash on Delivery Order</button>
@@ -173,15 +172,52 @@ function render() {
     document.querySelectorAll('.delivery-option').forEach((el) => (el.dataset.active = String(el.dataset.value === delivery)));
     renderSummary();
   }));
-  document.querySelectorAll('input[name="payment"]').forEach((radio) => radio.addEventListener('change', (event) => {
-    const online = event.target.value === 'paymob';
-    document.querySelectorAll('.payment-option').forEach((element) => { element.dataset.active = String(element.dataset.value === event.target.value); });
-    document.getElementById('placeOrderBtn').textContent = online ? 'Continue to Secure Payment' : 'Place Cash on Delivery Order';
-    document.getElementById('paymentNote').textContent = online ? 'You will complete payment on the payment provider’s secure checkout. We never collect card details.' : 'Payment is due to the delivery courier when your order arrives. No card details are collected.';
-  }));
+  bindPaymentOptions();
   renderSummary();
 
   document.getElementById('checkoutForm').addEventListener('submit', onSubmit);
+}
+
+function paymentOptionsMarkup() {
+  return `${onlinePaymentEnabled ? `<label class="payment-option" data-value="paymob" style="margin-top:.75rem">
+    <input type="radio" name="payment" value="paymob" style="margin-top:.2rem" />
+    <div><strong>Pay online securely</strong><p class="text-muted" style="font-size:var(--fs-small)">Card and other methods enabled by the payment provider</p></div>
+  </label>` : `<p class="text-muted" style="font-size:var(--fs-small);margin-top:1rem">Online payment is turned off. Cash on Delivery is available.</p>`}`;
+}
+
+function bindPaymentOptions() {
+  document.querySelectorAll('input[name="payment"]').forEach((radio) => radio.addEventListener('change', (event) => applyPaymentSelection(event.target.value)));
+  applyPaymentSelection(document.querySelector('input[name="payment"]:checked')?.value || 'cod');
+}
+
+function applyPaymentSelection(method) {
+  const online = method === 'paymob';
+  document.querySelectorAll('.payment-option').forEach((element) => { element.dataset.active = String(element.dataset.value === method); });
+  const button = document.getElementById('placeOrderBtn');
+  const note = document.getElementById('paymentNote');
+  if (button) button.textContent = online ? 'Continue to Secure Payment' : 'Place Cash on Delivery Order';
+  if (note) note.textContent = online ? 'You will complete payment on the payment provider’s secure checkout. We never collect card details.' : 'Payment is due to the delivery courier when your order arrives. No card details are collected.';
+}
+
+async function refreshPaymentAvailability() {
+  try {
+    const response = await fetch(`${API_ORIGIN}/api/payments/config`, { credentials: 'include', cache: 'no-store' });
+    if (!response.ok) return;
+    const enabled = (await response.json()).onlinePaymentEnabled === true;
+    if (enabled === onlinePaymentEnabled) return;
+    onlinePaymentEnabled = enabled;
+    const selected = document.querySelector('input[name="payment"]:checked')?.value || 'cod';
+    const safeSelection = enabled || selected !== 'paymob' ? selected : 'cod';
+    const section = document.getElementById('paymentSection');
+    if (!section) return;
+    section.innerHTML = `<h3 class="h3" style="margin-bottom:1.25rem">Payment</h3>
+      <label class="payment-option" data-active="${safeSelection === 'cod'}" data-value="cod">
+        <input type="radio" name="payment" value="cod" ${safeSelection === 'cod' ? 'checked' : ''} style="margin-top:.2rem" />
+        <div><strong>Cash on Delivery</strong><p class="text-muted" style="font-size:var(--fs-small)">Pay when your order arrives</p></div>
+      </label>${paymentOptionsMarkup()}`;
+    if (safeSelection === 'paymob') section.querySelector('input[value="paymob"]')?.setAttribute('checked', 'checked');
+    bindPaymentOptions();
+  } catch { /* Keep the last verified payment choices if refresh is unavailable. */ }
 }
 
 function renderSummary() {

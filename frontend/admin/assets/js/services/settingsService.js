@@ -24,6 +24,10 @@ function fromApi(value) {
       standardCost: value.standardShippingCents / 100,
       expressCost: value.expressShippingCents / 100,
     },
+    payments: {
+      onlinePaymentEnabled: value.onlinePaymentEnabled === true,
+      onlinePaymentConfigured: value.onlinePaymentConfigured === true,
+    },
   };
 }
 
@@ -42,7 +46,9 @@ export async function sendAdminTestEmail() {
 export async function saveSettingsSection(section, data) {
   const payload = section === 'general'
     ? { storeName: data.storeName, supportEmail: data.contactEmail }
-    : {
+    : section === 'payments'
+      ? { onlinePaymentEnabled: data.onlinePaymentEnabled }
+      : {
         freeShippingThreshold: data.freeShippingThreshold,
         standardShipping: data.standardCost,
         expressShipping: data.expressCost,

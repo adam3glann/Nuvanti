@@ -1,0 +1,2 @@
+ALTER TABLE store_settings
+  ADD COLUMN IF NOT EXISTS online_payment_enabled BOOLEAN NOT NULL DEFAULT FALSE;

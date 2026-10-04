@@ -96,8 +96,11 @@ router.post('/', requireAuth, requireVerifiedEmail, asyncRoute(async (req, res) 
       if (available < variant.quantity) { const error = new Error(`${product.name} does not have enough stock in size ${variant.size}.`); error.status = 409; throw error; }
     }
 
-    const { rows: settingsRows } = await client.query('SELECT standard_shipping_cents AS "standard", express_shipping_cents AS "express", free_shipping_threshold_cents AS "freeThreshold" FROM store_settings WHERE id = 1');
+    const { rows: settingsRows } = await client.query('SELECT standard_shipping_cents AS "standard", express_shipping_cents AS "express", free_shipping_threshold_cents AS "freeThreshold", online_payment_enabled AS "onlinePaymentEnabled" FROM store_settings WHERE id = 1 FOR SHARE');
     const settings = settingsRows[0] || { standard: 7500, express: 15000, freeThreshold: 300000 };
+    if (paymentMethod === 'paymob' && settings.onlinePaymentEnabled !== true) {
+      const error = new Error('Online payments are currently turned off. Choose Cash on Delivery.'); error.status = 409; throw error;
+    }
     const shippingCents = delivery === 'express' ? settings.express : (subtotal >= settings.freeThreshold ? 0 : settings.standard);
 
     let discountCents = 0;

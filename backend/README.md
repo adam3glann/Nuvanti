@@ -93,14 +93,14 @@ Add the result as `MFA_ENCRYPTION_KEY` in the Railway backend service Variables,
 
 ### Paymob online payments (Egypt / EGP)
 
-Hosted online checkout is implemented, but stays hidden until all four variables below are set on the Railway backend service:
+Hosted online checkout is implemented and stays off by default. After setting up Paymob, a super administrator can turn it on or off in Admin → Settings → Payments. The store still requires all four variables below on the Railway backend service before the switch can be enabled:
 
 - `PAYMOB_SECRET_KEY`: server-side API secret; never expose it to the storefront.
 - `PAYMOB_PUBLIC_KEY`: the public key used to open Paymob Unified Checkout.
 - `PAYMOB_PAYMENT_METHODS`: comma-separated Paymob payment integration IDs (for example `123456` or `123456,234567`), all from the same test/live mode as the keys.
 - `PAYMOB_HMAC_SECRET`: callback HMAC secret used to authenticate payment events.
 
-Add all four values to the Railway **backend service** (never Cloudflare Pages or frontend code), redeploy, then reload checkout. The online option appears automatically when the configuration is present; no frontend API key or code edit is needed. `API_PUBLIC_URL` must be the public HTTPS Railway backend URL, and `STORE_ORIGIN` must be the storefront URL so Paymob returns customers to the right site. Each payment intention sends the webhook URL automatically for card integrations. Also set `https://<your-railway-domain>/api/payments/paymob/webhook` as the transaction processed callback on each Paymob integration you enable, especially for wallets and other methods that do not support per-intention notification URLs.
+Add all four values to the Railway **backend service** (never Cloudflare Pages or frontend code), deploy the migration, then reload Admin → Settings → Payments. The switch remains off until explicitly enabled. `API_PUBLIC_URL` must be the public HTTPS Railway backend URL, and `STORE_ORIGIN` must be the storefront URL so Paymob returns customers to the right site. Each payment intention sends the webhook URL automatically for card integrations. Also set `https://<your-railway-domain>/api/payments/paymob/webhook` as the transaction processed callback on each Paymob integration you enable, especially for wallets and other methods that do not support per-intention notification URLs. Turning payments off hides the online option and rejects new online orders; payment links already created at Paymob may remain usable until they expire.
 
 Keep test credentials and test integration IDs together first. Complete a test purchase from the storefront and confirm the signed callback updates that exact order in Admin → Orders before switching all keys and integration IDs together to live mode. A browser redirect never marks an order paid: only a valid HMAC callback with the expected Paymob integration, EGP currency, order amount, and provider order ID does. Paymob handles card details on its hosted checkout page. Confirm fees, settlement, refunds, enabled methods, and merchant approval with Paymob before accepting live payments.
 

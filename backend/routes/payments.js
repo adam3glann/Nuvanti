@@ -10,7 +10,10 @@ import { restoreOrderInventory } from '../lib/orderLifecycle.js';
 const router = Router();
 const webhookLimiter = rateLimit({ windowMs: 60 * 1000, limit: 120, standardHeaders: 'draft-7', legacyHeaders: false });
 const asyncRoute = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
-router.get('/config', (req, res) => res.json({ onlinePaymentEnabled: paymobReady() }));
+router.get('/config', asyncRoute(async (req, res) => {
+  const { rows } = await query('SELECT online_payment_enabled AS "enabled" FROM store_settings WHERE id = 1');
+  res.set('Cache-Control', 'no-store').json({ onlinePaymentEnabled: rows[0]?.enabled === true && paymobReady() });
+}));
 
 // Paymob cannot send a browser Origin. The server's Origin middleware exempts
 // only this path, and the HMAC is verified before any database write.

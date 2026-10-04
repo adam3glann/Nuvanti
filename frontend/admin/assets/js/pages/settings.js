@@ -56,10 +56,15 @@ function render() {
       <p class="hint">These amounts update the checkout total immediately. The server recalculates the final amount when an order is placed.</p>
     `);
   } else if (tab === 'payments') {
+    const configured = settings.payments.onlinePaymentConfigured;
+    const enabled = settings.payments.onlinePaymentEnabled;
     root.innerHTML = `
       <div class="card"><div class="card-pad">
         <div class="settings-row"><div><p class="settings-row__label">Cash on Delivery</p><p class="settings-row__desc">Customers pay the courier when the order arrives.</p></div><span class="badge badge--success">Enabled</span></div>
-        <div class="settings-row"><div><p class="settings-row__label">Online card payments</p><p class="settings-row__desc">Connect a payment provider and add signed webhooks before enabling cards.</p></div><span class="badge badge--neutral">Not connected</span></div>
+        <div class="settings-row"><div><p class="settings-row__label">Online card payments</p><p class="settings-row__desc">${configured ? 'Choose whether customers can select online payment at checkout.' : 'Add valid Paymob keys, payment method IDs, and webhook secret in Railway before enabling cards.'}</p></div><span class="badge ${enabled && configured ? 'badge--success' : 'badge--neutral'}">${enabled && configured ? 'Enabled' : configured ? 'Off' : 'Not configured'}</span></div>
+        <div class="settings-row"><div><p class="settings-row__label" id="onlinePaymentsLabel">Accept online payments</p><p class="settings-row__desc">When off, new customers can only choose Cash on Delivery. Existing Paymob payment links may still work until they expire.</p></div><label class="a-switch"><input type="checkbox" id="onlinePaymentEnabled" aria-labelledby="onlinePaymentsLabel" ${enabled ? 'checked' : ''} ${!canEdit || !configured ? 'disabled' : ''}><span class="a-switch-track"></span></label></div>
+        ${!configured ? '<p class="hint">Payments stay off until Paymob is fully configured. This switch starts off by default.</p>' : ''}
+        ${canEdit ? '<button class="btn btn-primary" id="saveSectionBtn">Save Changes</button>' : '<p class="hint">You have view-only access to settings.</p>'}
       </div></div>`;
   } else {
     const ready = emailStatus?.configured;
@@ -102,11 +107,17 @@ document.getElementById('settingsRoot')?.addEventListener('click', async (event)
   const sectionName = tab;
   const data = sectionName === 'general'
     ? { storeName: value('storeName').trim(), contactEmail: value('contactEmail').trim() }
-    : {
+    : sectionName === 'payments'
+      ? { onlinePaymentEnabled: document.getElementById('onlinePaymentEnabled')?.checked === true }
+      : {
         freeShippingThreshold: numberValue('freeShippingThreshold'),
         standardCost: numberValue('standardCost'),
         expressCost: numberValue('expressCost'),
       };
+  if (sectionName === 'payments' && data.onlinePaymentEnabled && !settings.payments.onlinePaymentEnabled) {
+    const accepted = window.confirm('Enable online card payments for customers? Confirm that your Paymob account is ready for live payments. You can turn this off here at any time.');
+    if (!accepted) return;
+  }
   if (sectionName === 'general' && (!data.storeName || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.contactEmail))) {
     showAdminToast('Enter a store name and a valid support email.', 'error');
     return;

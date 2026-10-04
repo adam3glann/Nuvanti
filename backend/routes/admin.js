@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { paymobReady } from '../lib/paymob.js';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import multer from 'multer';
@@ -821,13 +822,17 @@ const settingsInput = z.object({
   standardShipping: z.coerce.number().min(0).optional(),
   expressShipping: z.coerce.number().min(0).optional(),
   freeShippingThreshold: z.coerce.number().min(0).optional(),
+  onlinePaymentEnabled: z.boolean().optional(),
 });
 router.get('/settings', requirePermission('settings.view'), async (req, res) => {
-  const { rows } = await query(`SELECT store_name AS "storeName", support_email AS "supportEmail", currency, standard_shipping_cents AS "standardShippingCents", express_shipping_cents AS "expressShippingCents", free_shipping_threshold_cents AS "freeShippingThresholdCents" FROM store_settings WHERE id = 1`);
-  res.json(rows[0]);
+  const { rows } = await query(`SELECT store_name AS "storeName", support_email AS "supportEmail", currency, standard_shipping_cents AS "standardShippingCents", express_shipping_cents AS "expressShippingCents", free_shipping_threshold_cents AS "freeShippingThresholdCents", online_payment_enabled AS "onlinePaymentEnabled" FROM store_settings WHERE id = 1`);
+  res.set('Cache-Control', 'no-store').json({ ...rows[0], onlinePaymentConfigured: paymobReady() });
 });
 router.patch('/settings', requirePermission('settings.edit'), async (req, res) => {
   const s = settingsInput.parse(req.body);
+  if (s.onlinePaymentEnabled === true && !paymobReady()) {
+    return res.status(409).json({ error: 'Online payments cannot be enabled until Paymob keys, payment method IDs, and webhook secret are configured.' });
+  }
   const { rows } = await query(
     `UPDATE store_settings SET
       store_name = coalesce($1, store_name),
@@ -836,13 +841,14 @@ router.patch('/settings', requirePermission('settings.edit'), async (req, res) =
       standard_shipping_cents = coalesce($4, standard_shipping_cents),
       express_shipping_cents = coalesce($5, express_shipping_cents),
       free_shipping_threshold_cents = coalesce($6, free_shipping_threshold_cents),
+      online_payment_enabled = coalesce($7, online_payment_enabled),
       updated_at = NOW()
     WHERE id = 1
-    RETURNING store_name AS "storeName", support_email AS "supportEmail", currency, standard_shipping_cents AS "standardShippingCents", express_shipping_cents AS "expressShippingCents", free_shipping_threshold_cents AS "freeShippingThresholdCents"`,
-    [s.storeName ?? null, s.supportEmail ?? null, s.currency ?? null, s.standardShipping != null ? Math.round(s.standardShipping * 100) : null, s.expressShipping != null ? Math.round(s.expressShipping * 100) : null, s.freeShippingThreshold != null ? Math.round(s.freeShippingThreshold * 100) : null],
+    RETURNING store_name AS "storeName", support_email AS "supportEmail", currency, standard_shipping_cents AS "standardShippingCents", express_shipping_cents AS "expressShippingCents", free_shipping_threshold_cents AS "freeShippingThresholdCents", online_payment_enabled AS "onlinePaymentEnabled"`,
+    [s.storeName ?? null, s.supportEmail ?? null, s.currency ?? null, s.standardShipping != null ? Math.round(s.standardShipping * 100) : null, s.expressShipping != null ? Math.round(s.expressShipping * 100) : null, s.freeShippingThreshold != null ? Math.round(s.freeShippingThreshold * 100) : null, s.onlinePaymentEnabled ?? null],
   );
-  await logAudit({ req, action: 'settings.updated', targetType: 'settings', targetId: '1' });
-  res.json(rows[0]);
+  await logAudit({ req, action: s.onlinePaymentEnabled == null ? 'settings.updated' : 'settings.online_payment_toggled', targetType: 'settings', targetId: '1' });
+  res.set('Cache-Control', 'no-store').json({ ...rows[0], onlinePaymentConfigured: paymobReady() });
 });
 
 export default router;
