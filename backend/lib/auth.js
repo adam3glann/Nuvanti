@@ -106,7 +106,7 @@ export function clearSession(res) {
   res.clearCookie(emailChallengeCookieName, options);
 }
 
-async function resolveSession(session) {
+export async function resolveSession(session) {
   const { rows } = await query(
     `WITH valid_session AS (
        SELECT u.id, u.email, u.role, u.email_verified_at AS "emailVerifiedAt",

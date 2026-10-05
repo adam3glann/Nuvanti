@@ -60,18 +60,15 @@ async function initializeCheckout() {
     summary.innerHTML = '';
     return;
   }
-  if (!currentUser) {
-    form.innerHTML = '<div class="state-block"><h3>Sign in to continue</h3><p>Your bag will be waiting after you sign in or create an account.</p><a class="btn btn-primary" href="account.html?next=checkout">Sign In or Create Account</a></div>';
-    summary.innerHTML = '';
-    return;
-  }
-  if (!currentUser.emailVerifiedAt) {
+  if (currentUser && !currentUser.emailVerifiedAt) {
     form.innerHTML = '<div class="state-block"><h3>Verify your email to order</h3><p>Confirm your email address before placing an order. Open the confirmation link from your inbox, then return here to finish checkout.</p><a class="btn btn-primary" href="account.html?tab=profile">Open account and resend email</a></div>';
     summary.innerHTML = '';
     return;
   }
-  try { savedAddress = (await fetchAddresses()).find((address) => address.isDefault) || null; }
-  catch { savedAddress = null; }
+  if (currentUser) {
+    try { savedAddress = (await fetchAddresses()).find((address) => address.isDefault) || null; }
+    catch { savedAddress = null; }
+  }
   render();
   await restoreSavedDiscount();
   renderSummary();
@@ -121,11 +118,19 @@ function render() {
   document.getElementById('checkoutForm').innerHTML = `
     <section class="checkout-section">
       <h3 class="h3" style="margin-bottom:1.25rem">Customer Information</h3>
-      <div class="field"><label for="fullName">Full Name</label><input type="text" id="fullName" value="${escapeAttr(savedAddress?.name || currentUser.name)}" autocomplete="name" required /></div>
+      <div class="field"><label for="fullName">Full Name</label><input type="text" id="fullName" value="${escapeAttr(savedAddress?.name || currentUser?.name || '')}" autocomplete="name" required /></div>
       <div class="field-row">
-        <div class="field"><label>Order email</label><p class="text-muted">${escapeHtml(currentUser.email)}</p><p class="text-muted" style="font-size:var(--fs-micro)">Your confirmation and tracking link will be sent here.</p></div>
+        ${currentUser ? `<div class="field"><label>Order email</label><p class="text-muted">${escapeHtml(currentUser.email)}</p><p class="text-muted" style="font-size:var(--fs-micro)">Your confirmation and tracking link will be sent here.</p></div>` : `<div class="field"><label for="email">Email for receipt and tracking link <span lang="ar" dir="rtl">البريد الإلكتروني للإيصال ورابط التتبع</span></label><input type="email" id="email" autocomplete="email" maxlength="254" required /></div>`}
         <div class="field"><label for="phone">Phone</label><input type="tel" id="phone" value="${escapeAttr(savedAddress?.phone || '')}" autocomplete="tel" required /></div>
       </div>
+      ${!currentUser ? `<div class="guest-account-choice">
+        <p><strong>Continue as a guest</strong> — no account is needed to place your order. <span lang="ar" dir="rtl">يمكنك إتمام الطلب كضيف دون إنشاء حساب.</span></p>
+        <label class="guest-account-choice__toggle"><input type="checkbox" id="createGuestAccount" /><span>Create an account for future orders <span lang="ar" dir="rtl">إنشاء حساب للطلبات القادمة</span></span></label>
+        <div id="guestAccountFields" hidden>
+          <div class="field"><label for="guestPassword">Choose a password <span lang="ar" dir="rtl">اختر كلمة مرور</span></label><input type="password" id="guestPassword" autocomplete="new-password" minlength="12" maxlength="128" /><p class="text-muted" style="font-size:var(--fs-micro)">At least 12 characters. We’ll send an email verification link. <span lang="ar" dir="rtl">12 حرفاً على الأقل. سنرسل رابطاً لتأكيد البريد الإلكتروني.</span></p></div>
+          <div class="field"><label for="guestPasswordConfirm">Confirm password <span lang="ar" dir="rtl">تأكيد كلمة المرور</span></label><input type="password" id="guestPasswordConfirm" autocomplete="new-password" minlength="12" maxlength="128" /></div>
+        </div>
+      </div>` : ''}
     </section>
 
     <section class="checkout-section">
@@ -178,6 +183,13 @@ function render() {
   }));
   bindPaymentOptions();
   renderSummary();
+
+  document.getElementById('createGuestAccount')?.addEventListener('change', (event) => {
+    const fields = document.getElementById('guestAccountFields');
+    fields.hidden = !event.target.checked;
+    document.getElementById('guestPassword').required = event.target.checked;
+    document.getElementById('guestPasswordConfirm').required = event.target.checked;
+  });
 
   document.getElementById('checkoutForm').addEventListener('submit', onSubmit);
 }
@@ -299,7 +311,8 @@ function renderSummary() {
 async function onSubmit(e) {
   e.preventDefault();
   const form = e.target;
-  const requiredIds = ['fullName', 'phone', 'address', 'city', 'country'];
+  const createAccount = document.getElementById('createGuestAccount')?.checked === true;
+  const requiredIds = ['fullName', 'phone', 'address', 'city', 'country', ...(!currentUser ? ['email'] : []), ...(createAccount ? ['guestPassword', 'guestPasswordConfirm'] : [])];
   let valid = true;
   requiredIds.forEach((id) => {
     const input = document.getElementById(id);
@@ -307,9 +320,15 @@ async function onSubmit(e) {
   });
   if (!valid) return;
 
+  const guestPassword = value('guestPassword');
+  if (createAccount && guestPassword !== value('guestPasswordConfirm')) {
+    showToast('The passwords do not match. · كلمتا المرور غير متطابقتين.');
+    return;
+  }
+
   const customer = {
     name: document.getElementById('fullName').value,
-    email: currentUser.email,
+    email: currentUser?.email || value('email').trim(),
     phone: document.getElementById('phone').value,
   };
   const shipping = {
@@ -323,7 +342,7 @@ async function onSubmit(e) {
   const paymentMethod = document.querySelector('input[name="payment"]:checked')?.value || 'cod';
   button.disabled = true; button.textContent = 'Placing order…';
   let placedOrder;
-  try { placedOrder = await createOrder({ lines, customer, shipping, delivery, paymentMethod, discountCode: discountInfo?.code }); }
+  try { placedOrder = await createOrder({ lines, customer, shipping, delivery, paymentMethod, discountCode: discountInfo?.code, createAccount: createAccount ? { password: guestPassword } : undefined }); }
   catch (error) {
     if (error.status === 409) {
       try {
@@ -341,6 +360,9 @@ async function onSubmit(e) {
     button.textContent = paymentMethod === 'paymob' ? 'Continue to Secure Payment' : paymentMethod === 'instapay' ? 'Place InstaPay Order' : 'Place Cash on Delivery Order';
     return;
   }
+  if (placedOrder.accountCreated) {
+    currentUser = await getCurrentUser().catch(() => null);
+  }
   clearCart();
   clearDiscountCode();
   refreshCartDrawer();
@@ -351,4 +373,5 @@ async function onSubmit(e) {
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 }
+function value(id) { return document.getElementById(id)?.value ?? ''; }
 function escapeAttr(value) { return escapeHtml(value); }

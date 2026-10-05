@@ -1,14 +1,16 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 import rateLimit from 'express-rate-limit';
-import { requireAuth, requireVerifiedEmail } from '../lib/auth.js';
+import { issueSession, readSession, requireAuth, resolveSession, setSessionCookie } from '../lib/auth.js';
 import { transaction, query } from '../lib/db.js';
 import { emailDeliveryStatus, sendOrderConfirmation } from '../lib/mail.js';
 import { sendOrderWhatsApp } from '../lib/whatsapp.js';
 import { storePublicOrigin } from '../lib/publicOrigins.js';
 import { createPaymobCheckout, paymobReady } from '../lib/paymob.js';
 import { restoreOrderInventory } from '../lib/orderLifecycle.js';
+import { sendVerificationLink } from './auth.js';
 
 const router = Router();
 const asyncRoute = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
@@ -20,10 +22,11 @@ const checkout = z.object({
     size: z.string().max(20).optional(),
     image: z.string().max(500).optional(),
   })).min(1).max(30),
-  shipping: z.object({ name: z.string().min(2).max(100), phone: z.string().max(30).optional(), address1: z.string().min(3).max(150), city: z.string().min(2).max(80), country: z.literal('Egypt'), postalCode: z.string().min(1).max(20) }),
+  shipping: z.object({ name: z.string().min(2).max(100), email: z.string().trim().email().max(254).transform((value) => value.toLowerCase()).optional(), phone: z.string().max(30).optional(), address1: z.string().min(3).max(150), city: z.string().min(2).max(80), country: z.literal('Egypt'), postalCode: z.string().min(1).max(20) }),
   delivery: z.enum(['standard', 'express']),
   paymentMethod: z.enum(['cod', 'paymob', 'instapay']).default('cod'),
   discountCode: z.string().max(40).optional(),
+  createAccount: z.object({ password: z.string().min(12).max(128) }).optional(),
 });
 
 function selectedCatalogImage(product, requestedImage) {
@@ -42,6 +45,15 @@ const validateDiscountSchema = z.object({
   subtotal: z.coerce.number().min(0),
 });
 const discountPreviewLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 60, standardHeaders: 'draft-7', legacyHeaders: false });
+const guestOrderLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Too many guest checkout attempts. Please wait a few minutes and try again.' }, skip: (req) => Boolean(req.user) });
+function optionalAuth(req, res, next) {
+  const session = readSession(req);
+  if (!session) return next();
+  resolveSession(session).then((user) => {
+    if (user) req.user = { ...session, sub: String(user.id), email: user.email, role: user.role, emailVerifiedAt: user.emailVerifiedAt };
+    next();
+  }).catch(next);
+}
 router.post('/validate-discount', discountPreviewLimiter, async (req, res) => {
   const parsed = validateDiscountSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: 'Enter a discount code.' });
@@ -59,11 +71,28 @@ router.post('/validate-discount', discountPreviewLimiter, async (req, res) => {
   res.json({ code: discount.code, type: discount.type, value: discount.value, discountCents });
 });
 
-router.post('/', requireAuth, requireVerifiedEmail, asyncRoute(async (req, res) => {
-  const { items, shipping, delivery, discountCode, paymentMethod } = checkout.parse(req.body);
+router.post('/', optionalAuth, guestOrderLimiter, asyncRoute(async (req, res) => {
+  const { items, shipping, delivery, discountCode, paymentMethod, createAccount } = checkout.parse(req.body);
+  if (req.user && !req.user.emailVerifiedAt) return res.status(403).json({ code: 'EMAIL_NOT_VERIFIED', error: 'Confirm your email before placing an order.' });
+  if (req.user && createAccount) return res.status(400).json({ error: 'You are already signed in.' });
+  const customerEmail = req.user?.email || shipping.email;
+  if (!customerEmail) return res.status(400).json({ error: 'Enter an email address for your order receipt and secure tracking link.' });
+  shipping.email = customerEmail;
   if (paymentMethod === 'paymob' && !paymobReady()) return res.status(503).json({ error: 'Online payment is not configured yet. Choose Cash on Delivery or contact the store.' });
+  const accountPasswordHash = !req.user && createAccount ? await bcrypt.hash(createAccount.password, 12) : null;
   const trackingToken = crypto.randomBytes(24).toString('hex');
-  const { order, itemSummaries, transferDetails } = await transaction(async (client) => {
+  let transactionResult;
+  try {
+    transactionResult = await transaction(async (client) => {
+    let orderUserId = req.user?.sub || null;
+    let registeredUser = null;
+    if (!req.user && accountPasswordHash) {
+      const { rows: users } = await client.query(`INSERT INTO users (email, name, password_hash, role)
+        VALUES ($1, $2, $3, 'customer')
+        RETURNING id, email, name, role, session_version AS "sessionVersion"`, [customerEmail, shipping.name, accountPasswordHash]);
+      registeredUser = users[0];
+      orderUserId = registeredUser.id;
+    }
     const ids = [...new Set(items.map((item) => item.productId))];
     const { rows: products } = await client.query(`SELECT id, name, price_cents, inventory, sizes, colors, images, metadata,
       CASE WHEN metadata->'inventory' IS NULL OR metadata->'inventory' = '{}'::jsonb
@@ -120,7 +149,7 @@ router.post('/', requireAuth, requireVerifiedEmail, asyncRoute(async (req, res) 
     }
 
     const totalCents = Math.max(0, subtotal - discountCents) + shippingCents;
-    const { rows } = await client.query('INSERT INTO orders (user_id, status, subtotal_cents, shipping_cents, total_cents, shipping_address, delivery, payment_method, payment_status, payment_provider, tracking_token, discount_code, discount_cents, instapay_recipient_snapshot, instapay_whatsapp_phone_snapshot) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING id, status, subtotal_cents AS "subtotalCents", shipping_cents AS "shippingCents", total_cents AS "totalCents", created_at AS "createdAt", discount_code AS "discountCode", discount_cents AS "discountCents"', [req.user.sub, 'pending', subtotal, shippingCents, totalCents, shipping, delivery, paymentMethod, 'pending', paymentMethod === 'paymob' ? 'paymob' : null, trackingToken, appliedCode, discountCents, paymentMethod === 'instapay' ? settings.instapayRecipient : null, paymentMethod === 'instapay' ? settings.instapayWhatsappPhone : null]);
+    const { rows } = await client.query('INSERT INTO orders (user_id, status, subtotal_cents, shipping_cents, total_cents, shipping_address, delivery, payment_method, payment_status, payment_provider, tracking_token, discount_code, discount_cents, instapay_recipient_snapshot, instapay_whatsapp_phone_snapshot) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING id, status, subtotal_cents AS "subtotalCents", shipping_cents AS "shippingCents", total_cents AS "totalCents", created_at AS "createdAt", discount_code AS "discountCode", discount_cents AS "discountCents"', [orderUserId, 'pending', subtotal, shippingCents, totalCents, shipping, delivery, paymentMethod, 'pending', paymentMethod === 'paymob' ? 'paymob' : null, trackingToken, appliedCode, discountCents, paymentMethod === 'instapay' ? settings.instapayRecipient : null, paymentMethod === 'instapay' ? settings.instapayWhatsappPhone : null]);
     for (const item of items) { const p = map.get(item.productId); await client.query('INSERT INTO order_items (order_id, product_id, product_name, unit_price_cents, unit_cost_cents, quantity, color, size, image_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)', [rows[0].id, p.id, p.name, p.price_cents, p.unitCostCents, item.quantity, item.color || null, item.size || null, selectedCatalogImage(p, item.image)]); }
     for (const [productId, quantity] of productQuantities) {
       const product = map.get(productId);
@@ -135,6 +164,7 @@ router.post('/', requireAuth, requireVerifiedEmail, asyncRoute(async (req, res) 
     }
     return {
       order: rows[0],
+      registeredUser,
       transferDetails: paymentMethod === 'instapay' ? { recipient: settings.instapayRecipient, whatsappPhone: settings.instapayWhatsappPhone } : null,
       itemSummaries: items.map((item) => ({
         name: map.get(item.productId).name,
@@ -145,14 +175,18 @@ router.post('/', requireAuth, requireVerifiedEmail, asyncRoute(async (req, res) 
         image: selectedCatalogImage(map.get(item.productId), item.image),
       })),
     };
-  });
-
+    });
+  } catch (error) {
+    if (createAccount && error.code === '23505' && error.constraint === 'users_email_key') return res.status(409).json({ code: 'ACCOUNT_EXISTS', error: 'An account already exists for this email. Sign in, or continue as a guest without creating an account.' });
+    throw error;
+  }
+  const { order, itemSummaries, transferDetails, registeredUser } = transactionResult;
   const storeOrigin = storePublicOrigin();
   const trackingUrl = `${storeOrigin}/track.html?order=${order.id}&token=${trackingToken}`;
   let paymentUrl = null;
   if (paymentMethod === 'paymob') {
     try {
-      const payment = await createPaymobCheckout({ order, customer: req.user, shipping });
+      const payment = await createPaymobCheckout({ order, customer: { email: customerEmail, name: shipping.name }, shipping });
       await query('UPDATE orders SET payment_provider_order_id = $1, payment_updated_at = NOW() WHERE id = $2 AND payment_status = $3', [payment.providerOrderId, order.id, 'pending']);
       paymentUrl = payment.url;
     } catch (error) {
@@ -161,13 +195,18 @@ router.post('/', requireAuth, requireVerifiedEmail, asyncRoute(async (req, res) 
       return res.status(502).json({ error: 'Online payment could not start. Your order was not placed; please try again or choose Cash on Delivery.' });
     }
   }
+  if (registeredUser) {
+    try { setSessionCookie(res, await issueSession(registeredUser, req)); }
+    catch (error) { console.error(`Checkout account session could not be started for NV-${order.id}:`, error); }
+    sendVerificationLink(registeredUser).catch((error) => console.error(`Checkout account verification email failed for NV-${order.id}:`, error));
+  }
   // Keep checkout successful if email fails, but wait for the provider result so
   // the customer can see whether the receipt was accepted for delivery.
   let emailDelivery = { sent: false, configured: emailDeliveryStatus().configured };
   try {
-    if (paymentMethod === 'cod') {
+    if (paymentMethod === 'cod' || !req.user) {
       await sendOrderConfirmation({
-      to: req.user.email,
+      to: customerEmail,
       name: shipping.name,
       orderId: order.id,
       items: itemSummaries,
@@ -183,10 +222,10 @@ router.post('/', requireAuth, requireVerifiedEmail, asyncRoute(async (req, res) 
       emailDelivery = { sent: emailDeliveryStatus().configured, configured: emailDeliveryStatus().configured };
     }
   } catch (error) {
-    console.error(`Order confirmation email failed for order #${order.id} to ${req.user.email}:`, error);
+    console.error(`Order confirmation email failed for order #${order.id} to ${customerEmail}:`, error);
   }
 
-  res.status(201).json({ order: { ...order, trackingUrl, emailDelivery, paymentMethod, paymentUrl, transferDetails }, items: itemSummaries });
+  res.status(201).json({ order: { ...order, trackingUrl, emailDelivery, paymentMethod, paymentUrl, transferDetails, guest: !req.user && !registeredUser, accountCreated: Boolean(registeredUser) }, items: itemSummaries });
   if (paymentMethod === 'cod' && shipping.phone) {
     sendOrderWhatsApp({ phone: shipping.phone, message: `Hi ${shipping.name}, your Nuvanti order #${order.id} is confirmed! Track it here: ${trackingUrl}` })
       .catch((error) => console.error('Order confirmation WhatsApp failed:', error));

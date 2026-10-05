@@ -48,6 +48,8 @@ Account recovery is handled through the relevant sign-in page. Do not publish re
 
 Placing an order (`POST /api/orders`) fires two best-effort notifications after the order is saved — neither can fail the checkout itself:
 
+Checkout supports guests and registered customers. Guests provide an email for their receipt and secure tracking link, plus their shipping/contact details; creating an account is optional. Selecting account creation sets a password and sends an email-verification link, while allowing the current order to complete before verification. Guest orders use a nullable `user_id`; an order number alone never grants access, since public tracking requires its random per-order token. Guest order creation is rate limited. Railway's start command runs `npm run migrate`, which applies `036_guest_checkout.sql` automatically.
+
 - **Email** via the same SMTP config as password resets (`sendOrderConfirmation` in `lib/mail.js`).
 - **WhatsApp** via Twilio's WhatsApp API (`lib/whatsapp.js`), only if `TWILIO_*` is configured and the shipping phone number is in a recognizable international format (a leading `+`). If not configured, or the number can't be normalized, it's skipped silently — checkout is unaffected either way.
 

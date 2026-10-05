@@ -33,9 +33,9 @@ router.post('/paymob/webhook', webhookLimiter, asyncRoute(async (req, res) => {
   const result = await transaction(async (client) => {
     const { rows } = await client.query(`SELECT o.id, o.status, o.payment_status AS "paymentStatus", o.total_cents AS "totalCents",
       o.subtotal_cents AS "subtotalCents", o.shipping_cents AS "shippingCents", o.discount_cents AS "discountCents",
-      o.discount_code AS "discountCode", o.delivery, o.shipping_address AS shipping, u.email, u.name,
+      o.discount_code AS "discountCode", o.delivery, o.shipping_address AS shipping, coalesce(u.email, o.shipping_address->>'email') AS email, coalesce(u.name, o.shipping_address->>'name') AS name,
       o.tracking_token AS "trackingToken"
-      FROM orders o JOIN users u ON u.id = o.user_id
+      FROM orders o LEFT JOIN users u ON u.id = o.user_id
       WHERE o.payment_provider = 'paymob' AND o.payment_provider_order_id = $1 FOR UPDATE OF o`, [providerOrderId]);
     const order = rows[0];
     if (!order || Number(order.totalCents) !== callbackAmount) return { invalid: true };
