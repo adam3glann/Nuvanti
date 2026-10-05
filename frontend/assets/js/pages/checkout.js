@@ -23,6 +23,8 @@ let storeSettings = null;
 let currentUser = null;
 let savedAddress = null;
 let onlinePaymentEnabled = false;
+let instapayEnabled = false;
+let instapayDetails = null;
 
 let lines = getCart();
 if (lines.length === 0) {
@@ -51,6 +53,8 @@ async function initializeCheckout() {
       const paymentResponse = await fetch(`${API_ORIGIN}/api/payments/config`, { credentials: 'include' });
       onlinePaymentEnabled = paymentResponse.ok && (await paymentResponse.json()).onlinePaymentEnabled === true;
     } catch { onlinePaymentEnabled = false; }
+    instapayEnabled = storeSettings.instapayEnabled === true && Boolean(storeSettings.instapayRecipient && storeSettings.instapayWhatsappPhone);
+    instapayDetails = instapayEnabled ? storeSettings : null;
   } catch {
     form.innerHTML = '<div class="state-block"><h3>Checkout is temporarily unavailable</h3><p>We could not verify your account or current delivery prices. Your bag is saved—please try again shortly.</p></div>';
     summary.innerHTML = '';
@@ -95,7 +99,7 @@ async function initializeCheckout() {
       if (express) express.textContent = formatPrice(storeSettings.expressShippingCents / 100);
       renderSummary();
     }
-    await refreshPaymentAvailability();
+      await refreshPaymentAvailability();
   }, 15000);
 }
 
@@ -182,7 +186,10 @@ function paymentOptionsMarkup() {
   return `${onlinePaymentEnabled ? `<label class="payment-option" data-value="paymob" style="margin-top:.75rem">
     <input type="radio" name="payment" value="paymob" style="margin-top:.2rem" />
     <div><strong>Pay online securely</strong><p class="text-muted" style="font-size:var(--fs-small)">Card and other methods enabled by the payment provider</p></div>
-  </label>` : `<p class="text-muted" style="font-size:var(--fs-small);margin-top:1rem">Online payment is turned off. Cash on Delivery is available.</p>`}`;
+  </label>` : ''}${instapayEnabled ? `<label class="payment-option" data-value="instapay" style="margin-top:.75rem">
+    <input type="radio" name="payment" value="instapay" style="margin-top:.2rem" />
+    <div><strong>InstaPay transfer</strong><p class="text-muted" style="font-size:var(--fs-small)">Transfer after placing your order, then send a screenshot on WhatsApp</p></div>
+  </label>` : ''}`;
 }
 
 function bindPaymentOptions() {
@@ -195,8 +202,9 @@ function applyPaymentSelection(method) {
   document.querySelectorAll('.payment-option').forEach((element) => { element.dataset.active = String(element.dataset.value === method); });
   const button = document.getElementById('placeOrderBtn');
   const note = document.getElementById('paymentNote');
-  if (button) button.textContent = online ? 'Continue to Secure Payment' : 'Place Cash on Delivery Order';
-  if (note) note.textContent = online ? 'You will complete payment on the payment provider’s secure checkout. We never collect card details.' : 'Payment is due to the delivery courier when your order arrives. No card details are collected.';
+  if (button) button.textContent = online ? 'Continue to Secure Payment' : method === 'instapay' ? 'Place InstaPay Order' : 'Place Cash on Delivery Order';
+  if (note) note.textContent = online ? 'You will complete payment on the payment provider’s secure checkout. We never collect card details.' : method === 'instapay' ? 'Your order stays unpaid until we verify your transfer.' : 'Payment is due to the delivery courier when your order arrives. No card details are collected.';
+  renderSummary();
 }
 
 async function refreshPaymentAvailability() {
@@ -204,10 +212,14 @@ async function refreshPaymentAvailability() {
     const response = await fetch(`${API_ORIGIN}/api/payments/config`, { credentials: 'include', cache: 'no-store' });
     if (!response.ok) return;
     const enabled = (await response.json()).onlinePaymentEnabled === true;
-    if (enabled === onlinePaymentEnabled) return;
+    const latestSettings = await refreshStoreSettings();
+    const newInstaEnabled = latestSettings.instapayEnabled === true && Boolean(latestSettings.instapayRecipient && latestSettings.instapayWhatsappPhone);
+    if (enabled === onlinePaymentEnabled && newInstaEnabled === instapayEnabled && JSON.stringify(latestSettings) === JSON.stringify(storeSettings)) return;
     onlinePaymentEnabled = enabled;
+    instapayEnabled = newInstaEnabled;
+    instapayDetails = newInstaEnabled ? latestSettings : null;
     const selected = document.querySelector('input[name="payment"]:checked')?.value || 'cod';
-    const safeSelection = enabled || selected !== 'paymob' ? selected : 'cod';
+    const safeSelection = (enabled || selected !== 'paymob') && (newInstaEnabled || selected !== 'instapay') ? selected : 'cod';
     const section = document.getElementById('paymentSection');
     if (!section) return;
     section.innerHTML = `<h3 class="h3" style="margin-bottom:1.25rem">Payment</h3>
@@ -215,7 +227,7 @@ async function refreshPaymentAvailability() {
         <input type="radio" name="payment" value="cod" ${safeSelection === 'cod' ? 'checked' : ''} style="margin-top:.2rem" />
         <div><strong>Cash on Delivery</strong><p class="text-muted" style="font-size:var(--fs-small)">Pay when your order arrives</p></div>
       </label>${paymentOptionsMarkup()}`;
-    if (safeSelection === 'paymob') section.querySelector('input[value="paymob"]')?.setAttribute('checked', 'checked');
+    section.querySelector(`input[value="${safeSelection}"]`)?.setAttribute('checked', 'checked');
     bindPaymentOptions();
   } catch { /* Keep the last verified payment choices if refresh is unavailable. */ }
 }
@@ -252,6 +264,7 @@ function renderSummary() {
     ${discountInfo ? `<div class="summary-row"><span>Discount (${discountInfo.code})</span><span>-${formatPrice(discount)}</span></div>` : ''}
     <div class="summary-row"><span>Shipping</span><span>${shippingCost === 0 ? 'Free' : formatPrice(shippingCost)}</span></div>
     <div class="summary-row summary-row--total"><span>Total</span><span>${formatPrice(total)}</span></div>
+    ${instapayDetails && document.querySelector('input[name="payment"]:checked')?.value === 'instapay' ? `<div class="card" style="margin-top:1rem;padding:1rem"><strong>InstaPay transfer details</strong><p class="text-muted" style="font-size:var(--fs-small);margin:.5rem 0">Transfer exactly ${formatPrice(total)}. Your order remains unpaid until we verify it.</p><div class="summary-row"><span>Recipient</span><span>${escapeHtml(instapayDetails.instapayRecipient)}</span></div><button type="button" class="btn btn-outline btn-sm" id="copyInstaPayDetails">Copy InstaPay details</button></div>` : ''}
   `;
 
   document.getElementById('applyPromo').addEventListener('click', async () => {
@@ -276,6 +289,10 @@ function renderSummary() {
     discountInfo = null;
     clearDiscountCode();
     renderSummary();
+  });
+  document.getElementById('copyInstaPayDetails')?.addEventListener('click', async (event) => {
+    try { await navigator.clipboard.writeText(instapayDetails.instapayRecipient); event.currentTarget.textContent = 'Copied'; }
+    catch { showToast('Copy is unavailable. Select and copy the recipient details.'); }
   });
 }
 
@@ -321,7 +338,7 @@ async function onSubmit(e) {
     }
     showToast(error.message);
     button.disabled = false;
-    button.textContent = paymentMethod === 'paymob' ? 'Continue to Secure Payment' : 'Place Cash on Delivery Order';
+    button.textContent = paymentMethod === 'paymob' ? 'Continue to Secure Payment' : paymentMethod === 'instapay' ? 'Place InstaPay Order' : 'Place Cash on Delivery Order';
     return;
   }
   clearCart();

@@ -19,7 +19,7 @@ export async function createOrder({ lines, customer, shipping, delivery, discoun
   const subtotal = Number(body.order.subtotalCents) / 100;
   const discountAmount = (body.order.discountCents || 0) / 100;
   const shippingCost = Number(body.order.shippingCents) / 100;
-  const order = { id: String(body.order.id), paymentMethod: body.order.paymentMethod || paymentMethod, paymentStatus: 'pending', paymentUrl: body.order.paymentUrl || null, emailDelivery: body.order.emailDelivery || { sent: false, configured: false }, orderNumber: `NV-${body.order.id}`, createdAt: body.order.createdAt, trackingUrl: body.order.trackingUrl, lines: orderLines, customer, shipping, delivery, subtotal, shippingCost, discountCode: body.order.discountCode || null, discountAmount, total: Number(body.order.totalCents) / 100, estimatedDelivery: delivery === 'express' ? '1–2 business days' : '4–7 business days' };
+  const order = { id: String(body.order.id), paymentMethod: body.order.paymentMethod || paymentMethod, paymentStatus: 'pending', paymentUrl: body.order.paymentUrl || null, transferDetails: body.order.transferDetails || null, emailDelivery: body.order.emailDelivery || { sent: false, configured: false }, orderNumber: `NV-${body.order.id}`, createdAt: body.order.createdAt, trackingUrl: body.order.trackingUrl, lines: orderLines, customer, shipping, delivery, subtotal, shippingCost, discountCode: body.order.discountCode || null, discountAmount, total: Number(body.order.totalCents) / 100, estimatedDelivery: delivery === 'express' ? '1–2 business days' : '4–7 business days' };
   sessionStorage.setItem(STORAGE_KEY, JSON.stringify(order));
   return order;
 }

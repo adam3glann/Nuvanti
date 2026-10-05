@@ -418,7 +418,7 @@ router.get('/financial-summary', requirePermission('analytics.view'), asyncRoute
   });
 }));
 router.get('/products', requirePermission('products.view'), async (req, res) => { const { rows } = await query(`SELECT ${columns} FROM products ORDER BY updated_at DESC`); res.json(rows.map(toAdminProduct)); });
-const PAYMENT_METHOD_LABELS = { cod: 'Cash on Delivery', paymob: 'Online payment (Paymob)' };
+const PAYMENT_METHOD_LABELS = { cod: 'Cash on Delivery', paymob: 'Online payment (Paymob)', instapay: 'InstaPay manual transfer' };
 router.get('/orders', requirePermission('orders.view'), asyncRoute(async (req, res) => {
   const limit = req.query.limit === undefined ? 100 : z.coerce.number().int().min(1).max(100).parse(req.query.limit);
   const { rows } = await query(`SELECT o.id, o.status, o.payment_status AS "paymentStatus", o.payment_transaction_id AS "paymentTransactionId", o.total_cents AS "totalCents", o.subtotal_cents AS "subtotalCents", o.shipping_cents AS "shippingCents", o.delivery, o.payment_method AS "paymentMethod", o.created_at AS "createdAt", o.shipping_address AS "shippingAddress", u.email, u.name,
@@ -428,7 +428,7 @@ router.get('/orders', requirePermission('orders.view'), asyncRoute(async (req, r
     id: `NV-${row.id}`, dbId: String(row.id), status: row.status, paymentStatus: row.paymentStatus || (['paid', 'fulfilled'].includes(row.status) ? 'paid' : 'pending'),
     total: Number(row.totalCents) / 100, totalCents: Number(row.totalCents),
     subtotal: Number(row.subtotalCents) / 100, shipping: Number(row.shippingCents) / 100,
-    delivery: row.delivery, paymentMethod: PAYMENT_METHOD_LABELS[row.paymentMethod] || row.paymentMethod,
+    delivery: row.delivery, paymentMethod: PAYMENT_METHOD_LABELS[row.paymentMethod] || row.paymentMethod, paymentMethodCode: row.paymentMethod,
     createdAt: row.createdAt,
     customer: { name: row.name, email: row.email, phone: row.shippingAddress?.phone || '—' },
     shippingAddress: { ...row.shippingAddress, method: row.delivery === 'express' ? 'Express' : 'Standard' },
@@ -444,6 +444,9 @@ router.patch('/orders/:id', requirePermission('orders.edit'), async (req, res) =
     const order = rows[0];
     if (!order) return { notFound: true };
     if (order.status === status) return { ...order, unchanged: true };
+    if (order.paymentMethod === 'instapay' && order.paymentStatus !== 'paid' && ['paid', 'processing', 'shipped', 'out_for_delivery', 'fulfilled'].includes(status)) {
+      return { conflict: 'Verify the InstaPay transfer and mark the payment paid before advancing this order.' };
+    }
     if (order.status === 'cancelled') {
       return { conflict: 'Cancelled orders cannot be reopened. Create a new order if the customer still wants the items.' };
     }
@@ -473,6 +476,23 @@ router.patch('/orders/:id', requirePermission('orders.edit'), async (req, res) =
     sendOrderStatusUpdate({ to: result.email, name: result.name || 'Customer', orderId: result.id, status, trackingUrl })
       .catch((error) => console.error('Order status email failed:', error));
   }
+});
+router.patch('/orders/:id/payment', requirePermission('orders.edit'), async (req, res) => {
+  const input = z.object({ paymentStatus: z.literal('paid') }).parse(req.body);
+  const result = await transaction(async (client) => {
+    const { rows } = await client.query('SELECT id, status, payment_method AS "paymentMethod", payment_status AS "paymentStatus" FROM orders WHERE id = $1 FOR UPDATE', [req.params.id]);
+    const order = rows[0];
+    if (!order) return { notFound: true };
+    if (order.paymentMethod !== 'instapay') return { conflict: 'Only InstaPay transfers can be manually verified here.' };
+    if (order.status === 'cancelled') return { conflict: 'Cancelled orders cannot be marked paid.' };
+    if (order.paymentStatus === 'paid') return { ...order, unchanged: true };
+    const { rows: updated } = await client.query("UPDATE orders SET payment_status = 'paid', payment_updated_at = NOW(), status = CASE WHEN status = 'pending' THEN 'paid' ELSE status END WHERE id = $1 RETURNING id, status, payment_status AS \"paymentStatus\"", [order.id]);
+    return updated[0];
+  });
+  if (result.notFound) return res.status(404).json({ error: 'Order not found.' });
+  if (result.conflict) return res.status(409).json({ error: result.conflict });
+  await logAudit({ req, action: 'order.instapay_verified', targetType: 'order', targetId: result.id, metadata: input });
+  res.json({ id: result.id, status: result.status, paymentStatus: result.paymentStatus });
 });
 router.get('/categories', requirePermission('products.view'), async (req, res) => { const { rows } = await query(`SELECT c.id::text, c.name, c.slug, c.description, c.image_url AS "imageUrl", c.is_active AS "isActive", c.menu_position AS "menuPosition", c.menu_show AS "menuShow", c.menu_label AS "menuLabel", c.menu_style AS "menuStyle", c.menu_background_color AS "menuBackgroundColor", c.menu_background_end_color AS "menuBackgroundEndColor", c.menu_text_color AS "menuTextColor", c.menu_icon AS "menuIcon", c.menu_animation AS "menuAnimation", c.menu_desktop_appearance AS "menuDesktopAppearance", c.menu_mobile_appearance AS "menuMobileAppearance", count(p.id)::int AS "productCount" FROM categories c LEFT JOIN products p ON p.category = c.slug GROUP BY c.id ORDER BY c.menu_position, c.name`); res.json(rows.map((c) => ({ ...c, status: c.isActive ? 'active' : 'disabled' }))); });
 router.put('/categories/order', requirePermission('products.edit'), asyncRoute(async (req, res) => {
@@ -823,15 +843,25 @@ const settingsInput = z.object({
   expressShipping: z.coerce.number().min(0).optional(),
   freeShippingThreshold: z.coerce.number().min(0).optional(),
   onlinePaymentEnabled: z.boolean().optional(),
+  instapayEnabled: z.boolean().optional(),
+  instapayRecipient: z.string().trim().max(200).optional(),
+  instapayWhatsappPhone: z.string().trim().max(30).refine((value) => value === '' || /^\+?[0-9]{8,15}$/.test(value)).optional(),
 });
 router.get('/settings', requirePermission('settings.view'), async (req, res) => {
-  const { rows } = await query(`SELECT store_name AS "storeName", support_email AS "supportEmail", currency, standard_shipping_cents AS "standardShippingCents", express_shipping_cents AS "expressShippingCents", free_shipping_threshold_cents AS "freeShippingThresholdCents", online_payment_enabled AS "onlinePaymentEnabled" FROM store_settings WHERE id = 1`);
+  const { rows } = await query(`SELECT store_name AS "storeName", support_email AS "supportEmail", currency, standard_shipping_cents AS "standardShippingCents", express_shipping_cents AS "expressShippingCents", free_shipping_threshold_cents AS "freeShippingThresholdCents", online_payment_enabled AS "onlinePaymentEnabled", instapay_enabled AS "instapayEnabled", instapay_recipient AS "instapayRecipient", instapay_whatsapp_phone AS "instapayWhatsappPhone" FROM store_settings WHERE id = 1`);
   res.set('Cache-Control', 'no-store').json({ ...rows[0], onlinePaymentConfigured: paymobReady() });
 });
 router.patch('/settings', requirePermission('settings.edit'), async (req, res) => {
   const s = settingsInput.parse(req.body);
   if (s.onlinePaymentEnabled === true && !paymobReady()) {
     return res.status(409).json({ error: 'Online payments cannot be enabled until Paymob keys, payment method IDs, and webhook secret are configured.' });
+  }
+  if (s.instapayEnabled === true) {
+    const recipient = s.instapayRecipient;
+    const phone = s.instapayWhatsappPhone;
+    if (!recipient?.trim() || !phone || !/^\+?[0-9]{8,15}$/.test(phone)) {
+      return res.status(409).json({ error: 'Add receiving InstaPay details and a WhatsApp number in international format before enabling transfers.' });
+    }
   }
   const { rows } = await query(
     `UPDATE store_settings SET
@@ -842,12 +872,15 @@ router.patch('/settings', requirePermission('settings.edit'), async (req, res) =
       express_shipping_cents = coalesce($5, express_shipping_cents),
       free_shipping_threshold_cents = coalesce($6, free_shipping_threshold_cents),
       online_payment_enabled = coalesce($7, online_payment_enabled),
+      instapay_enabled = coalesce($8, instapay_enabled),
+      instapay_recipient = coalesce($9, instapay_recipient),
+      instapay_whatsapp_phone = coalesce($10, instapay_whatsapp_phone),
       updated_at = NOW()
     WHERE id = 1
-    RETURNING store_name AS "storeName", support_email AS "supportEmail", currency, standard_shipping_cents AS "standardShippingCents", express_shipping_cents AS "expressShippingCents", free_shipping_threshold_cents AS "freeShippingThresholdCents", online_payment_enabled AS "onlinePaymentEnabled"`,
-    [s.storeName ?? null, s.supportEmail ?? null, s.currency ?? null, s.standardShipping != null ? Math.round(s.standardShipping * 100) : null, s.expressShipping != null ? Math.round(s.expressShipping * 100) : null, s.freeShippingThreshold != null ? Math.round(s.freeShippingThreshold * 100) : null, s.onlinePaymentEnabled ?? null],
+    RETURNING store_name AS "storeName", support_email AS "supportEmail", currency, standard_shipping_cents AS "standardShippingCents", express_shipping_cents AS "expressShippingCents", free_shipping_threshold_cents AS "freeShippingThresholdCents", online_payment_enabled AS "onlinePaymentEnabled", instapay_enabled AS "instapayEnabled", instapay_recipient AS "instapayRecipient", instapay_whatsapp_phone AS "instapayWhatsappPhone"`,
+    [s.storeName ?? null, s.supportEmail ?? null, s.currency ?? null, s.standardShipping != null ? Math.round(s.standardShipping * 100) : null, s.expressShipping != null ? Math.round(s.expressShipping * 100) : null, s.freeShippingThreshold != null ? Math.round(s.freeShippingThreshold * 100) : null, s.onlinePaymentEnabled ?? null, s.instapayEnabled ?? null, s.instapayRecipient ?? null, s.instapayWhatsappPhone ?? null],
   );
-  await logAudit({ req, action: s.onlinePaymentEnabled == null ? 'settings.updated' : 'settings.online_payment_toggled', targetType: 'settings', targetId: '1' });
+  await logAudit({ req, action: s.instapayEnabled != null || s.instapayRecipient != null || s.instapayWhatsappPhone != null ? 'settings.instapay_updated' : s.onlinePaymentEnabled == null ? 'settings.updated' : 'settings.online_payment_toggled', targetType: 'settings', targetId: '1' });
   res.set('Cache-Control', 'no-store').json({ ...rows[0], onlinePaymentConfigured: paymobReady() });
 });
 

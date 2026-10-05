@@ -1,0 +1,4 @@
+ALTER TABLE store_settings
+  ADD COLUMN IF NOT EXISTS instapay_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS instapay_recipient TEXT NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS instapay_whatsapp_phone TEXT NOT NULL DEFAULT '';

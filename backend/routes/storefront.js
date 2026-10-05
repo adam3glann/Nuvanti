@@ -36,7 +36,10 @@ router.get('/settings', async (req, res) => {
   const { rows } = await query(`SELECT store_name AS "storeName", currency,
     standard_shipping_cents AS "standardShippingCents",
     express_shipping_cents AS "expressShippingCents",
-    free_shipping_threshold_cents AS "freeShippingThresholdCents"
+    free_shipping_threshold_cents AS "freeShippingThresholdCents",
+    instapay_enabled AS "instapayEnabled",
+    CASE WHEN instapay_enabled THEN instapay_recipient ELSE '' END AS "instapayRecipient",
+    CASE WHEN instapay_enabled THEN instapay_whatsapp_phone ELSE '' END AS "instapayWhatsappPhone"
     FROM store_settings WHERE id = 1`);
   res.set('Cache-Control', 'no-store');
   res.json(rows[0] || {

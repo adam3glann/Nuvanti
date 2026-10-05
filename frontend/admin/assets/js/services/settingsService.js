@@ -27,6 +27,9 @@ function fromApi(value) {
     payments: {
       onlinePaymentEnabled: value.onlinePaymentEnabled === true,
       onlinePaymentConfigured: value.onlinePaymentConfigured === true,
+      instapayEnabled: value.instapayEnabled === true,
+      instapayRecipient: value.instapayRecipient || '',
+      instapayWhatsappPhone: value.instapayWhatsappPhone || '',
     },
   };
 }
@@ -47,7 +50,7 @@ export async function saveSettingsSection(section, data) {
   const payload = section === 'general'
     ? { storeName: data.storeName, supportEmail: data.contactEmail }
     : section === 'payments'
-      ? { onlinePaymentEnabled: data.onlinePaymentEnabled }
+      ? { onlinePaymentEnabled: data.onlinePaymentEnabled, instapayEnabled: data.instapayEnabled, instapayRecipient: data.instapayRecipient, instapayWhatsappPhone: data.instapayWhatsappPhone }
       : {
         freeShippingThreshold: data.freeShippingThreshold,
         standardShipping: data.standardCost,

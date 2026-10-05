@@ -17,11 +17,15 @@ if (!order) {
     </div>`;
 } else {
   const onlinePending = order.paymentMethod === 'paymob' && order.paymentStatus !== 'paid';
+  const instaPending = order.paymentMethod === 'instapay' && order.paymentStatus !== 'paid';
+  const instaPhone = String(order.transferDetails?.whatsappPhone || '').replace(/\D/g, '');
+  const instaMessage = `Hi, I have placed order ${order.orderNumber} for EGP ${Number(order.total).toFixed(2)} via InstaPay. I am attaching my transfer screenshot here.`;
+  const instaWhatsAppUrl = instaPhone ? `https://wa.me/${instaPhone}?text=${encodeURIComponent(instaMessage)}` : '';
   root.innerHTML = `
     <div class="order-success">
       <div class="order-success__icon">${icon('check')}</div>
-      <h1>${onlinePending ? 'Checking your payment' : 'Thank you for your order.'}</h1>
-      <p class="text-muted" id="paymentResultMessage">${onlinePending ? 'Your order is saved. We are waiting for the payment provider to confirm your payment. This page will update shortly.' : `Your order is saved in My Account → Orders. ${order.emailDelivery?.sent ? `Confirmation accepted by the email provider for ${escapeHtml(order.customer.email)}. Shipping updates will go to the same address.` : `Order placed, but the confirmation email could not be sent to ${escapeHtml(order.customer.email)}. Check Admin Settings → Email and Railway mail variables.`}`}</p>
+      <h1>${onlinePending ? 'Checking your payment' : instaPending ? 'Transfer needed to confirm your order' : 'Thank you for your order.'}</h1>
+      <p class="text-muted" id="paymentResultMessage">${onlinePending ? 'Your order is saved. We are waiting for the payment provider to confirm your payment. This page will update shortly.' : instaPending ? 'Your order is saved and remains unpaid until we verify your InstaPay transfer. Send the transfer screenshot through WhatsApp.' : `Your order is saved in My Account → Orders. ${order.emailDelivery?.sent ? `Confirmation accepted by the email provider for ${escapeHtml(order.customer.email)}. Shipping updates will go to the same address.` : `Order placed, but the confirmation email could not be sent to ${escapeHtml(order.customer.email)}. Check Admin Settings → Email and Railway mail variables.`}`}</p>
 
       <div class="order-detail-card">
         <div class="order-detail-row"><span>Order Number</span><strong>${escapeHtml(order.orderNumber)}</strong></div>
@@ -36,9 +40,11 @@ if (!order) {
         ${order.discountCode ? `<div class="order-detail-row"><span>Discount (${escapeHtml(order.discountCode)})</span><span>-${formatPrice(order.discountAmount)}</span></div>` : ''}
         <div class="order-detail-row"><span>Shipping</span><span>${order.shippingCost === 0 ? 'Free' : formatPrice(order.shippingCost)}</span></div>
         <div class="order-detail-row" style="font-weight:700;font-size:1.05rem"><span>Total</span><span>${formatPrice(order.total)}</span></div>
+        ${instaPending ? `<div class="order-detail-row"><span>Payment status</span><strong>Unpaid · awaiting transfer verification</strong></div><div class="order-detail-row"><span>InstaPay recipient</span><strong>${escapeHtml(order.transferDetails?.recipient || '')}</strong></div>` : ''}
       </div>
 
       <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap">
+        ${instaPending && instaWhatsAppUrl ? `<a href="${escapeHtml(instaWhatsAppUrl)}" class="btn btn-primary" target="_blank" rel="noopener noreferrer">Send transfer screenshot on WhatsApp</a>` : ''}
         <a href="shop.html" class="btn btn-primary">Continue Shopping</a>
         <a href="${escapeHtml(getSafeTrackingUrl(order.trackingUrl))}" class="btn btn-outline">Track Order</a>
       </div>

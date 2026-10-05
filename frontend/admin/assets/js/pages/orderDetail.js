@@ -4,7 +4,7 @@ import { statusBadge } from '../components/statusBadge.js';
 import { showAdminToast } from '../components/toast.js';
 import { confirmDialog } from '../components/confirmDialog.js';
 import { hasPermission } from '../components/permissions.js';
-import { fetchAdminOrder, updateOrderStatus, cancelOrder } from '../services/orderService.js';
+import { fetchAdminOrder, updateOrderStatus, cancelOrder, markInstaPayPaid } from '../services/orderService.js';
 import { startLiveRefresh } from '../services/liveRefresh.js';
 
 const params = new URLSearchParams(location.search);
@@ -91,6 +91,7 @@ function render(order) {
           <div class="card-head"><h2>Status</h2></div>
           <div class="card-pad">
             <div class="o-timeline" id="orderTimeline"></div>
+            ${canEdit && order.paymentMethodCode === 'instapay' && order.paymentStatus !== 'paid' && order.status !== 'cancelled' ? '<p class="hint">Confirm the transfer arrived in the InstaPay account before marking this order paid.</p><button class="btn btn-primary" id="verifyInstaPayBtn" style="width:100%;margin-top:.75rem">Verify transfer and mark paid</button>' : ''}
             ${canEdit && order.status !== 'cancelled' ? `
               <div class="field" style="margin-top:1rem"><label for="statusSelect">Update Status</label>
                 <select id="statusSelect">${statusChoices(order.status, canCancel)}</select>
@@ -119,6 +120,12 @@ function render(order) {
 
   document.getElementById('printInvoiceBtn')?.addEventListener('click', () => window.print());
   document.getElementById('printSlipBtn')?.addEventListener('click', () => window.print());
+  document.getElementById('verifyInstaPayBtn')?.addEventListener('click', async () => {
+    const ok = await confirmDialog({ title: 'Verify InstaPay transfer?', body: 'Only confirm after checking that the full order amount reached the store account.', confirmLabel: 'Mark Paid' });
+    if (!ok) return;
+    try { const updated = await markInstaPayPaid(order.id); showAdminToast('InstaPay transfer verified and order marked paid.', 'success'); render(updated); }
+    catch (error) { showAdminToast(error.message, 'error'); }
+  });
   document.getElementById('contactBtn')?.addEventListener('click', () => { window.location.href = `mailto:${order.customer.email}`; });
 
   document.getElementById('updateStatusBtn')?.addEventListener('click', async () => {

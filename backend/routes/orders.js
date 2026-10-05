@@ -22,7 +22,7 @@ const checkout = z.object({
   })).min(1).max(30),
   shipping: z.object({ name: z.string().min(2).max(100), phone: z.string().max(30).optional(), address1: z.string().min(3).max(150), city: z.string().min(2).max(80), country: z.literal('Egypt'), postalCode: z.string().min(1).max(20) }),
   delivery: z.enum(['standard', 'express']),
-  paymentMethod: z.enum(['cod', 'paymob']).default('cod'),
+  paymentMethod: z.enum(['cod', 'paymob', 'instapay']).default('cod'),
   discountCode: z.string().max(40).optional(),
 });
 
@@ -96,10 +96,13 @@ router.post('/', requireAuth, requireVerifiedEmail, asyncRoute(async (req, res) 
       if (available < variant.quantity) { const error = new Error(`${product.name} does not have enough stock in size ${variant.size}.`); error.status = 409; throw error; }
     }
 
-    const { rows: settingsRows } = await client.query('SELECT standard_shipping_cents AS "standard", express_shipping_cents AS "express", free_shipping_threshold_cents AS "freeThreshold", online_payment_enabled AS "onlinePaymentEnabled" FROM store_settings WHERE id = 1 FOR SHARE');
+    const { rows: settingsRows } = await client.query('SELECT standard_shipping_cents AS "standard", express_shipping_cents AS "express", free_shipping_threshold_cents AS "freeThreshold", online_payment_enabled AS "onlinePaymentEnabled", instapay_enabled AS "instapayEnabled", instapay_recipient AS "instapayRecipient", instapay_whatsapp_phone AS "instapayWhatsappPhone" FROM store_settings WHERE id = 1 FOR SHARE');
     const settings = settingsRows[0] || { standard: 7500, express: 15000, freeThreshold: 300000 };
     if (paymentMethod === 'paymob' && settings.onlinePaymentEnabled !== true) {
       const error = new Error('Online payments are currently turned off. Choose Cash on Delivery.'); error.status = 409; throw error;
+    }
+    if (paymentMethod === 'instapay' && (settings.instapayEnabled !== true || !settings.instapayRecipient?.trim() || !settings.instapayWhatsappPhone?.trim())) {
+      const error = new Error('InstaPay transfer is currently unavailable. Choose Cash on Delivery.'); error.status = 409; throw error;
     }
     const shippingCents = delivery === 'express' ? settings.express : (subtotal >= settings.freeThreshold ? 0 : settings.standard);
 
@@ -132,6 +135,7 @@ router.post('/', requireAuth, requireVerifiedEmail, asyncRoute(async (req, res) 
     }
     return {
       order: rows[0],
+      transferDetails: paymentMethod === 'instapay' ? { recipient: settings.instapayRecipient, whatsappPhone: settings.instapayWhatsappPhone } : null,
       itemSummaries: items.map((item) => ({
         name: map.get(item.productId).name,
         priceCents: map.get(item.productId).price_cents,
@@ -182,7 +186,7 @@ router.post('/', requireAuth, requireVerifiedEmail, asyncRoute(async (req, res) 
     console.error(`Order confirmation email failed for order #${order.id} to ${req.user.email}:`, error);
   }
 
-  res.status(201).json({ order: { ...order, trackingUrl, emailDelivery, paymentMethod, paymentUrl }, items: itemSummaries });
+  res.status(201).json({ order: { ...order, trackingUrl, emailDelivery, paymentMethod, paymentUrl, transferDetails }, items: itemSummaries });
   if (paymentMethod === 'cod' && shipping.phone) {
     sendOrderWhatsApp({ phone: shipping.phone, message: `Hi ${shipping.name}, your Nuvanti order #${order.id} is confirmed! Track it here: ${trackingUrl}` })
       .catch((error) => console.error('Order confirmation WhatsApp failed:', error));
