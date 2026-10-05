@@ -297,9 +297,9 @@ async function renderDashboard(session, tab) {
             ${instaPending ? `<section class="instapay-account-panel" aria-labelledby="instapayOrder${escapeAttr(o.id)}">
               <h3 id="instapayOrder${escapeAttr(o.id)}">InstaPay transfer needed <span lang="ar" dir="rtl">التحويل عبر إنستاباي مطلوب</span></h3>
               <div class="instapay-account-panel__amount"><span>Transfer this exact total <span lang="ar" dir="rtl">حوّل هذا الإجمالي بالضبط</span></span><strong>${formatPrice(amount)}</strong></div>
-              <div class="instapay-account-panel__recipient"><div><span>Recipient <span lang="ar" dir="rtl">المستلم</span></span><strong>${escapeHtml(o.instapayRecipient)}</strong></div><button type="button" class="btn btn-outline btn-sm" data-copy-instapay="${escapeAttr(o.id)}" data-recipient="${escapeAttr(o.instapayRecipient)}">Copy · نسخ</button></div>
+              <div class="instapay-account-panel__recipient"><div><span>Recipient <span lang="ar" dir="rtl">المستلم</span></span><strong>${renderInstapayRecipient(o.instapayRecipient)}</strong></div><button type="button" class="btn btn-outline btn-sm" data-copy-instapay="${escapeAttr(o.id)}" data-recipient="${escapeAttr(o.instapayRecipient)}">Copy · نسخ</button></div>
               <ol><li>Transfer the exact total to this recipient. <span lang="ar" dir="rtl">حوّل الإجمالي بالضبط إلى هذا المستلم.</span></li><li>Take a screenshot after the transfer. <span lang="ar" dir="rtl">التقط صورة شاشة بعد التحويل.</span></li><li>Send the screenshot and order number ${orderNumber} using the green WhatsApp button. <span lang="ar" dir="rtl">أرسل صورة التحويل ورقم الطلب ${orderNumber} عبر زر واتساب الأخضر.</span></li></ol>
-              ${whatsappUrl ? `<a class="btn instapay-whatsapp" href="${escapeAttr(whatsappUrl)}" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">●</span> Send screenshot + order number on WhatsApp <span lang="ar" dir="rtl">إرسال الصورة ورقم الطلب عبر واتساب</span></a>` : '<p role="alert">WhatsApp is unavailable. Contact the store with this order number and your transfer screenshot. · واتساب غير متاح، تواصل معنا برقم الطلب وصورة التحويل.</p>'}
+              ${whatsappUrl ? `<a class="btn instapay-whatsapp" href="${escapeAttr(whatsappUrl)}" target="_blank" rel="noopener noreferrer" aria-label="Open WhatsApp to send the transfer screenshot and order ${escapeAttr(orderNumber)}. Opens in a new tab."><span aria-hidden="true">●</span> Send screenshot + order number on WhatsApp <span lang="ar" dir="rtl">إرسال الصورة ورقم الطلب عبر واتساب</span></a>` : '<p role="alert">WhatsApp is unavailable. Contact the store with this order number and your transfer screenshot. · واتساب غير متاح، تواصل معنا برقم الطلب وصورة التحويل.</p>'}
               <p class="instapay-account-panel__pending" role="status">Unpaid until the transfer is verified. <span lang="ar" dir="rtl">يظل الطلب غير مدفوع حتى التحقق من التحويل.</span></p>
               <p class="instapay-copy-status" data-copy-status="${escapeAttr(o.id)}" role="status" aria-live="polite"></p>
             </section>` : ''}
@@ -403,3 +403,12 @@ function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 }
 function escapeAttr(value) { return escapeHtml(value); }
+function renderInstapayRecipient(value) {
+  const recipient = String(value ?? '');
+  const match = recipient.match(/(^|[^\d])((?:\+?20[ -]?1[0125]|0?1[0125])(?:[ -]?\d){8})(?=$|[^\d])/);
+  if (!match) return escapeHtml(recipient);
+  const number = match[2];
+  const telNumber = number.replace(/[^\d+]/g, '');
+  const start = match.index + match[1].length;
+  return `${escapeHtml(recipient.slice(0, start))}<a href="tel:${telNumber}" aria-label="Call InstaPay recipient phone number">${escapeHtml(number)}</a>${escapeHtml(recipient.slice(start + number.length))}`;
+}

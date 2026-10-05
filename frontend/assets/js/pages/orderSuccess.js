@@ -47,11 +47,11 @@ if (!order) {
         <p class="instapay-transfer-panel__eyebrow">InstaPay · Payment pending</p>
         <h2 id="instapayTransferTitle">Complete your transfer to confirm your order</h2>
         <div class="instapay-transfer-panel__amount"><span>Transfer this exact total</span><strong>${formatPrice(order.total)}</strong></div>
-        <div class="instapay-transfer-panel__recipient"><div><span>InstaPay recipient</span><strong id="instapayRecipientValue">${escapeHtml(order.transferDetails?.recipient || '')}</strong></div><button type="button" class="btn btn-outline btn-sm" id="copyInstaPayRecipient" aria-label="Copy InstaPay recipient details">Copy details</button></div>
+        <div class="instapay-transfer-panel__recipient"><div><span>InstaPay recipient</span><strong id="instapayRecipientValue">${renderInstapayRecipient(order.transferDetails?.recipient || '')}</strong></div><button type="button" class="btn btn-outline btn-sm" id="copyInstaPayRecipient" aria-label="Copy InstaPay recipient details">Copy details</button></div>
         <ol class="instapay-transfer-panel__steps"><li>Transfer the exact total above to the recipient shown.</li><li>After transferring, take a screenshot of the completed transfer.</li><li>Use the green WhatsApp button below to send the screenshot and your order number.</li></ol>
         <div class="instapay-transfer-panel__arabic" lang="ar" dir="rtl"><strong>الخطوات لإتمام الطلب</strong><ol><li>حوّل الإجمالي الموضح بالضبط إلى بيانات مستلم إنستاباي أعلاه.</li><li>بعد التحويل، التقط صورة شاشة تؤكد إتمام التحويل.</li><li>اضغط زر واتساب الأخضر لإرسال صورة التحويل ورقم الطلب.</li></ol></div>
         <p class="instapay-transfer-panel__pending" role="status">Your order stays unpaid until we verify the transfer. <span lang="ar" dir="rtl">يظل الطلب غير مدفوع حتى نتحقق من التحويل.</span></p>
-        ${instaWhatsAppUrl ? `<a href="${escapeHtml(instaWhatsAppUrl)}" class="btn instapay-whatsapp" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">●</span> Send screenshot + order number on WhatsApp <span lang="ar" dir="rtl">إرسال الصورة ورقم الطلب عبر واتساب</span></a>` : '<p role="alert">WhatsApp is unavailable. Please contact the store with your order number and transfer screenshot.</p>'}
+        ${instaWhatsAppUrl ? `<a href="${escapeHtml(instaWhatsAppUrl)}" class="btn instapay-whatsapp" target="_blank" rel="noopener noreferrer" aria-label="Open WhatsApp to send the transfer screenshot and order ${escapeHtml(order.orderNumber)}. Opens in a new tab."><span aria-hidden="true">●</span> Send screenshot + order number on WhatsApp <span lang="ar" dir="rtl">إرسال الصورة ورقم الطلب عبر واتساب</span></a>` : '<p role="alert">WhatsApp is unavailable. Please contact the store with your order number and transfer screenshot.</p>'}
         <p id="instapayCopyStatus" class="instapay-copy-status" role="status" aria-live="polite"></p>
       </section>` : ''}
 
@@ -95,6 +95,16 @@ async function refreshPaymentStatus(order) {
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+}
+
+function renderInstapayRecipient(value) {
+  const recipient = String(value ?? '');
+  const match = recipient.match(/(^|[^\d])((?:\+?20[ -]?1[0125]|0?1[0125])(?:[ -]?\d){8})(?=$|[^\d])/);
+  if (!match) return escapeHtml(recipient);
+  const number = match[2];
+  const telNumber = number.replace(/[^\d+]/g, '');
+  const start = match.index + match[1].length;
+  return `${escapeHtml(recipient.slice(0, start))}<a href="tel:${telNumber}" aria-label="Call InstaPay recipient phone number">${escapeHtml(number)}</a>${escapeHtml(recipient.slice(start + number.length))}`;
 }
 
 function getSafeTrackingUrl(value) {
