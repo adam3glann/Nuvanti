@@ -3,6 +3,15 @@
 // or exercise sign-in.
 import http from 'k6/http';
 import { check, sleep } from 'k6';
+import { Counter } from 'k6/metrics';
+
+const rateLimitedResponses = new Counter('rate_limited_responses');
+const serverErrorResponses = new Counter('server_error_responses');
+
+function recordResponse(response) {
+  if (response.status === 429) rateLimitedResponses.add(1);
+  if (response.status >= 500) serverErrorResponses.add(1);
+}
 
 const baseUrl = (__ENV.BASE_URL || '').replace(/\/+$/, '');
 if (!baseUrl) throw new Error('Set BASE_URL to your staging storefront URL.');
@@ -56,23 +65,27 @@ export default function () {
 
   if (__ITER === 0) {
     const home = http.get(`${baseUrl}/`);
+    recordResponse(home);
     check(home, { 'storefront loads': (response) => response.status === 200 });
 
     if (includePresenceWrites && !presenceOnly) {
       const pageView = http.post(`${apiBaseUrl}/api/storefront/page-view`, null, apiRequestOptions);
+      recordResponse(pageView);
       check(pageView, { 'page view is recorded': (response) => response.status === 204 });
     }
   }
 
   if (!presenceOnly) {
     const response = http.get(`${apiBaseUrl}/api/products?limit=100`, apiRequestOptions);
+    recordResponse(response);
     check(response, { 'product list loads': (result) => result.status === 200 });
 
     if (response.status === 200) {
       const products = response.json();
       if (Array.isArray(products) && products.length) {
         const product = products[Math.floor(Math.random() * products.length)];
-        http.get(`${apiBaseUrl}/api/products/${encodeURIComponent(product.slug)}`, apiRequestOptions);
+        const details = http.get(`${apiBaseUrl}/api/products/${encodeURIComponent(product.slug)}`, apiRequestOptions);
+        recordResponse(details);
       }
     }
   }
@@ -83,6 +96,7 @@ export default function () {
       JSON.stringify({ action: 'heartbeat', visitorId, tabId }),
       { ...apiRequestOptions, headers: { ...apiRequestOptions.headers, 'Content-Type': 'application/json' } },
     );
+    recordResponse(presence);
     check(presence, { 'visitor presence is recorded': (result) => result.status === 204 });
   }
 
