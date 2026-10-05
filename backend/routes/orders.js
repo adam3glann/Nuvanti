@@ -63,7 +63,7 @@ router.post('/', requireAuth, requireVerifiedEmail, asyncRoute(async (req, res) 
   const { items, shipping, delivery, discountCode, paymentMethod } = checkout.parse(req.body);
   if (paymentMethod === 'paymob' && !paymobReady()) return res.status(503).json({ error: 'Online payment is not configured yet. Choose Cash on Delivery or contact the store.' });
   const trackingToken = crypto.randomBytes(24).toString('hex');
-  const { order, itemSummaries } = await transaction(async (client) => {
+  const { order, itemSummaries, transferDetails } = await transaction(async (client) => {
     const ids = [...new Set(items.map((item) => item.productId))];
     const { rows: products } = await client.query(`SELECT id, name, price_cents, inventory, sizes, colors, images, metadata,
       CASE WHEN metadata->'inventory' IS NULL OR metadata->'inventory' = '{}'::jsonb
