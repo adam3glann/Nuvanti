@@ -190,11 +190,13 @@ export async function restoreStoreBackup(client, backup) {
     'id', 'user_id', 'status', 'subtotal_cents', 'shipping_cents', 'total_cents',
     'shipping_address', 'created_at', 'discount_code', 'discount_cents', 'delivery',
     'payment_method', 'payment_status', 'payment_provider', 'payment_updated_at',
+    'instapay_recipient_snapshot', 'instapay_whatsapp_phone_snapshot',
   ], backup.orders, (row) => [
     row.id, row.userId, row.status, row.subtotalCents, row.shippingCents, row.totalCents,
     json(row.shippingAddress, {}), row.createdAt, row.discountCode || null, row.discountCents || 0,
     row.delivery || 'standard', row.paymentMethod || 'cod', row.paymentStatus || 'pending',
     row.paymentProvider || null, row.paymentUpdatedAt || null,
+    row.instapayRecipient || null, row.instapayWhatsappPhone || null,
   ]);
 
   await insertRows(client, 'order_items', [

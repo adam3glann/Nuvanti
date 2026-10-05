@@ -277,16 +277,43 @@ async function renderDashboard(session, tab) {
     panel.innerHTML = `<div class="a-skeleton" style="height:120px;border-radius:12px"></div>`;
     try {
       const orders = await fetchMyOrders();
-      panel.innerHTML = orders.length ? orders.map((o) => `
-        <a class="order-row" href="${o.trackingUrl}" style="text-decoration:none;color:inherit">
-          <div>
-            <strong>NV-${o.id}</strong>
-            <p class="text-muted" style="font-size:var(--fs-small)">${new Date(o.createdAt).toLocaleDateString()} · ${o.itemCount} item(s)</p>
-          </div>
-          <span>${formatPrice(o.totalCents / 100)}</span>
-          <span class="badge badge--outline">${o.paymentMethod === 'paymob' && o.paymentStatus === 'failed' ? 'Payment failed' : STATUS_LABELS[o.status] || o.status}</span>
-        </a>
-      `).join('') : `<div class="state-block"><h3>No orders yet</h3><p>Your order history will appear here once you place your first order.</p><a href="shop.html" class="btn btn-primary">Shop Now</a></div>`;
+      panel.innerHTML = orders.length ? orders.map((o) => {
+        const instaPending = o.paymentMethod === 'instapay' && o.paymentStatus === 'pending' && o.status !== 'cancelled' && o.instapayRecipient;
+        const phone = String(o.instapayWhatsappPhone || '').replace(/\D/g, '');
+        const orderNumber = `NV-${o.id}`;
+        const amount = Number(o.totalCents) / 100;
+        const message = `Hello, I transferred EGP ${amount.toFixed(2)} via InstaPay for order ${orderNumber}. I am attaching the transfer screenshot.\n\nمرحباً، قمت بتحويل ${amount.toFixed(2)} جنيه عبر إنستاباي للطلب ${orderNumber}. أرفق صورة التحويل.`;
+        const whatsappUrl = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}` : '';
+        return `
+          <article class="account-order-card">
+            <a class="order-row account-order-card__summary" href="${escapeAttr(o.trackingUrl)}" style="text-decoration:none;color:inherit">
+              <div>
+                <strong>${orderNumber}</strong>
+                <p class="text-muted" style="font-size:var(--fs-small)">${new Date(o.createdAt).toLocaleDateString()} · ${o.itemCount} item(s)</p>
+              </div>
+              <span>${formatPrice(amount)}</span>
+              <span class="badge badge--outline">${o.paymentMethod === 'paymob' && o.paymentStatus === 'failed' ? 'Payment failed' : STATUS_LABELS[o.status] || o.status}</span>
+            </a>
+            ${instaPending ? `<section class="instapay-account-panel" aria-labelledby="instapayOrder${escapeAttr(o.id)}">
+              <h3 id="instapayOrder${escapeAttr(o.id)}">InstaPay transfer needed <span lang="ar" dir="rtl">التحويل عبر إنستاباي مطلوب</span></h3>
+              <div class="instapay-account-panel__amount"><span>Transfer this exact total <span lang="ar" dir="rtl">حوّل هذا الإجمالي بالضبط</span></span><strong>${formatPrice(amount)}</strong></div>
+              <div class="instapay-account-panel__recipient"><div><span>Recipient <span lang="ar" dir="rtl">المستلم</span></span><strong>${escapeHtml(o.instapayRecipient)}</strong></div><button type="button" class="btn btn-outline btn-sm" data-copy-instapay="${escapeAttr(o.id)}" data-recipient="${escapeAttr(o.instapayRecipient)}">Copy · نسخ</button></div>
+              <ol><li>Transfer the exact total to this recipient. <span lang="ar" dir="rtl">حوّل الإجمالي بالضبط إلى هذا المستلم.</span></li><li>Take a screenshot after the transfer. <span lang="ar" dir="rtl">التقط صورة شاشة بعد التحويل.</span></li><li>Send the screenshot and order number ${orderNumber} using the green WhatsApp button. <span lang="ar" dir="rtl">أرسل صورة التحويل ورقم الطلب ${orderNumber} عبر زر واتساب الأخضر.</span></li></ol>
+              ${whatsappUrl ? `<a class="btn instapay-whatsapp" href="${escapeAttr(whatsappUrl)}" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">●</span> Send screenshot + order number on WhatsApp <span lang="ar" dir="rtl">إرسال الصورة ورقم الطلب عبر واتساب</span></a>` : '<p role="alert">WhatsApp is unavailable. Contact the store with this order number and your transfer screenshot. · واتساب غير متاح، تواصل معنا برقم الطلب وصورة التحويل.</p>'}
+              <p class="instapay-account-panel__pending" role="status">Unpaid until the transfer is verified. <span lang="ar" dir="rtl">يظل الطلب غير مدفوع حتى التحقق من التحويل.</span></p>
+              <p class="instapay-copy-status" data-copy-status="${escapeAttr(o.id)}" role="status" aria-live="polite"></p>
+            </section>` : ''}
+          </article>`;
+      }).join('') : `<div class="state-block"><h3>No orders yet</h3><p>Your order history will appear here once you place your first order.</p><a href="shop.html" class="btn btn-primary">Shop Now</a></div>`;
+      panel.querySelectorAll('[data-copy-instapay]').forEach((button) => button.addEventListener('click', async () => {
+        const status = panel.querySelector(`[data-copy-status="${button.dataset.copyInstapay}"]`);
+        try {
+          await navigator.clipboard.writeText(button.dataset.recipient || '');
+          status.textContent = 'Recipient details copied. · تم نسخ بيانات المستلم.';
+        } catch {
+          status.textContent = 'Copy unavailable. Select the recipient details and copy them. · تعذّر النسخ. حدّد بيانات المستلم وانسخها.';
+        }
+      }));
     } catch (error) {
       panel.innerHTML = `<div class="state-block"><h3>Couldn't load your orders</h3><p>${escapeHtml(error.message)}</p></div>`;
     }
