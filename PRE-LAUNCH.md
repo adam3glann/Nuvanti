@@ -6,7 +6,7 @@ Use this checklist before opening the store to real customers. Application code 
 
 - [ ] Railway deploys from the repository root and passes `/api/health` after migrations and bootstrap.
 - [ ] Cloudflare Pages uses `frontend/` as its project root and deploys the `/api/*` proxy. If the Railway domain changes, set `NUVANTI_API_ORIGIN` in Pages and redeploy.
-- [ ] Railway `STORE_ORIGIN` exactly matches the live storefront origin; `COOKIE_DOMAIN` is blank. The `frontend/admin/` directory is not deployed as public static content.
+- [ ] Railway `STORE_ORIGIN` exactly matches the live storefront origin; `COOKIE_DOMAIN` is blank. Confirm `https://<store-origin>/admin/` redirects to the Railway admin login and protected admin pages never load from the public static storefront.
 - [ ] Production variables from [DEPLOYMENT-POSTGRES.md](DEPLOYMENT-POSTGRES.md) are set. `JWT_SECRET` and `MFA_ENCRYPTION_KEY` are unique, random, and private. Keep the MFA key stable after enrollment.
 - [ ] Supabase PostgreSQL is reachable with TLS certificate verification enabled. Confirm migrations are applied and the initial active super-admin can sign in.
 - [ ] Verify the application database role in Supabase. The Railway startup command runs migrations and the application with the configured `DATABASE_URL`; do not claim least-privilege separation unless the role grants have been reviewed and a separate migration role is in place.
@@ -16,7 +16,7 @@ Use this checklist before opening the store to real customers. Application code 
 
 ## Account security and email
 
-- [ ] MFA is supported but currently optional per staff account. Enable it for every staff user in Admin → Security, store recovery codes in a private password manager, and confirm each login requires a fresh authenticator code.
+- [ ] Enable MFA for every staff user in Admin → Security before launch, store recovery codes in a private password manager, and confirm each login requires a fresh authenticator code. The application currently supports but does not force TOTP enrollment, so this remains an operator-controlled launch requirement.
 - [ ] Configure SMTP or Resend and a valid `MAIL_FROM`. In Admin → Settings → Email, send a test message and confirm it arrives.
 - [ ] Create a fresh customer account and confirm the verification email arrives. Confirm the link verifies the account and checkout rejects unverified accounts through the API.
 - [ ] Verify password reset, administrator setup, order confirmation, order status, and newsletter confirmation/unsubscribe emails. Check provider logs and spam folders if a message is missing.

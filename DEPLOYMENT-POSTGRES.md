@@ -51,7 +51,7 @@ or paste them into chat.
 
 Initial administrator provisioning uses one-time private Railway variables only when no active super administrator exists. Follow the private owner setup process for their names and values. Remove all bootstrap variables from Railway as soon as initial setup is complete. The bootstrap command leaves the existing catalog and active super-admin unchanged on subsequent deploys.
 
-In Cloudflare Pages, set the project root to `frontend/`. The proxy defaults to `https://nuvanti-production.up.railway.app`; if the Railway domain changes, set the Pages environment variable `NUVANTI_API_ORIGIN` to the new HTTPS origin and redeploy Pages. In Railway, set `STORE_ORIGIN` to the exact storefront origin and leave `COOKIE_DOMAIN` blank. The storefront uses same-origin API requests so session cookies remain first-party on phones.
+In Cloudflare Pages, set the project root to `frontend/`. The API proxy and `/admin/*` gateway default to `https://nuvanti-production.up.railway.app`; if the Railway domain changes, set the Pages environment variable `NUVANTI_API_ORIGIN` to the new HTTPS origin and redeploy Pages. `/admin/*` requests are handled by a Pages Function and redirected to Railway's protected admin app before static assets are served. In Railway, set `STORE_ORIGIN` to the exact storefront origin and leave `COOKIE_DOMAIN` blank. The storefront uses same-origin API requests so session cookies remain first-party on phones.
 
 In Admin → Settings → Email, check the provider status and use **Send test email** after configuring the variables. The test goes to the signed-in super administrator. Set the Customer Support Email in Settings → General to receive contact-form alerts.
 

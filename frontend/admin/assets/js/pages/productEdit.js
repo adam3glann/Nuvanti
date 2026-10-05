@@ -123,12 +123,12 @@ function renderForm(product, cats, cols) {
           <div class="card-pad">
             <div class="field"><label for="fSku">SKU</label><input id="fSku" class="mono" value="${esc(product.sku)}" /></div>
             <div class="field"><label for="fCategory">Category</label>
-              <select id="fCategory">${cats.map((c) => `<option value="${c.slug}" ${c.slug === product.category ? 'selected' : ''}>${c.name}</option>`).join('')}</select>
+              <select id="fCategory">${cats.map((c) => `<option value="${esc(c.slug)}" ${c.slug === product.category ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
             </div>
             <div class="field"><label for="fCollection">Collection</label>
               <select id="fCollection">
                 <option value="">None</option>
-                ${cols.map((c) => `<option value="${c.slug}" ${c.slug === product.collection ? 'selected' : ''}>${c.name}</option>`).join('')}
+                ${cols.map((c) => `<option value="${esc(c.slug)}" ${c.slug === product.collection ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}
               </select>
             </div>
             <div class="field"><label for="fMaterial">Material</label><input id="fMaterial" value="${esc(product.material || '')}" /></div>

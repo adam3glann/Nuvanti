@@ -1,5 +1,5 @@
 import { initAdminShell } from '../components/shell.js';
-import { formatPrice, paginationHTML, storeAssetSrc } from '../components/utils.js';
+import { escapeHtml, formatPrice, paginationHTML, storeAssetSrc } from '../components/utils.js';
 import { statusBadge } from '../components/statusBadge.js';
 import { icon } from '../components/icons.js';
 import { showAdminToast } from '../components/toast.js';
@@ -24,7 +24,7 @@ let selected = new Set();
 
 async function init() {
   const cats = await fetchCategories();
-  document.getElementById('categoryFilter').innerHTML = `<option value="">All Categories</option>${cats.map((c) => `<option value="${c.slug}">${c.name}</option>`).join('')}`;
+  document.getElementById('categoryFilter').innerHTML = `<option value="">All Categories</option>${cats.map((c) => `<option value="${escapeHtml(c.slug)}">${escapeHtml(c.name)}</option>`).join('')}`;
   document.getElementById('searchInput').value = state.query;
 
   if (!canEdit) document.getElementById('newProductBtn').style.display = 'none';
@@ -70,10 +70,10 @@ async function load() {
       <td>
         <div style="display:flex;align-items:center;gap:.6rem">
           <img src="${storeAssetSrc(p.images[0])}" alt="" width="36" height="45" style="object-fit:cover;border-radius:3px" />
-          <div><a href="product-edit.html?id=${p.id}" style="font-weight:600;color:var(--a-text)">${p.name}</a><br /><span class="mono" style="color:var(--a-muted)">${p.sku}</span></div>
+          <div><a href="product-edit.html?id=${encodeURIComponent(p.id)}" style="font-weight:600;color:var(--a-text)">${escapeHtml(p.name)}</a><br /><span class="mono" style="color:var(--a-muted)">${escapeHtml(p.sku)}</span></div>
         </div>
       </td>
-      <td style="text-transform:capitalize">${p.category.replace('-', ' ')}</td>
+      <td style="text-transform:capitalize">${escapeHtml(p.category.replace('-', ' '))}</td>
       <td>${formatPrice(p.price)}</td>
       <td>${statusBadge(stockStatus)} <span style="color:var(--a-muted);font-size:.76rem">(${productStockTotal(p)})</span></td>
       <td>${statusBadge(p.status)}</td>

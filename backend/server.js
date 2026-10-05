@@ -125,7 +125,7 @@ const adminApiLimiter = rateLimit({
   limit: 1800,
   standardHeaders: "draft-7",
   legacyHeaders: false,
-  keyGenerator: (req) => `admin:${req.user.id}`,
+  keyGenerator: (req) => `admin:${req.user.sub}`,
   message: { error: "Admin request limit reached. Wait a few minutes and retry." },
 });
 if (process.env.NODE_ENV === "production") {
