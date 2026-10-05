@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 import rateLimit from 'express-rate-limit';
 import { issueSession, readSession, requireAuth, resolveSession, setSessionCookie } from '../lib/auth.js';
 import { transaction, query } from '../lib/db.js';
-import { emailDeliveryStatus, sendOrderConfirmation } from '../lib/mail.js';
+import { emailDeliveryStatus, sendNewOrderNotification, sendOrderConfirmation } from '../lib/mail.js';
 import { sendOrderWhatsApp } from '../lib/whatsapp.js';
 import { storePublicOrigin } from '../lib/publicOrigins.js';
 import { createPaymobCheckout, paymobReady } from '../lib/paymob.js';
@@ -14,6 +14,21 @@ import { sendVerificationLink } from './auth.js';
 
 const router = Router();
 const asyncRoute = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
+
+async function notifySuperAdminsOfOrder({ orderId, totalCents, paymentMethod, itemCount }) {
+  const { rows } = await query(`SELECT email FROM users
+    WHERE role = 'super_admin' AND is_active = true ORDER BY id`);
+  const recipients = [...new Set(rows.map(({ email }) => String(email || '').trim().toLowerCase()).filter(Boolean))];
+  const results = await Promise.allSettled(recipients.map((to) => sendNewOrderNotification({
+    to, orderId, totalCents, paymentMethod, itemCount,
+  })));
+  for (const result of results) {
+    if (result.status === 'rejected') {
+      console.error(`New order notification email failed for order NV-${orderId}:`, result.reason);
+    }
+  }
+}
+
 const checkout = z.object({
   items: z.array(z.object({
     productId: z.coerce.number().int().positive(),
@@ -200,6 +215,13 @@ router.post('/', optionalAuth, guestOrderLimiter, asyncRoute(async (req, res) =>
     catch (error) { console.error(`Checkout account session could not be started for NV-${order.id}:`, error); }
     sendVerificationLink(registeredUser).catch((error) => console.error(`Checkout account verification email failed for NV-${order.id}:`, error));
   }
+  // Notify every active super admin without making order placement depend on email delivery.
+  notifySuperAdminsOfOrder({
+    orderId: order.id,
+    totalCents: order.totalCents,
+    paymentMethod,
+    itemCount: itemSummaries.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
+  }).catch((error) => console.error(`Unable to notify super admins about order NV-${order.id}:`, error));
   // Keep checkout successful if email fails, but wait for the provider result so
   // the customer can see whether the receipt was accepted for delivery.
   let emailDelivery = { sent: false, configured: emailDeliveryStatus().configured };

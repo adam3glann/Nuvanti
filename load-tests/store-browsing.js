@@ -1,7 +1,6 @@
-// Staging storefront load test. Point BASE_URL at a staging Pages URL whose
-// /api proxy targets a staging Railway API and staging database. This models
-// storefront entry, catalog browsing, and visitor presence. It does not place
-// orders, initiate payments, or exercise sign-in.
+// Storefront load test. Prefer staging. This models storefront entry, catalog
+// browsing, and visitor presence. It does not place orders, initiate payments,
+// or exercise sign-in.
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 
@@ -9,11 +8,14 @@ const baseUrl = (__ENV.BASE_URL || '').replace(/\/+$/, '');
 if (!baseUrl) throw new Error('Set BASE_URL to your staging storefront URL.');
 const apiBaseUrl = (__ENV.API_BASE_URL || baseUrl).replace(/\/+$/, '');
 const includePresenceWrites = __ENV.INCLUDE_PRESENCE_WRITES !== 'false';
+const presenceOnly = __ENV.PRESENCE_ONLY === 'true';
 // Use the synthetic forwarding IPs only for a local server configured with
 // TRUST_PROXY=1; never send them to a public environment.
 const apiRequestOptions = {
   headers: {
-    ...(__ENV.API_BASE_URL ? { Origin: baseUrl } : {}),
+    // k6 is not a browser and does not add Origin automatically. The API
+    // requires it on POSTs, so send the storefront origin for every write.
+    Origin: baseUrl,
     ...(__ENV.SIMULATE_CLIENT_IPS === 'true'
       ? { 'X-Forwarded-For': `198.51.100.${__VU}` }
       : {}),
@@ -25,13 +27,21 @@ export const options = {
     browsing: {
       executor: 'ramping-vus',
       startVUs: 0,
-      stages: [
-        { duration: '1m', target: 50 },
-        { duration: '1m', target: 100 },
-        { duration: '2m', target: 200 },
-        { duration: '5m', target: 200 },
-        { duration: '1m', target: 0 },
-      ],
+      stages: presenceOnly
+        ? [
+            // Quick admin counter demo. Each synthetic session sends a small
+            // number of heartbeats and fits under the shared-IP write limit.
+            { duration: '10s', target: 200 },
+            { duration: '20s', target: 200 },
+            { duration: '1s', target: 0 },
+          ]
+        : [
+            { duration: '1m', target: 50 },
+            { duration: '1m', target: 100 },
+            { duration: '2m', target: 200 },
+            { duration: '5m', target: 200 },
+            { duration: '1m', target: 0 },
+          ],
     },
   },
   thresholds: {
@@ -48,20 +58,22 @@ export default function () {
     const home = http.get(`${baseUrl}/`);
     check(home, { 'storefront loads': (response) => response.status === 200 });
 
-    if (includePresenceWrites) {
+    if (includePresenceWrites && !presenceOnly) {
       const pageView = http.post(`${apiBaseUrl}/api/storefront/page-view`, null, apiRequestOptions);
       check(pageView, { 'page view is recorded': (response) => response.status === 204 });
     }
   }
 
-  const response = http.get(`${apiBaseUrl}/api/products?limit=100`, apiRequestOptions);
-  check(response, { 'product list loads': (result) => result.status === 200 });
+  if (!presenceOnly) {
+    const response = http.get(`${apiBaseUrl}/api/products?limit=100`, apiRequestOptions);
+    check(response, { 'product list loads': (result) => result.status === 200 });
 
-  if (response.status === 200) {
-    const products = response.json();
-    if (Array.isArray(products) && products.length) {
-      const product = products[Math.floor(Math.random() * products.length)];
-      http.get(`${apiBaseUrl}/api/products/${encodeURIComponent(product.slug)}`, apiRequestOptions);
+    if (response.status === 200) {
+      const products = response.json();
+      if (Array.isArray(products) && products.length) {
+        const product = products[Math.floor(Math.random() * products.length)];
+        http.get(`${apiBaseUrl}/api/products/${encodeURIComponent(product.slug)}`, apiRequestOptions);
+      }
     }
   }
 

@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer';
-import { storePublicOrigin } from './publicOrigins.js';
+import { adminPublicOrigin, storePublicOrigin } from './publicOrigins.js';
 
 function hasValue(key) {
   const value = String(process.env[key] || '').trim();
@@ -177,6 +177,57 @@ export async function sendOrderConfirmation({ to, name, orderId, items, totalCen
     devDetail: `order #${orderId}, ${trackingUrl}`,
   });
 }
+
+export async function sendNewOrderNotification({ to, orderId, totalCents, paymentMethod, itemCount }) {
+  const paymentMethods = {
+    cod: 'Cash on Delivery',
+    paymob: 'Online payment (Paymob)',
+    instapay: 'InstaPay manual transfer',
+  };
+  const methodLabel = paymentMethods[paymentMethod] || 'Payment method';
+  const total = (Number(totalCents) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const orderUrl = `${adminPublicOrigin()}/orders.html`;
+  const details = `Order NV-${orderId}\nTotal: ${total} EGP\nPayment method: ${methodLabel}\nPayment status: Pending\nItems: ${Number(itemCount)}`;
+  const orderSummary = `
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+      <tr>
+        <td style="padding:8px 0;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#59645e">Total</td>
+        <td align="right" style="padding:8px 0;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;color:#17211d">${total} EGP</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 0;border-top:1px solid #e4e5df;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#59645e">Payment method</td>
+        <td align="right" style="padding:8px 0;border-top:1px solid #e4e5df;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#17211d">${escapeHtml(methodLabel)}</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 0;border-top:1px solid #e4e5df;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#59645e">Payment status</td>
+        <td align="right" style="padding:8px 0;border-top:1px solid #e4e5df;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#17211d">Pending</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 0;border-top:1px solid #e4e5df;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#59645e">Items</td>
+        <td align="right" style="padding:8px 0;border-top:1px solid #e4e5df;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#17211d">${Number(itemCount)}</td>
+      </tr>
+    </table>`;
+  await deliver({
+    to,
+    subject: `New Nuvanti order NV-${orderId}`,
+    text: `A new order has arrived and needs review.\n\n${details}\n\nOpen the admin orders page: ${orderUrl}`,
+    html: emailLayout({
+      preheader: `New order NV-${orderId} needs review.`,
+      eyebrow: 'NEW ORDER',
+      title: 'A new order has arrived',
+      intro: `Order NV-${escapeHtml(orderId)} is ready for your team to review.`,
+      content: orderSummary,
+      actionLabel: 'OPEN ADMIN ORDERS',
+      actionUrl: orderUrl,
+      footerNote: paymentMethod === 'instapay'
+        ? 'This InstaPay order remains unpaid until a super admin verifies the transfer.'
+        : 'Review the order in Admin before fulfillment.',
+    }),
+    devLabel: 'Development new-order notification',
+    devDetail: `order NV-${orderId} for ${total} EGP`,
+  });
+}
+
 export async function sendOrderStatusUpdate({ to, name, orderId, status, trackingUrl }) {
   const labels = { pending: 'Order received', paid: 'Payment received', processing: 'Being prepared', shipped: 'Shipped', out_for_delivery: 'Out for delivery', fulfilled: 'Delivered', cancelled: 'Cancelled' };
   const label = labels[status] || 'Updated';
