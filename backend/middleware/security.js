@@ -27,8 +27,19 @@ export function sameOrigin({ storeOrigin, storeOrigins = [], storePreviewOrigin,
 export function notFound(req, res) { res.status(404).json({ error: 'Not found.' }); }
 
 export function errorHandler(error, req, res, next) { // eslint-disable-line no-unused-vars
-  console.error(error);
   const status = error.status || (error.name === 'ZodError' ? 400 : 500);
+  if (status >= 500) {
+    if (process.env.NODE_ENV === 'production') {
+      console.error('Request failed.', {
+        method: req.method,
+        path: req.path,
+        errorName: error.name || 'Error',
+        errorCode: error.code,
+      });
+    } else {
+      console.error(error);
+    }
+  }
   const message = error.name === 'ZodError' ? 'Invalid request data.' : status >= 500 ? 'Internal server error.' : error.message;
   res.status(status).json({ error: message });
 }
