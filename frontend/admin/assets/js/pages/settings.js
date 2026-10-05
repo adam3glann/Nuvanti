@@ -68,7 +68,7 @@ function render() {
         <h3>InstaPay manual transfer</h3>
         <p class="hint">Customers transfer the order total and send a screenshot through WhatsApp. Transfers remain unpaid until an admin verifies them.</p>
         <div class="field"><label for="instapayRecipient">Receiving InstaPay details</label><textarea id="instapayRecipient" maxlength="200" rows="3" ${disabled()}>${escapeHtml(settings.payments.instapayRecipient)}</textarea></div>
-        <div class="field"><label for="instapayWhatsappPhone">WhatsApp number (international format)</label><input id="instapayWhatsappPhone" type="tel" inputmode="tel" placeholder="201012345678" value="${escapeHtml(settings.payments.instapayWhatsappPhone)}" maxlength="30" ${disabled()} /></div>
+        <div class="field"><label for="instapayWhatsappPhone">WhatsApp number (country code)</label><input id="instapayWhatsappPhone" type="tel" inputmode="tel" placeholder="+201012345678 or 201012345678" value="${escapeHtml(settings.payments.instapayWhatsappPhone)}" maxlength="30" aria-describedby="instapayPhoneHelp" ${disabled()} /><p class="hint" id="instapayPhoneHelp">Use the international country code, for example +20… or 20… for Egypt. Local Egyptian 01… numbers are also accepted and converted for WhatsApp.</p></div>
         <div class="settings-row"><div><p class="settings-row__label" id="instapayLabel">Accept InstaPay transfers</p><p class="settings-row__desc">Starts disabled. Set receiving details and WhatsApp number before enabling.</p></div><label class="a-switch"><input type="checkbox" id="instapayEnabled" aria-labelledby="instapayLabel" ${settings.payments.instapayEnabled ? 'checked' : ''} ${disabled()}><span class="a-switch-track"></span></label></div>
         ${canEdit ? '<button class="btn btn-primary" id="saveSectionBtn">Save Changes</button>' : '<p class="hint">You have view-only access to settings.</p>'}
       </div></div>`;
@@ -124,8 +124,8 @@ document.getElementById('settingsRoot')?.addEventListener('click', async (event)
     const accepted = window.confirm('Enable online card payments for customers? Confirm that your Paymob account is ready for live payments. You can turn this off here at any time.');
     if (!accepted) return;
   }
-  if (sectionName === 'payments' && data.instapayEnabled && (!data.instapayRecipient || !/^\+?[0-9]{8,15}$/.test(data.instapayWhatsappPhone))) {
-    showAdminToast('Enter receiving InstaPay details and a WhatsApp number in international format before enabling transfers.', 'error');
+  if (sectionName === 'payments' && data.instapayEnabled && (!data.instapayRecipient || !/^(?:\+?[1-9]\d{7,14}|00[1-9]\d{7,14}|01[0125]\d{8})$/.test(data.instapayWhatsappPhone.replace(/[\s().-]/g, '')))) {
+    showAdminToast('Enter receiving InstaPay details and a valid WhatsApp number with country code. Egyptian 01… numbers are also accepted.', 'error');
     return;
   }
   if (sectionName === 'general' && (!data.storeName || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.contactEmail))) {

@@ -2,6 +2,7 @@ import { initShell } from '../main.js?v=store-theme-1';
 import { icon } from '../components/icons.js';
 import { formatPrice } from '../components/productCard.js';
 import { fetchOrderPaymentStatus, getLastOrder } from '../services/orderService.js';
+import { createWhatsAppUrl } from '../services/whatsapp.js';
 
 initShell({ currentPage: 'shop' });
 
@@ -18,9 +19,8 @@ if (!order) {
 } else {
   const onlinePending = order.paymentMethod === 'paymob' && order.paymentStatus !== 'paid';
   const instaPending = order.paymentMethod === 'instapay' && order.paymentStatus === 'pending' && order.status !== 'cancelled';
-  const instaPhone = String(order.transferDetails?.whatsappPhone || '').replace(/\D/g, '');
   const instaMessage = `Hello, I transferred EGP ${Number(order.total).toFixed(2)} via InstaPay for order ${order.orderNumber}. I am attaching the transfer screenshot.\n\nمرحباً، قمت بتحويل ${Number(order.total).toFixed(2)} جنيه عبر إنستاباي للطلب ${order.orderNumber}. أرفق صورة التحويل.`;
-  const instaWhatsAppUrl = instaPhone ? `https://wa.me/${instaPhone}?text=${encodeURIComponent(instaMessage)}` : '';
+  const instaWhatsAppUrl = createWhatsAppUrl(order.transferDetails?.whatsappPhone, instaMessage);
   root.innerHTML = `
     <div class="order-success">
       <div class="order-success__icon">${icon('check')}</div>

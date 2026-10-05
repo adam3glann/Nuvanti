@@ -5,6 +5,7 @@ import { fetchMyOrders } from '../services/orderService.js';
 import { fetchAddresses, createAddress, deleteAddress } from '../services/addressService.js';
 import { showToast } from '../components/toast.js';
 import { icon } from '../components/icons.js';
+import { createWhatsAppUrl } from '../services/whatsapp.js';
 
 initShell({ currentPage: 'account' });
 
@@ -279,11 +280,10 @@ async function renderDashboard(session, tab) {
       const orders = await fetchMyOrders();
       panel.innerHTML = orders.length ? orders.map((o) => {
         const instaPending = o.paymentMethod === 'instapay' && o.paymentStatus === 'pending' && o.status !== 'cancelled' && o.instapayRecipient;
-        const phone = String(o.instapayWhatsappPhone || '').replace(/\D/g, '');
         const orderNumber = `NV-${o.id}`;
         const amount = Number(o.totalCents) / 100;
         const message = `Hello, I transferred EGP ${amount.toFixed(2)} via InstaPay for order ${orderNumber}. I am attaching the transfer screenshot.\n\nمرحباً، قمت بتحويل ${amount.toFixed(2)} جنيه عبر إنستاباي للطلب ${orderNumber}. أرفق صورة التحويل.`;
-        const whatsappUrl = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}` : '';
+        const whatsappUrl = createWhatsAppUrl(o.instapayWhatsappPhone, message);
         return `
           <article class="account-order-card">
             <a class="order-row account-order-card__summary" href="${escapeAttr(o.trackingUrl)}" style="text-decoration:none;color:inherit">

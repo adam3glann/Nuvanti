@@ -845,7 +845,10 @@ const settingsInput = z.object({
   onlinePaymentEnabled: z.boolean().optional(),
   instapayEnabled: z.boolean().optional(),
   instapayRecipient: z.string().trim().max(200).optional(),
-  instapayWhatsappPhone: z.string().trim().max(30).refine((value) => value === '' || /^\+?[0-9]{8,15}$/.test(value)).optional(),
+  instapayWhatsappPhone: z.string().trim().max(30).refine((value) => {
+    const compact = value.replace(/[\s().-]/g, '');
+    return compact === '' || /^(?:\+?[1-9]\d{7,14}|00[1-9]\d{7,14}|01[0125]\d{8})$/.test(compact);
+  }).optional(),
 });
 router.get('/settings', requirePermission('settings.view'), async (req, res) => {
   const { rows } = await query(`SELECT store_name AS "storeName", support_email AS "supportEmail", currency, standard_shipping_cents AS "standardShippingCents", express_shipping_cents AS "expressShippingCents", free_shipping_threshold_cents AS "freeShippingThresholdCents", online_payment_enabled AS "onlinePaymentEnabled", instapay_enabled AS "instapayEnabled", instapay_recipient AS "instapayRecipient", instapay_whatsapp_phone AS "instapayWhatsappPhone" FROM store_settings WHERE id = 1`);
@@ -859,8 +862,8 @@ router.patch('/settings', requirePermission('settings.edit'), async (req, res) =
   if (s.instapayEnabled === true) {
     const recipient = s.instapayRecipient;
     const phone = s.instapayWhatsappPhone;
-    if (!recipient?.trim() || !phone || !/^\+?[0-9]{8,15}$/.test(phone)) {
-      return res.status(409).json({ error: 'Add receiving InstaPay details and a WhatsApp number in international format before enabling transfers.' });
+    if (!recipient?.trim() || !phone || !/^(?:\+?[1-9]\d{7,14}|00[1-9]\d{7,14}|01[0125]\d{8})$/.test(phone.replace(/[\s().-]/g, ''))) {
+      return res.status(409).json({ error: 'Add receiving InstaPay details and a valid WhatsApp number with country code before enabling transfers.' });
     }
   }
   const { rows } = await query(
