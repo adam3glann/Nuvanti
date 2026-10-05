@@ -32,6 +32,14 @@ const apiRequestOptions = {
 };
 
 export const options = {
+  // Used by `k6 cloud run`; local `k6 run` keeps the same script runnable
+  // without cloud credentials. The Grafana Free plan allows one load zone.
+  cloud: {
+    name: 'Nuvanti storefront 100-user capacity check',
+    distribution: {
+      frankfurt: { loadZone: 'amazon:de:frankfurt', percent: 100 },
+    },
+  },
   scenarios: {
     browsing: {
       executor: 'ramping-vus',
@@ -40,15 +48,15 @@ export const options = {
         ? [
             // Quick admin counter demo. Each synthetic session sends a small
             // number of heartbeats and fits under the shared-IP write limit.
-            { duration: '10s', target: 200 },
-            { duration: '20s', target: 200 },
+            { duration: '10s', target: 100 },
+            { duration: '20s', target: 100 },
             { duration: '1s', target: 0 },
           ]
         : [
             { duration: '1m', target: 50 },
             { duration: '1m', target: 100 },
-            { duration: '2m', target: 200 },
-            { duration: '5m', target: 200 },
+            { duration: '2m', target: 100 },
+            { duration: '5m', target: 100 },
             { duration: '1m', target: 0 },
           ],
     },
