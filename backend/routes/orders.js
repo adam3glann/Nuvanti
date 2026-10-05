@@ -204,9 +204,13 @@ async function cancelUnpaidOrder(orderId) {
   });
 }
 router.get('/mine', requireAuth, async (req, res) => {
-  const { rows } = await query(`SELECT o.id, o.status, o.payment_status AS "paymentStatus", o.payment_method AS "paymentMethod", o.total_cents AS "totalCents", o.created_at AS "createdAt", o.tracking_token AS "trackingToken", o.instapay_recipient_snapshot AS "instapayRecipient", o.instapay_whatsapp_phone_snapshot AS "instapayWhatsappPhone", coalesce(sum(i.quantity), 0)::int AS "itemCount" FROM orders o LEFT JOIN order_items i ON i.order_id = o.id WHERE o.user_id = $1 GROUP BY o.id ORDER BY o.created_at DESC`, [req.user.sub]);
+  const { rows } = await query(`SELECT o.id, o.status, o.payment_status AS "paymentStatus", o.payment_method AS "paymentMethod", o.total_cents AS "totalCents", o.created_at AS "createdAt", o.tracking_token AS "trackingToken",
+    CASE WHEN o.payment_method = 'instapay' THEN coalesce(o.instapay_recipient_snapshot, (SELECT CASE WHEN s.instapay_enabled AND s.updated_at <= o.created_at THEN s.instapay_recipient END FROM store_settings s WHERE s.id = 1)) END AS "instapayRecipient",
+    CASE WHEN o.payment_method = 'instapay' THEN coalesce(o.instapay_whatsapp_phone_snapshot, (SELECT NULLIF(s.instapay_whatsapp_phone, '') FROM store_settings s WHERE s.id = 1)) END AS "instapayWhatsappPhone",
+    coalesce(sum(i.quantity), 0)::int AS "itemCount"
+    FROM orders o LEFT JOIN order_items i ON i.order_id = o.id WHERE o.user_id = $1 GROUP BY o.id ORDER BY o.created_at DESC`, [req.user.sub]);
   const storeOrigin = storePublicOrigin();
-  res.json(rows.map(({ trackingToken, ...row }) => ({ ...row, trackingUrl: `${storeOrigin}/track.html?order=${row.id}&token=${trackingToken}` })));
+  res.set('Cache-Control', 'no-store').json(rows.map(({ trackingToken, ...row }) => ({ ...row, trackingUrl: `${storeOrigin}/track.html?order=${row.id}&token=${trackingToken}` })));
 });
 
 // Public, token-guarded order lookup â€” this is what the tracking link in the
@@ -217,7 +221,10 @@ router.get('/track/:id', trackLimiter, async (req, res) => {
   const id = Number(req.params.id);
   const token = String(req.query.token || '');
   if (!Number.isInteger(id) || !token) return res.status(400).json({ error: 'Invalid tracking link.' });
-  const { rows } = await query('SELECT id, status, payment_status AS "paymentStatus", payment_method AS "paymentMethod", delivery, total_cents AS "totalCents", created_at AS "createdAt", shipping_address AS "shippingAddress", tracking_token AS "trackingToken" FROM orders WHERE id = $1', [id]);
+  const { rows } = await query(`SELECT o.id, o.status, o.payment_status AS "paymentStatus", o.payment_method AS "paymentMethod", o.delivery, o.total_cents AS "totalCents", o.created_at AS "createdAt", o.shipping_address AS "shippingAddress", o.tracking_token AS "trackingToken",
+    CASE WHEN o.payment_method = 'instapay' THEN coalesce(o.instapay_recipient_snapshot, (SELECT CASE WHEN s.instapay_enabled AND s.updated_at <= o.created_at THEN s.instapay_recipient END FROM store_settings s WHERE s.id = 1)) END AS "instapayRecipient",
+    CASE WHEN o.payment_method = 'instapay' THEN coalesce(o.instapay_whatsapp_phone_snapshot, (SELECT NULLIF(s.instapay_whatsapp_phone, '') FROM store_settings s WHERE s.id = 1)) END AS "instapayWhatsappPhone"
+    FROM orders o WHERE o.id = $1`, [id]);
   const order = rows[0];
   const tokenBuf = Buffer.from(token);
   const validLength = order && Buffer.byteLength(order.trackingToken || '') === tokenBuf.length;
@@ -229,6 +236,8 @@ router.get('/track/:id', trackLimiter, async (req, res) => {
     status: order.status,
     paymentStatus: order.paymentStatus,
     paymentMethod: order.paymentMethod,
+    instapayRecipient: order.instapayRecipient,
+    instapayWhatsappPhone: order.instapayWhatsappPhone,
     delivery: order.delivery,
     total: Number(order.totalCents) / 100,
     createdAt: order.createdAt,

@@ -279,10 +279,13 @@ async function renderDashboard(session, tab) {
     try {
       const orders = await fetchMyOrders();
       panel.innerHTML = orders.length ? orders.map((o) => {
-        const instaPending = o.paymentMethod === 'instapay' && o.paymentStatus === 'pending' && o.status !== 'cancelled' && o.instapayRecipient;
+        const instaPending = o.paymentMethod === 'instapay' && o.paymentStatus === 'pending' && o.status !== 'cancelled';
+        const hasInstaRecipient = Boolean(o.instapayRecipient);
         const orderNumber = `NV-${o.id}`;
         const amount = Number(o.totalCents) / 100;
-        const message = `Hello, I transferred EGP ${amount.toFixed(2)} via InstaPay for order ${orderNumber}. I am attaching the transfer screenshot.\n\nمرحباً، قمت بتحويل ${amount.toFixed(2)} جنيه عبر إنستاباي للطلب ${orderNumber}. أرفق صورة التحويل.`;
+        const message = hasInstaRecipient
+          ? `Hello, I transferred EGP ${amount.toFixed(2)} via InstaPay for order ${orderNumber}. I am attaching the transfer screenshot.\n\nمرحباً، قمت بتحويل ${amount.toFixed(2)} جنيه عبر إنستاباي للطلب ${orderNumber}. أرفق صورة التحويل.`
+          : `Hello, I have order ${orderNumber} and need the verified InstaPay transfer details before I pay.\n\nمرحباً، لدي الطلب ${orderNumber} وأحتاج بيانات تحويل إنستاباي المؤكدة قبل الدفع.`;
         const whatsappUrl = createWhatsAppUrl(o.instapayWhatsappPhone, message);
         return `
           <article class="account-order-card">
@@ -296,10 +299,10 @@ async function renderDashboard(session, tab) {
             </a>
             ${instaPending ? `<section class="instapay-account-panel" aria-labelledby="instapayOrder${escapeAttr(o.id)}">
               <h3 id="instapayOrder${escapeAttr(o.id)}">InstaPay transfer needed <span lang="ar" dir="rtl">التحويل عبر إنستاباي مطلوب</span></h3>
-              <div class="instapay-account-panel__amount"><span>Transfer this exact total <span lang="ar" dir="rtl">حوّل هذا الإجمالي بالضبط</span></span><strong>${formatPrice(amount)}</strong></div>
+              ${hasInstaRecipient ? `<div class="instapay-account-panel__amount"><span>Transfer this exact total <span lang="ar" dir="rtl">حوّل هذا الإجمالي بالضبط</span></span><strong>${formatPrice(amount)}</strong></div>
               <div class="instapay-account-panel__recipient"><div><span>Recipient <span lang="ar" dir="rtl">المستلم</span></span><strong>${renderInstapayRecipient(o.instapayRecipient)}</strong></div><button type="button" class="btn btn-outline btn-sm" data-copy-instapay="${escapeAttr(o.id)}" data-recipient="${escapeAttr(o.instapayRecipient)}">Copy · نسخ</button></div>
-              <ol><li>Transfer the exact total to this recipient. <span lang="ar" dir="rtl">حوّل الإجمالي بالضبط إلى هذا المستلم.</span></li><li>Take a screenshot after the transfer. <span lang="ar" dir="rtl">التقط صورة شاشة بعد التحويل.</span></li><li>Send the screenshot and order number ${orderNumber} using the green WhatsApp button. <span lang="ar" dir="rtl">أرسل صورة التحويل ورقم الطلب ${orderNumber} عبر زر واتساب الأخضر.</span></li></ol>
-              ${whatsappUrl ? `<a class="btn instapay-whatsapp" href="${escapeAttr(whatsappUrl)}" target="_blank" rel="noopener noreferrer" aria-label="Open WhatsApp to send the transfer screenshot and order ${escapeAttr(orderNumber)}. Opens in a new tab."><span aria-hidden="true">●</span> Send screenshot + order number on WhatsApp <span lang="ar" dir="rtl">إرسال الصورة ورقم الطلب عبر واتساب</span></a>` : '<p role="alert">WhatsApp is unavailable. Contact the store with this order number and your transfer screenshot. · واتساب غير متاح، تواصل معنا برقم الطلب وصورة التحويل.</p>'}
+              <ol><li>Transfer the exact total to this recipient. <span lang="ar" dir="rtl">حوّل الإجمالي بالضبط إلى هذا المستلم.</span></li><li>Take a screenshot after the transfer. <span lang="ar" dir="rtl">التقط صورة شاشة بعد التحويل.</span></li><li>Send the screenshot and order number ${orderNumber} using the green WhatsApp button. <span lang="ar" dir="rtl">أرسل صورة التحويل ورقم الطلب ${orderNumber} عبر زر واتساب الأخضر.</span></li></ol>` : '<p role="alert">We can’t confirm the recipient details saved for this older order. Contact us before transferring so we can confirm the correct destination. · لا يمكننا تأكيد بيانات المستلم المحفوظة لهذا الطلب. تواصل معنا لتأكيد بيانات التحويل قبل الدفع.</p>'}
+              ${whatsappUrl ? `<a class="btn instapay-whatsapp" href="${escapeAttr(whatsappUrl)}" target="_blank" rel="noopener noreferrer" aria-label="Open WhatsApp for help with InstaPay order ${escapeAttr(orderNumber)}. Opens in a new tab."><span aria-hidden="true">●</span> ${hasInstaRecipient ? 'Send screenshot + order number on WhatsApp' : 'Ask for transfer details on WhatsApp'} <span lang="ar" dir="rtl">${hasInstaRecipient ? 'إرسال الصورة ورقم الطلب عبر واتساب' : 'طلب بيانات التحويل عبر واتساب'}</span></a>` : '<p role="alert">WhatsApp is unavailable. Contact the store about this order before transferring. · واتساب غير متاح، تواصل مع المتجر قبل التحويل.</p>'}
               <p class="instapay-account-panel__pending" role="status">Unpaid until the transfer is verified. <span lang="ar" dir="rtl">يظل الطلب غير مدفوع حتى التحقق من التحويل.</span></p>
               <p class="instapay-copy-status" data-copy-status="${escapeAttr(o.id)}" role="status" aria-live="polite"></p>
             </section>` : ''}
