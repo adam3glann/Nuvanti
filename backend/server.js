@@ -18,7 +18,7 @@ import authRouter from "./routes/auth.js";
 import adminRouter from "./routes/admin.js";
 import uploadsRouter from "./routes/uploads.js";
 import paymentsRouter from "./routes/payments.js";
-import { requireAdminPage, requireAuth, requireRole } from "./lib/auth.js";
+import { requireAdminMfa, requireAdminPage, requireAuth, requireRole } from "./lib/auth.js";
 import { requireUnblockedAdminIp } from "./lib/adminLoginSecurity.js";
 import { errorHandler, notFound, sameOrigin } from "./middleware/security.js";
 import { query } from "./lib/db.js";
@@ -236,12 +236,13 @@ app.use("/api/newsletter", newsletterRouter);
 app.use("/api/orders", ordersRouter);
 app.use("/api/addresses", addressesRouter);
 app.use("/api/contact", contactRouter);
-app.use("/api/admin", requireUnblockedAdminIp, requireAuth, requireRole(...STAFF_ROLES), adminApiLimiter, adminRouter);
+app.use("/api/admin", requireUnblockedAdminIp, requireAuth, requireRole(...STAFF_ROLES), requireAdminMfa, adminApiLimiter, adminRouter);
 app.use(
   "/api/admin/uploads",
   requireUnblockedAdminIp,
   requireAuth,
   requireRole(...STAFF_ROLES),
+  requireAdminMfa,
   adminApiLimiter,
   (req, res, next) => {
     const canManageImages = ["products.create", "products.edit", "content.manage"]

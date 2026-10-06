@@ -16,7 +16,7 @@ Use this checklist before opening the store to real customers. Application code 
 
 ## Account security and email
 
-- [ ] Enable MFA for every staff user in Admin → Security before launch, store recovery codes in a private password manager, and confirm each login requires a fresh authenticator code. The application currently supports but does not force TOTP enrollment, so this remains an operator-controlled launch requirement.
+- [ ] Enable authenticator MFA for every staff user in Admin → Security, store recovery codes in a private password manager, and confirm each login requires a fresh authenticator code. Admin pages and data APIs now block staff until TOTP enrollment is complete; staff can still reach the Security page to enroll.
 - [ ] Configure SMTP or Resend and a valid `MAIL_FROM`. In Admin → Settings → Email, send a test message and confirm it arrives.
 - [ ] Create a fresh customer account and confirm the verification email arrives. Confirm the link verifies the account and checkout rejects unverified accounts through the API.
 - [ ] Verify password reset, administrator setup, order confirmation, order status, and newsletter confirmation/unsubscribe emails. Check provider logs and spam folders if a message is missing.

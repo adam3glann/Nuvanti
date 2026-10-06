@@ -110,7 +110,8 @@ export async function resolveSession(session) {
   const { rows } = await query(
     `WITH valid_session AS (
        SELECT u.id, u.email, u.role, u.email_verified_at AS "emailVerifiedAt",
-         u.session_version AS "sessionVersion", s.id AS "sessionId", s.last_seen_at AS "lastSeenAt"
+         u.totp_enabled_at AS "totpEnabledAt", u.session_version AS "sessionVersion",
+         s.id AS "sessionId", s.last_seen_at AS "lastSeenAt"
        FROM auth_sessions s JOIN users u ON u.id = s.user_id
        WHERE s.id = $1 AND s.user_id = $2 AND s.revoked_at IS NULL AND s.expires_at > NOW()
          AND s.session_version = u.session_version AND u.is_active = true
@@ -120,7 +121,8 @@ export async function resolveSession(session) {
        WHERE s.id = v."sessionId" AND (v."lastSeenAt" IS NULL OR v."lastSeenAt" < NOW() - INTERVAL '5 minutes')
        RETURNING s.id
      )
-     SELECT v.id, v.email, v.role, v."emailVerifiedAt", v."sessionVersion", v."sessionId"
+     SELECT v.id, v.email, v.role, v."emailVerifiedAt", v."totpEnabledAt",
+       v."sessionVersion", v."sessionId"
      FROM valid_session v`,
     [session.jti, session.sub],
   );
@@ -133,7 +135,14 @@ export async function requireAuth(req, res, next) {
   try {
     const user = await resolveSession(session);
     if (!user) return res.status(401).json({ error: 'Authentication required.' });
-    req.user = { ...session, sub: String(user.id), email: user.email, role: user.role, emailVerifiedAt: user.emailVerifiedAt };
+    req.user = {
+      ...session,
+      sub: String(user.id),
+      email: user.email,
+      role: user.role,
+      emailVerifiedAt: user.emailVerifiedAt,
+      totpEnabledAt: user.totpEnabledAt,
+    };
     next();
   } catch (error) { next(error); }
 }
@@ -150,9 +159,34 @@ export async function requireAdminPage(req, res, next) {
   try {
     const user = await resolveSession(session);
     if (!user || !staffRoles.includes(user.role)) return res.redirect('/login.html');
-    req.user = { ...session, sub: String(user.id), email: user.email, role: user.role, emailVerifiedAt: user.emailVerifiedAt };
+    req.user = {
+      ...session,
+      sub: String(user.id),
+      email: user.email,
+      role: user.role,
+      emailVerifiedAt: user.emailVerifiedAt,
+      totpEnabledAt: user.totpEnabledAt,
+    };
+    // Staff who have completed the email challenge but not authenticator setup
+    // may reach the Security page and its static assets only. Admin data APIs
+    // are separately guarded by requireAdminMfa.
+    if (
+      !user.totpEnabledAt
+      && req.path !== '/security.html'
+      && !req.path.startsWith('/assets/')
+    ) return res.redirect('/security.html');
     next();
   } catch (error) { next(error); }
+}
+
+export function requireAdminMfa(req, res, next) {
+  if (!req.user?.totpEnabledAt) {
+    return res.status(403).json({
+      code: 'MFA_SETUP_REQUIRED',
+      error: 'Set up authenticator two-factor authentication to access admin data.',
+    });
+  }
+  next();
 }
 
 export function requireRole(...roles) {
