@@ -128,6 +128,14 @@ const adminApiLimiter = rateLimit({
   keyGenerator: (req) => `admin:${req.user.sub}`,
   message: { error: "Admin request limit reached. Wait a few minutes and retry." },
 });
+function isPublicCatalogRead(req) {
+  if (req.method !== "GET") return false;
+  if (["/api/products", "/api/products/"].includes(req.path)) {
+    return req.query.search === undefined;
+  }
+  if (req.path.startsWith("/api/products/")) return true;
+  return ["/api/categories", "/api/categories/", "/api/navigation", "/api/navigation/"].includes(req.path);
+}
 if (process.env.NODE_ENV === "production") {
   if (
     !process.env.JWT_SECRET ||
@@ -183,6 +191,8 @@ app.use(
     // Give that endpoint its own tighter limiter after admin authentication so
     // it cannot exhaust the shared API budget and block catalog work.
     skip: (req) => ["/api/storefront/presence", "/api/storefront/page-view"].includes(req.path)
+      // Public catalog reads use a separate, higher read-only budget below.
+      || isPublicCatalogRead(req)
       || req.path === "/api/admin"
       || req.path.startsWith("/api/admin/"),
   }),
@@ -209,6 +219,15 @@ app.get("/api/health", async (req, res, next) => {
     next(error);
   }
 });
+const publicCatalogReadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 1800,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  skip: (req) => !isPublicCatalogRead(req),
+  message: { error: "Catalog request limit reached. Please wait a few minutes and retry." },
+});
+app.use(["/api/products", "/api/categories", "/api/navigation"], publicCatalogReadLimiter);
 app.use("/api/products", productsRouter);
 app.use("/api/categories", categoriesRouter);
 app.use("/api/navigation", navigationRouter);

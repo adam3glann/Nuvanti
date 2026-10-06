@@ -30,7 +30,7 @@ Use this checklist before opening the store to real customers. Application code 
 - [ ] If enabling Paymob, configure all four Paymob variables and the transaction callback URL. Complete a test payment, verify the signed webhook updates the correct order, and reconcile the result in Paymob before switching to live credentials. Refunds are not automated; document the manual refund and order reconciliation procedure.
 - [ ] Test the customer storefront on desktop and mobile, including sign-in, email verification, cart, discounts, checkout, and order tracking. Test admin product editing, customer/order pages, exports, and image uploads.
 - [ ] Confirm the admin header’s live online count changes as separate devices open/close the storefront. The count refreshes every 2 seconds and excludes stale visitor sessions after 12 seconds.
-- [ ] Run `k6 run -e BASE_URL=https://<staging-storefront-domain> load-tests/store-browsing.js` against staging before launch; confirm the configured 200-user scenario meets its error-rate and latency thresholds without exhausting the Railway service or Supabase database.
+- [ ] Set `NUVANTI_LOAD_TEST_BASE_URL` to a staging storefront, then run `./load-tests/run-distributed.ps1` before launch. The current profile peaks at 100 virtual users in one load zone to fit the configured Grafana plan. Confirm the error-rate and latency thresholds pass without exhausting Railway or Supabase. Test at 200 only when the load-test plan allows it, and keep the run on staging.
 - [ ] Confirm contact messages appear in Admin → Customers → Contact Messages and that configured support notifications arrive.
 
 ## Policies and launch decision

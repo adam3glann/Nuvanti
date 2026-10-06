@@ -7,6 +7,18 @@ if (-not (Get-Command k6 -ErrorAction SilentlyContinue)) {
   throw 'k6 is not installed or is not available on PATH.'
 }
 
+$baseUrl = ([string]$env:NUVANTI_LOAD_TEST_BASE_URL).Trim().TrimEnd('/')
+if (-not $baseUrl) {
+  throw 'Set NUVANTI_LOAD_TEST_BASE_URL to a staging storefront URL before starting a load test.'
+}
+$target = $null
+if (-not [Uri]::TryCreate($baseUrl, [UriKind]::Absolute, [ref]$target) -or $target.Scheme -ne 'https') {
+  throw 'NUVANTI_LOAD_TEST_BASE_URL must be an absolute HTTPS URL.'
+}
+if ($target.Host -in @('nuvanti-shop.pages.dev', 'nuvanti-production.up.railway.app')) {
+  throw 'The production storefront/API is blocked by default. Choose a staging URL.'
+}
+
 $k6ConfigPath = Join-Path $env:APPDATA 'k6\config.json'
 $hasEnvironmentCredentials = [bool]$env:K6_CLOUD_TOKEN -and [bool]$env:K6_CLOUD_STACK_ID
 $hasSavedCredentials = Test-Path -LiteralPath $k6ConfigPath
@@ -21,7 +33,7 @@ if (-not $hasEnvironmentCredentials -and -not $hasSavedCredentials) {
 
 & k6 cloud run `
   --summary-mode full `
-  -e 'BASE_URL=https://nuvanti-shop.pages.dev' `
+  -e "BASE_URL=$baseUrl" `
   'load-tests/store-browsing.js'
 
 exit $LASTEXITCODE
