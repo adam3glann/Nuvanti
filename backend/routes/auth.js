@@ -179,6 +179,7 @@ router.post('/login/email-code', asyncRoute(async (req, res) => {
 }));
 
 router.post('/login/mfa', asyncRoute(async (req, res) => {
+  if (await rejectBlockedAdminIp(req, res)) return;
   const challenge = readMfaChallenge(req);
   const { code } = mfaCodeInput.parse(req.body);
   if (!challenge) {
@@ -206,10 +207,19 @@ router.post('/login/mfa', asyncRoute(async (req, res) => {
       authenticated = consumed.rowCount === 1;
     }
   }
-  if (!authenticated) return res.status(401).json({ error: step !== null
-    ? 'This authenticator code was already used. Wait for the next 30-second code and try again.'
-    : 'That authenticator or recovery code is invalid or already used.' });
+  if (!authenticated) {
+    const ipBlock = await recordAdminEmailCodeFailure(req);
+    await logAudit({ req, actor: user, action: 'auth.mfa_login_failed', targetType: 'user', targetId: user.id, metadata: { failedAttempts: ipBlock.failedAttempts } });
+    if (ipBlock.blockedUntil && new Date(ipBlock.blockedUntil) > new Date()) {
+      res.set('Retry-After', String(Math.max(1, Math.ceil((new Date(ipBlock.blockedUntil).getTime() - Date.now()) / 1000))));
+      return res.status(423).json({ error: 'Three incorrect admin verification codes blocked sign-in from this network for 24 hours.' });
+    }
+    return res.status(401).json({ error: step !== null
+      ? 'This authenticator code was already used. Wait for the next 30-second code and try again.'
+      : 'That authenticator or recovery code is invalid or already used.' });
+  }
 
+  await clearAdminEmailCodeFailures(req);
   const safeUser = { id: user.id, email: user.email, name: user.name, role: user.role, sessionVersion: user.sessionVersion };
   clearMfaChallengeCookie(res);
   setSessionCookie(res, await issueSession(safeUser, req));
