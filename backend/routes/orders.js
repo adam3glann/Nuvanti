@@ -11,6 +11,7 @@ import { storePublicOrigin } from '../lib/publicOrigins.js';
 import { createPaymobCheckout, paymobReady } from '../lib/paymob.js';
 import { restoreOrderInventory } from '../lib/orderLifecycle.js';
 import { sendVerificationLink } from './auth.js';
+import { requireCheckoutAvailable } from '../middleware/emergencyLockdown.js';
 
 const router = Router();
 const asyncRoute = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
@@ -69,7 +70,7 @@ function optionalAuth(req, res, next) {
     next();
   }).catch(next);
 }
-router.post('/validate-discount', discountPreviewLimiter, async (req, res) => {
+router.post('/validate-discount', requireCheckoutAvailable, discountPreviewLimiter, async (req, res) => {
   const parsed = validateDiscountSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: 'Enter a discount code.' });
   const { code, subtotal } = parsed.data;
@@ -86,7 +87,7 @@ router.post('/validate-discount', discountPreviewLimiter, async (req, res) => {
   res.json({ code: discount.code, type: discount.type, value: discount.value, discountCents });
 });
 
-router.post('/', optionalAuth, guestOrderLimiter, asyncRoute(async (req, res) => {
+router.post('/', requireCheckoutAvailable, optionalAuth, guestOrderLimiter, asyncRoute(async (req, res) => {
   const { items, shipping, delivery, discountCode, paymentMethod, createAccount } = checkout.parse(req.body);
   if (req.user && !req.user.emailVerifiedAt) return res.status(403).json({ code: 'EMAIL_NOT_VERIFIED', error: 'Confirm your email before placing an order.' });
   if (req.user && createAccount) return res.status(400).json({ error: 'You are already signed in.' });

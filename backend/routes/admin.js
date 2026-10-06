@@ -24,6 +24,7 @@ const adminPresenceLimiter = rateLimit({
 const asyncRoute = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
 const MANAGEABLE_ROLES = ['staff', 'manager', 'admin', 'super_admin'];
 const RESETTABLE_ROLES = ['admin', 'super_admin'];
+const STAFF_ROLES = ['staff', 'manager', 'admin', 'super_admin'];
 const SUPER_ADMIN_GUARD_LOCK = 724062;
 const restoreBackupUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024, files: 1 } });
 function requireStoreMaintenanceRole(req, res, next) {
@@ -165,6 +166,40 @@ router.get('/maintenance/backup', requireStoreMaintenanceRole, asyncRoute(async 
     };
   });
   res.set({ 'Cache-Control': 'no-store', 'Content-Disposition': 'attachment; filename="nuvanti-store-backup.json"' }).json(backup);
+}));
+
+router.post('/maintenance/emergency', asyncRoute(async (req, res) => {
+  if (req.user?.role !== 'super_admin') {
+    return res.status(403).json({ error: 'Only a super admin can activate emergency lockdown.' });
+  }
+  if (req.body?.confirmation !== 'LOCK DOWN STORE') {
+    return res.status(400).json({ error: 'Emergency confirmation is required.' });
+  }
+
+  const result = await transaction(async (client) => {
+    await client.query(`UPDATE emergency_lockdown SET is_active = TRUE, activated_at = NOW(), activated_by = $1 WHERE id = 1`, [req.user.sub]);
+    const { rows: staff } = await client.query(`UPDATE users
+      SET session_version = session_version + 1
+      WHERE role = ANY($1::text[]) AND is_active = true
+      RETURNING id`, [STAFF_ROLES]);
+    const { rowCount: revokedSessions } = await client.query(`UPDATE auth_sessions
+      SET revoked_at = NOW()
+      WHERE user_id IN (SELECT id FROM users WHERE role = ANY($1::text[]))
+        AND revoked_at IS NULL`, [STAFF_ROLES]);
+    const { rowCount: clearedEmailChallenges } = await client.query(`DELETE FROM admin_email_login_challenges
+      WHERE user_id IN (SELECT id FROM users WHERE role = ANY($1::text[]))`, [STAFF_ROLES]);
+    const { rowCount: clearedResetTokens } = await client.query(`DELETE FROM password_reset_tokens
+      WHERE user_id IN (SELECT id FROM users WHERE role = ANY($1::text[]))`, [STAFF_ROLES]);
+    return {
+      staffAccountsInvalidated: staff.length,
+      sessionsRevoked: revokedSessions,
+      emailChallengesCleared: clearedEmailChallenges,
+      passwordResetTokensCleared: clearedResetTokens,
+    };
+  });
+
+  await logAudit({ req, action: 'security.emergency_lockdown_activated', targetType: 'staff', targetId: 'all', metadata: result });
+  res.set('Cache-Control', 'no-store').json({ ok: true, ...result });
 }));
 
 router.post('/maintenance/restore', requireStoreMaintenanceRole, restoreBackupUpload.single('backupFile'), asyncRoute(async (req, res) => {

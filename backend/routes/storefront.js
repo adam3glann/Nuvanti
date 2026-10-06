@@ -2,6 +2,7 @@ import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { query } from '../lib/db.js';
+import { isEmergencyLockdownActive } from '../middleware/emergencyLockdown.js';
 
 const router = Router();
 const presenceLimiter = rateLimit({ windowMs: 60 * 1000, limit: 600, standardHeaders: 'draft-7', legacyHeaders: false });
@@ -33,6 +34,7 @@ router.post('/page-view', pageViewLimiter, asyncRoute(async (req, res) => {
 }));
 
 router.get('/settings', async (req, res) => {
+  const emergencyLockdown = await isEmergencyLockdownActive();
   const { rows } = await query(`SELECT store_name AS "storeName", currency,
     standard_shipping_cents AS "standardShippingCents",
     express_shipping_cents AS "expressShippingCents",
@@ -42,10 +44,10 @@ router.get('/settings', async (req, res) => {
     CASE WHEN instapay_enabled THEN instapay_whatsapp_phone ELSE '' END AS "instapayWhatsappPhone"
     FROM store_settings WHERE id = 1`);
   res.set('Cache-Control', 'no-store');
-  res.json(rows[0] || {
+  res.json({ ...(rows[0] || {
     storeName: 'Nuvanti', currency: 'EGP', standardShippingCents: 7500,
     expressShippingCents: 15000, freeShippingThresholdCents: 300000,
-  });
+  }), emergencyLockdown });
 });
 
 router.get('/homepage-slides', async (req, res) => {

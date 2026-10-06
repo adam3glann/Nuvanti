@@ -10,6 +10,7 @@ import { logAudit } from '../lib/audit.js';
 import { adminPublicOrigin, storePublicOrigin } from '../lib/publicOrigins.js';
 import { createOtpAuthUri, createRecoveryCodes, createTotpSecret, decryptTotpSecret, encryptTotpSecret, hashRecoveryCode, verifyTotp } from '../lib/totp.js';
 import { clearAdminEmailCodeFailures, hashAdminEmailCode, recordAdminEmailCodeFailure, rejectBlockedAdminIp, safeHashEquals } from '../lib/adminLoginSecurity.js';
+import { isEmergencyLockdownActive } from '../middleware/emergencyLockdown.js';
 
 const STAFF_ROLES = ['staff', 'manager', 'admin', 'super_admin'];
 const MAX_FAILED_ATTEMPTS = 5;
@@ -24,6 +25,12 @@ const credentials = z.object({ email: z.string().trim().email().max(254).transfo
 const registrationCredentials = z.object({ email: z.string().trim().email().max(254).transform((v) => v.toLowerCase()), password: z.string().min(12).max(128) });
 const resetRequest = z.object({ email: z.string().trim().email().max(254).transform((v) => v.toLowerCase()) });
 const resetPassword = z.object({ token: z.string().regex(/^[a-f0-9]{64}$/), password: z.string().min(12).max(128) });
+async function blockStaffLoginDuringLockdown(user, res) {
+  if (!STAFF_ROLES.includes(user?.role) || !(await isEmergencyLockdownActive())) return false;
+  clearSession(res);
+  res.set('Cache-Control', 'no-store').status(503).json({ error: 'Admin sign-in is temporarily disabled during a security lockdown.' });
+  return true;
+}
 
 router.post('/register', asyncRoute(async (req, res) => {
   const { email, password } = registrationCredentials.parse(req.body);
@@ -79,6 +86,8 @@ router.post('/login', asyncRoute(async (req, res) => {
     return res.status(401).json({ error: 'Invalid email or password.' });
   }
 
+  if (await blockStaffLoginDuringLockdown(user, res)) return;
+
   if (user.failed_login_count > 0 || user.locked_until) {
     await query('UPDATE users SET failed_login_count = 0, locked_until = NULL WHERE id = $1', [user.id]);
   }
@@ -117,6 +126,10 @@ const mfaCodeInput = z.object({ code: z.string().trim().min(6).max(32) });
 const emailCodeInput = z.object({ code: z.string().trim().regex(/^\d{6}$/) });
 
 router.post('/login/email-code', asyncRoute(async (req, res) => {
+  if (await isEmergencyLockdownActive()) {
+    clearAdminEmailChallengeCookie(res);
+    return res.status(503).json({ error: 'Admin sign-in is temporarily disabled during a security lockdown.' });
+  }
   if (await rejectBlockedAdminIp(req, res)) {
     clearAdminEmailChallengeCookie(res);
     return;
@@ -179,6 +192,10 @@ router.post('/login/email-code', asyncRoute(async (req, res) => {
 }));
 
 router.post('/login/mfa', asyncRoute(async (req, res) => {
+  if (await isEmergencyLockdownActive()) {
+    clearMfaChallengeCookie(res);
+    return res.status(503).json({ error: 'Admin sign-in is temporarily disabled during a security lockdown.' });
+  }
   if (await rejectBlockedAdminIp(req, res)) return;
   const challenge = readMfaChallenge(req);
   const { code } = mfaCodeInput.parse(req.body);
@@ -235,6 +252,9 @@ router.post('/password-reset/request', asyncRoute(async (req, res) => {
   const { rows } = await query(`SELECT id, email, role FROM users WHERE email = $1 AND is_active = true`, [email]);
   const user = rows[0];
   if (user) {
+    if (STAFF_ROLES.includes(user.role) && await isEmergencyLockdownActive()) {
+      return res.status(202).json({ message: 'If an account exists for that email, a reset link has been sent.' });
+    }
     const token = crypto.randomBytes(32).toString('hex');
     const hash = crypto.createHash('sha256').update(token).digest('hex');
     await query('DELETE FROM password_reset_tokens WHERE user_id = $1 OR expires_at < NOW()', [user.id]);
@@ -257,8 +277,12 @@ router.post('/password-reset/confirm', asyncRoute(async (req, res) => {
   const hash = crypto.createHash('sha256').update(token).digest('hex');
   const passwordHash = await bcrypt.hash(password, 12);
   const reset = await transaction(async (client) => {
-    const { rows } = await client.query(`SELECT pr.id, pr.user_id, u.email FROM password_reset_tokens pr JOIN users u ON u.id = pr.user_id WHERE pr.token_hash = $1 AND pr.used_at IS NULL AND pr.expires_at > NOW() AND u.is_active = true FOR UPDATE OF pr`, [hash]);
+    const { rows } = await client.query(`SELECT pr.id, pr.user_id, u.email, u.role FROM password_reset_tokens pr JOIN users u ON u.id = pr.user_id WHERE pr.token_hash = $1 AND pr.used_at IS NULL AND pr.expires_at > NOW() AND u.is_active = true FOR UPDATE OF pr`, [hash]);
     if (!rows[0]) return null;
+    if (STAFF_ROLES.includes(rows[0].role)) {
+      const { rows: lockdownRows } = await client.query('SELECT is_active FROM emergency_lockdown WHERE id = 1');
+      if (lockdownRows[0]?.is_active === true) return null;
+    }
     await client.query('UPDATE users SET password_hash = $1, failed_login_count = 0, locked_until = NULL, session_version = session_version + 1 WHERE id = $2', [passwordHash, rows[0].user_id]);
     await client.query('UPDATE password_reset_tokens SET used_at = NOW() WHERE user_id = $1 AND used_at IS NULL', [rows[0].user_id]);
     return rows[0];

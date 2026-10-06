@@ -5,7 +5,7 @@ import { lineChart } from '../components/charts.js';
 import { fetchRecentAdminOrders } from '../services/orderService.js';
 import { fetchRevenueSeries, fetchFinancialSummary, clearAnalyticsCache } from '../services/analyticsService.js';
 import { startLiveRefresh } from '../services/liveRefresh.js';
-import { downloadStoreBackup, resetStoreData, restoreStoreBackup } from '../services/maintenanceService.js';
+import { activateEmergencyLockdown, downloadStoreBackup, resetStoreData, restoreStoreBackup } from '../services/maintenanceService.js';
 import { showAdminToast } from '../components/toast.js';
 
 const session = initAdminShell({ page: 'dashboard', title: 'Dashboard' });
@@ -20,6 +20,31 @@ function initStoreMaintenance(adminSession) {
   const panel = document.getElementById('storeMaintenance');
   if (!panel || !['admin', 'super_admin'].includes(adminSession.role)) return;
   panel.hidden = false;
+  const emergencyPanel = document.getElementById('emergencyLockdownPanel');
+  const emergencyButton = document.getElementById('emergencyLockdown');
+  if (adminSession.role === 'super_admin' && emergencyPanel && emergencyButton) {
+    emergencyPanel.hidden = false;
+    emergencyButton.addEventListener('click', async () => {
+      const accepted = window.confirm('This downloads a private store-data snapshot, pauses new orders, blocks the admin site, and signs out all staff and admins. Unlocking requires Railway database access. Continue only if you are responding to a real security incident.');
+      if (!accepted) return;
+      if (window.prompt('To confirm, type LOCK DOWN STORE exactly:') !== 'LOCK DOWN STORE') {
+        showAdminToast('Lockdown cancelled. The confirmation text did not match.', 'info');
+        return;
+      }
+      emergencyButton.disabled = true;
+      emergencyButton.textContent = 'Downloading snapshot…';
+      try {
+        await downloadStoreBackup();
+        emergencyButton.textContent = 'Activating lockdown…';
+        await activateEmergencyLockdown();
+        window.location.replace('login.html');
+      } catch (error) {
+        emergencyButton.disabled = false;
+        emergencyButton.textContent = 'Download snapshot & lock down store';
+        showAdminToast(error.message || 'Emergency lockdown did not complete.', 'error');
+      }
+    });
+  }
 
   const backupButton = document.getElementById('downloadStoreBackup');
   const resetButton = document.getElementById('resetStoreData');

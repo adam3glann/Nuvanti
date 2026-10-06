@@ -91,6 +91,11 @@
             <button class="btn btn-danger" id="resetStoreData" type="button" disabled>Reset customer, order & dashboard data</button>
           </div>
           <p class="maintenance-note" id="maintenanceNote" role="status">Reset stays locked until a backup has downloaded. It deletes customers, orders, saved addresses, messages, newsletter subscribers, inventory adjustment history, visitor sessions and view totals. It restores stock reserved by non-cancelled test orders. Admin accounts, products and stock, photos, categories, collections, homepage slides and text, store settings, and discount codes are kept.</p>
+          <div class="maintenance-restore" id="emergencyLockdownPanel" hidden>
+            <h3>Emergency store lockdown</h3>
+            <p class="maintenance-note">Downloads the customer and order data snapshot, pauses new checkout, invalidates all staff and admin sessions, removes sign-in challenges, and blocks admin pages and new staff sign-ins. This does not rotate Railway, database, email, payment, or image-host credentials. The snapshot contains customer and order personal data; store it privately. Recovery requires Railway database access.</p>
+            <button class="btn btn-danger" id="emergencyLockdown" type="button">Download snapshot & lock down store</button>
+          </div>
           <div class="maintenance-restore">
             <h3>Restore from a backup file</h3>
             <p class="maintenance-note">Choose a previously downloaded Nuvanti JSON backup. This replaces the exported store data with that snapshot; current admin accounts and their passwords and MFA stay unchanged. Customer passwords, sessions, MFA secrets, Paymob transaction references, and private tokens are not in the file. Restored customers will need password resets; restore will not recreate payment-provider references or old newsletter unsubscribe links.</p>

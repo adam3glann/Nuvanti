@@ -49,6 +49,11 @@ async function initializeCheckout() {
     }
     if (cartChanges.priceChanged) showToast('Bag prices were updated to today’s catalog.');
     [currentUser, storeSettings] = await Promise.all([getCurrentUser(), loadStoreSettings()]);
+    if (storeSettings.emergencyLockdown === true) {
+      form.innerHTML = '<div class="state-block"><h3>Ordering is temporarily paused</h3><p>The store has paused checkout while a security issue is reviewed. Your bag is saved; please try again later.</p></div>';
+      summary.innerHTML = '';
+      return;
+    }
     try {
       const paymentResponse = await fetch(`${API_ORIGIN}/api/payments/config`, { credentials: 'include' });
       onlinePaymentEnabled = paymentResponse.ok && (await paymentResponse.json()).onlinePaymentEnabled === true;
@@ -87,6 +92,11 @@ async function initializeCheckout() {
       showToast('Your bag was updated to match current stock and prices. Please review the order summary.');
     }
     const latest = await refreshStoreSettings();
+    if (latest.emergencyLockdown === true) {
+      storeSettings = latest;
+      render();
+      return;
+    }
     if (JSON.stringify(latest) !== JSON.stringify(storeSettings)) {
       storeSettings = latest;
       const subtotal = cartSubtotal();
@@ -113,6 +123,11 @@ async function restoreSavedDiscount() {
 }
 
 function render() {
+  if (storeSettings?.emergencyLockdown === true) {
+    document.getElementById('checkoutForm').innerHTML = '<div class="state-block"><h3>Ordering is temporarily paused</h3><p>The store has paused checkout while a security issue is reviewed. Your bag is saved; please try again later.</p></div>';
+    document.getElementById('checkoutSummary').innerHTML = '';
+    return;
+  }
   const subtotal = cartSubtotal();
 
   document.getElementById('checkoutForm').innerHTML = `
