@@ -7,12 +7,16 @@ import { query, transaction } from '../lib/db.js';
 import { clearAdminEmailChallengeCookie, clearMfaChallengeCookie, clearSession, issueSession, readAdminEmailChallenge, readMfaChallenge, readSession, requireAuth, requireRole, setAdminEmailChallengeCookie, setMfaChallengeCookie, setSessionCookie } from '../lib/auth.js';
 import { sendAdminLoginCode, sendPasswordReset, sendVerificationEmail } from '../lib/mail.js';
 import { logAudit } from '../lib/audit.js';
+import { notifySuperAdminsOfLogin } from '../lib/adminNotifications.js';
 import { adminPublicOrigin, storePublicOrigin } from '../lib/publicOrigins.js';
 import { createOtpAuthUri, createRecoveryCodes, createTotpSecret, decryptTotpSecret, encryptTotpSecret, hashRecoveryCode, verifyTotp } from '../lib/totp.js';
 import { clearAdminEmailCodeFailures, hashAdminEmailCode, recordAdminEmailCodeFailure, rejectBlockedAdminIp, safeHashEquals } from '../lib/adminLoginSecurity.js';
 import { isEmergencyLockdownActive } from '../middleware/emergencyLockdown.js';
 
 const STAFF_ROLES = ['staff', 'manager', 'admin', 'super_admin'];
+function notifyAdminLogin(user, req) {
+  notifySuperAdminsOfLogin({ user, req }).catch((error) => console.error('Admin sign-in notification failed:', error));
+}
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_MINUTES = 15;
 
@@ -119,6 +123,7 @@ router.post('/login', asyncRoute(async (req, res) => {
   }
   setSessionCookie(res, await issueSession({ ...safeUser, sessionVersion: user.sessionVersion }, req));
   await logAudit({ req, actor: safeUser, action: 'auth.login_success', targetType: 'user', targetId: safeUser.id });
+  if (STAFF_ROLES.includes(user.role)) notifyAdminLogin(safeUser, req);
   res.json({ user: safeUser });
 }));
 
@@ -188,6 +193,7 @@ router.post('/login/email-code', asyncRoute(async (req, res) => {
   }
   setSessionCookie(res, await issueSession(safeUser, req));
   await logAudit({ req, actor: safeUser, action: 'auth.login_success_email_code', targetType: 'user', targetId: safeUser.id });
+  if (STAFF_ROLES.includes(user.role)) notifyAdminLogin(safeUser, req);
   res.json({ user: { id: user.id, email: user.email, name: user.name, role: user.role } });
 }));
 
@@ -241,6 +247,7 @@ router.post('/login/mfa', asyncRoute(async (req, res) => {
   clearMfaChallengeCookie(res);
   setSessionCookie(res, await issueSession(safeUser, req));
   await logAudit({ req, actor: safeUser, action: 'auth.login_success_mfa', targetType: 'user', targetId: safeUser.id });
+  notifyAdminLogin(safeUser, req);
   res.json({ user: { id: user.id, email: user.email, name: user.name, role: user.role } });
 }));
 

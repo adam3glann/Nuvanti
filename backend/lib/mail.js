@@ -78,6 +78,29 @@ export async function sendContactNotification({ to, name, email, message }) {
   });
 }
 
+export async function sendAdminLoginNotification({ to, name, email, role, ip, userAgent, loggedInAt }) {
+  const safeName = escapeHtml(name || 'Administrator');
+  const safeEmail = escapeHtml(email);
+  const safeRole = escapeHtml(role);
+  const safeIp = escapeHtml(ip || 'Unavailable');
+  const safeUserAgent = escapeHtml(userAgent || 'Unavailable');
+  const safeTime = escapeHtml(loggedInAt);
+  await deliver({
+    to,
+    subject: `Nuvanti admin sign-in: ${name || email}`,
+    text: `A staff account signed in to Nuvanti Admin.\n\nName: ${name || 'Administrator'}\nEmail: ${email}\nRole: ${role}\nTime: ${loggedInAt}\nIP address: ${ip || 'Unavailable'}\nBrowser: ${userAgent || 'Unavailable'}`,
+    html: emailLayout({
+      preheader: `A staff account signed in to Nuvanti Admin: ${email}.`,
+      eyebrow: 'ADMIN SECURITY ALERT',
+      title: 'Staff sign-in detected',
+      intro: `${safeName} signed in to Nuvanti Admin.`,
+      content: `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr><td style="padding:8px 0;font-family:Arial,sans-serif;font-size:14px;color:#17211d"><strong>Email:</strong> ${safeEmail}</td></tr><tr><td style="padding:8px 0;font-family:Arial,sans-serif;font-size:14px;color:#17211d"><strong>Role:</strong> ${safeRole}</td></tr><tr><td style="padding:8px 0;font-family:Arial,sans-serif;font-size:14px;color:#17211d"><strong>Time:</strong> ${safeTime}</td></tr><tr><td style="padding:8px 0;font-family:Arial,sans-serif;font-size:14px;color:#17211d"><strong>IP address:</strong> ${safeIp}</td></tr><tr><td style="padding:8px 0;font-family:Arial,sans-serif;font-size:14px;color:#17211d"><strong>Browser:</strong> ${safeUserAgent}</td></tr></table>`,
+    }),
+    devLabel: 'Development admin sign-in notification',
+    devDetail: `${email} signed in from ${ip || 'unknown IP'}`,
+  });
+}
+
 export async function sendPasswordReset({ to, resetUrl }) {
   await deliver({
     to,
