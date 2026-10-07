@@ -7,7 +7,11 @@ async function request(path, options = {}) {
     ...options,
   });
   const body = response.status === 204 ? null : await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body?.error || 'Security settings request failed.');
+  if (!response.ok) {
+    const error = new Error(body?.error || `Security request failed (${response.status} ${response.statusText}).`);
+    error.status = response.status;
+    throw error;
+  }
   return body;
 }
 

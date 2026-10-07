@@ -208,6 +208,18 @@ app.use(
     limit: 10,
     standardHeaders: "draft-7",
     legacyHeaders: false,
+    // This limit is for credential and verification attempts. Authenticated
+    // reads such as MFA status/session listing must remain usable so staff can
+    // finish account recovery and required MFA setup after repeated retries.
+    skip: (req) => !new Set([
+      "/register",
+      "/login",
+      "/login/email-code",
+      "/login/mfa",
+      "/password-reset/request",
+      "/password-reset/confirm",
+      "/verify-email/confirm",
+    ]).has(req.path),
   }),
   authRouter,
 );

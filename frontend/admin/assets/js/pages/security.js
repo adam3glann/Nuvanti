@@ -12,15 +12,22 @@ async function loadSecurity() {
   const root = document.getElementById('secRoot');
   root.innerHTML = '<div class="card card-pad"><p>Loading security settings…</p></div>';
   try {
-    const [mfa, sessions] = await Promise.all([getMfaStatus(), getActiveSessions()]);
-    render(mfa, sessions);
+    // Session history is useful but must not prevent a staff member from
+    // reaching MFA setup, which is required to unlock the rest of the admin.
+    const [mfaResult, sessionsResult] = await Promise.allSettled([getMfaStatus(), getActiveSessions()]);
+    if (mfaResult.status === 'rejected') throw mfaResult.reason;
+    render(
+      mfaResult.value,
+      sessionsResult.status === 'fulfilled' ? sessionsResult.value : [],
+      sessionsResult.status === 'rejected' ? sessionsResult.reason : null,
+    );
   } catch (error) {
     root.innerHTML = `<div class="admin-empty"><h2>Security settings unavailable</h2><p>${escapeHtml(error.message)}</p><button class="btn btn-outline" id="retrySecurity">Try Again</button></div>`;
     root.querySelector('#retrySecurity').addEventListener('click', loadSecurity);
   }
 }
 
-function render(mfa, sessions) {
+function render(mfa, sessions, sessionsError = null) {
   const root = document.getElementById('secRoot');
   const sessionRows = sessions.map((item) => `
     <div class="settings-row">
@@ -42,7 +49,9 @@ function render(mfa, sessions) {
       </div>
       <div class="card">
         <div class="card-head" style="display:flex;justify-content:space-between;align-items:center"><h2>Active Sessions</h2><button class="btn btn-outline btn-sm" id="revokeOthersBtn" ${sessions.filter((item) => !item.isCurrent).length ? '' : 'disabled'}>Sign out other devices</button></div>
-        <div class="card-pad">${sessionRows || '<p class="settings-row__desc">No active sessions were found. Sign in again to create a tracked session.</p>'}</div>
+        <div class="card-pad">${sessionsError
+          ? `<p class="settings-row__desc">Active sessions could not be loaded: ${escapeHtml(sessionsError.message)} You can still set up two-factor authentication.</p>`
+          : sessionRows || '<p class="settings-row__desc">No active sessions were found. Sign in again to create a tracked session.</p>'}</div>
       </div>
     </div>`;
   root.querySelector('#changePwBtn').addEventListener('click', openChangePassword);
