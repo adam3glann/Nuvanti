@@ -23,6 +23,7 @@ function fromApi(value) {
       freeShippingThreshold: value.freeShippingThresholdCents / 100,
       standardCost: value.standardShippingCents / 100,
       expressCost: value.expressShippingCents / 100,
+      locations: Array.isArray(value.shippingLocations) ? value.shippingLocations : [],
     },
     payments: {
       onlinePaymentEnabled: value.onlinePaymentEnabled === true,
@@ -51,6 +52,8 @@ export async function saveSettingsSection(section, data) {
     ? { storeName: data.storeName, supportEmail: data.contactEmail }
     : section === 'payments'
       ? { onlinePaymentEnabled: data.onlinePaymentEnabled, instapayEnabled: data.instapayEnabled, instapayRecipient: data.instapayRecipient, instapayWhatsappPhone: data.instapayWhatsappPhone }
+      : section === 'shipping'
+        ? { freeShippingThreshold: data.freeShippingThreshold, standardShipping: data.standardCost, expressShipping: data.expressCost, shippingLocations: data.locations }
       : {
         freeShippingThreshold: data.freeShippingThreshold,
         standardShipping: data.standardCost,

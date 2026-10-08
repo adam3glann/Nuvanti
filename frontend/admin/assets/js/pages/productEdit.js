@@ -37,6 +37,7 @@ function blankProduct() {
     id: null, name: '', slug: '', description: '', price: 0, compareAtPrice: null, cost: null,
     sku: '', category: '', collection: '', material: '', colors: [], sizes: [], images: [], colorImages: {},
     inventory: {}, badges: [], status: 'draft', featured: false, bestseller: false, newArrival: false,
+    inventoryByVariant: {}, sizeGuide: '', sizeGuideImage: '', sizeGuideMeasurements: [],
     seoTitle: '', seoDescription: '',
   };
 }
@@ -93,6 +94,19 @@ function renderForm(product, cats, cols) {
           </div>
         </div>
 
+        <div class="card" style="margin-bottom:1.25rem">
+          <div class="card-head"><h2>Size Guide</h2></div>
+          <div class="card-pad">
+            <div class="field"><label for="fSizeGuide">Fit and measurement notes</label><textarea id="fSizeGuide" rows="3" maxlength="2000" placeholder="Measurements are of the garment, laid flat.">${esc(product.sizeGuide || '')}</textarea></div>
+            <div class="field"><label for="fSizeGuideImage">Size guide image</label><input id="fSizeGuideImage" type="url" maxlength="1000" value="${esc(product.sizeGuideImage || '')}" placeholder="https://…" /><button type="button" class="btn btn-outline btn-sm" id="uploadSizeGuideImage" style="margin-top:.4rem">Upload guide image</button><small class="hint">Optional. Upload an image or paste an HTTPS image URL.</small></div>
+            <div class="field"><label>Measurement table (one row per size)</label>
+              <div class="field-row"><input id="guideColumns" aria-label="Measurement columns" placeholder="Chest (cm), Length (cm)" value="${esc((product.sizeGuideMeasurements?.columns || []).join(', '))}" /></div>
+              <div id="guideRows"></div>
+              <small class="hint">Enter column names separated by commas. Rows follow the product sizes.</small>
+            </div>
+          </div>
+        </div>
+
         <div class="card">
           <div class="card-head"><h2>SEO</h2></div>
           <div class="card-pad">
@@ -146,6 +160,19 @@ function renderForm(product, cats, cols) {
 
   renderImages(product.images || []);
   renderVariants(product);
+  renderGuideRows(product.sizes || [], product.sizeGuideMeasurements || {});
+  document.getElementById('uploadSizeGuideImage').addEventListener('click', () => {
+    const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/jpeg,image/png,image/webp,image/gif';
+    input.addEventListener('change', async () => {
+      const file = input.files?.[0]; if (!file) return;
+      const button = document.getElementById('uploadSizeGuideImage');
+      button.disabled = true; button.textContent = 'Uploading…';
+      try { const image = await uploadAdminProductImage(file); document.getElementById('fSizeGuideImage').value = image.url; showAdminToast('Size guide image uploaded. Save the product to publish it.', 'success'); }
+      catch (error) { showAdminToast(error.message || 'Could not upload the size guide image.', 'error'); }
+      finally { button.disabled = false; button.textContent = 'Upload guide image'; }
+    });
+    input.click();
+  });
   const colorSwatches = { ...(product.colorSwatches || {}) };
   const colorImages = Object.fromEntries(Object.entries(product.colorImages || {}).map(([color, images]) => [color, Array.isArray(images) ? [...images] : []]));
   renderColorPalette(splitList(val('fColors')), colorSwatches);
@@ -170,9 +197,11 @@ function renderForm(product, cats, cols) {
   for (const field of ['fColors', 'fSizes']) {
     document.getElementById(field).addEventListener('input', () => {
       const stock = { ...(product.inventory || {}) };
-      document.querySelectorAll('[data-stock-size]').forEach((input) => { stock[input.dataset.stockSize] = Math.max(0, Number(input.value) || 0); });
+      Object.assign(stock, readInventory(product));
+      const inventoryByVariant = { ...(product.inventoryByVariant || {}), ...readVariantInventory() };
       const colors = splitList(val('fColors'));
-      renderVariants({ ...product, colors, sizes: splitList(val('fSizes')), inventory: stock });
+      renderVariants({ ...product, colors, sizes: splitList(val('fSizes')), inventory: stock, inventoryByVariant });
+      renderGuideRows(splitList(val('fSizes')), readSizeGuideMeasurements());
       renderColorPalette(colors, colorSwatches);
       renderColorImageSets(colors, colorImages);
     });
@@ -210,6 +239,10 @@ function renderForm(product, cats, cols) {
       colorSwatches: Object.fromEntries(colors.map((color) => [color, validHex(colorSwatches[color]) || defaultColorHex(color)])),
       sizes,
       inventory: readInventory(stockProduct),
+      inventoryByVariant: readVariantInventory(),
+      sizeGuide: val('fSizeGuide').trim(),
+      sizeGuideImage: val('fSizeGuideImage').trim(),
+      sizeGuideMeasurements: readSizeGuideMeasurements(),
     };
     button.disabled = true;
     button.textContent = isNew ? 'Creating…' : 'Saving…';
@@ -285,6 +318,26 @@ function readInventory(product) {
   return inventory;
 }
 
+function readVariantInventory() {
+  return Object.fromEntries([...document.querySelectorAll('[data-stock-color][data-stock-size]')]
+    .map((input) => [`${input.dataset.stockColor}::${input.dataset.stockSize}`, Math.max(0, Number(input.value) || 0)]));
+}
+
+function renderGuideRows(sizes, guide) {
+  const rows = Array.isArray(guide.rows) ? guide.rows : [];
+  document.getElementById('guideRows').innerHTML = sizes.map((size) => {
+    const values = rows.find((row) => row.size === size)?.values || [];
+    return `<div class="field-row" style="margin-top:.4rem"><label style="min-width:3rem">${esc(size)}</label><input data-guide-size="${esc(size)}" value="${esc(values.join(', '))}" placeholder="Measurements separated by commas" /></div>`;
+  }).join('') || '<small class="hint">Add product sizes to create measurement rows.</small>';
+}
+
+function readSizeGuideMeasurements() {
+  return {
+    columns: splitList(val('guideColumns')),
+    rows: [...document.querySelectorAll('[data-guide-size]')].map((input) => ({ size: input.dataset.guideSize, values: splitList(input.value) })),
+  };
+}
+
 function cssEscape(s) {
   return String(s).replace(/[^a-zA-Z0-9_-]/g, (c) => `\\${c}`);
 }
@@ -333,33 +386,26 @@ function renderImages(images) {
 
 function renderVariants(product) {
   const rows = [];
-  (product.colors || []).forEach((color) => {
+  ((product.colors || []).length ? product.colors : ['Default']).forEach((color) => {
     (product.sizes || []).forEach((size) => {
-      rows.push({ color, size, stock: product.inventory?.[size] ?? 0, sku: `${product.sku || 'NV'}-${color.slice(0, 3).toUpperCase()}-${size}` });
+      rows.push({ color, size, stock: product.inventoryByVariant?.[`${color}::${size}`] ?? (product.colors?.indexOf(color) === 0 ? product.inventory?.[size] ?? 0 : 0), sku: `${product.sku || 'NV'}-${color.slice(0, 3).toUpperCase()}-${size}` });
     });
   });
   document.getElementById('variantBody').innerHTML = rows.length ? rows.map((r) => `
     <tr>
-      <td>${r.color}</td><td>${r.size}</td>
-      <td class="mono">${r.sku}</td>
-      <td><div class="variant-stock-control"><input class="variant-stock-input" type="number" min="0" step="1" value="${Math.max(0, Number(r.stock) || 0)}" data-stock-size="${esc(r.size)}" aria-label="Available stock in size ${esc(r.size)}" /><span class="variant-stock-count variant-stock-count--${stockState(r.stock)}" data-stock-label="${esc(r.size)}">${stockLabel(r.stock)}</span></div></td>
+      <td>${esc(r.color)}</td><td>${esc(r.size)}</td>
+      <td class="mono">${esc(r.sku)}</td>
+      <td><div class="variant-stock-control"><input class="variant-stock-input" type="number" min="0" step="1" value="${Math.max(0, Number(r.stock) || 0)}" data-stock-color="${esc(r.color)}" data-stock-size="${esc(r.size)}" aria-label="Available stock for ${esc(r.color)} size ${esc(r.size)}" /><span class="variant-stock-count variant-stock-count--${stockState(r.stock)}" data-stock-label="${esc(r.color)}::${esc(r.size)}">${stockLabel(r.stock)}</span></div></td>
     </tr>
-  `).join('') + `<tr><td colspan="4" class="variant-stock-note">Stock is tracked per size and shared across colors. Updating a size changes the count shown for every color in that size.</td></tr>`
+  `).join('') + `<tr><td colspan="4" class="variant-stock-note">Each color and size combination has its own stock count.</td></tr>`
     : `<tr><td colspan="4" style="color:var(--a-muted)">No variants yet — add colors and sizes to generate variant rows.</td></tr>`;
 
-  // Stock is stored per size (not per color), so keep every row for the
-  // same size in sync as the admin types.
   document.getElementById('variantBody').querySelectorAll('[data-stock-size]').forEach((input) => {
     input.addEventListener('input', () => {
-      const size = input.dataset.stockSize;
-      document.querySelectorAll(`[data-stock-size="${cssEscape(size)}"]`).forEach((other) => {
-        if (other !== input) other.value = input.value;
-      });
       const stock = Math.max(0, Number(input.value) || 0);
-      document.querySelectorAll(`[data-stock-label="${cssEscape(size)}"]`).forEach((label) => {
-        label.textContent = stockLabel(stock);
-        label.className = `variant-stock-count variant-stock-count--${stockState(stock)}`;
-      });
+      const label = input.parentElement.querySelector('[data-stock-label]');
+      label.textContent = stockLabel(stock);
+      label.className = `variant-stock-count variant-stock-count--${stockState(stock)}`;
     });
   });
 }

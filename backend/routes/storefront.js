@@ -39,6 +39,7 @@ router.get('/settings', async (req, res) => {
     standard_shipping_cents AS "standardShippingCents",
     express_shipping_cents AS "expressShippingCents",
     free_shipping_threshold_cents AS "freeShippingThresholdCents",
+    shipping_locations AS "shippingLocations",
     instapay_enabled AS "instapayEnabled",
     CASE WHEN instapay_enabled THEN instapay_recipient ELSE '' END AS "instapayRecipient",
     CASE WHEN instapay_enabled THEN instapay_whatsapp_phone ELSE '' END AS "instapayWhatsappPhone"

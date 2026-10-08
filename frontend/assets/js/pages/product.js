@@ -816,7 +816,7 @@ function renderInfo() {
 
         ${(product.sizes || [])
           .map((size) => {
-            const stock = stockFor(product, size);
+            const stock = stockFor(product, size, selectedColor);
 
             return `
 
@@ -1049,7 +1049,7 @@ function bindInfoEvents() {
     });
 
     quantityInc.addEventListener("click", () => {
-      const maxQuantity = selectedSize ? Math.min(10, variantStockRemaining(product, selectedSize)) : 10;
+      const maxQuantity = selectedSize ? Math.min(10, variantStockRemaining(product, selectedSize, selectedColor)) : 10;
       selectedQuantity = Math.min(maxQuantity, selectedQuantity + 1);
 
       quantityValue.textContent = selectedQuantity;
@@ -1197,6 +1197,18 @@ function showSizeError() {
    ========================================================= */
 
 function openSizeGuide() {
+  const guide = product?.sizeGuideMeasurements || {};
+  const columns = Array.isArray(guide.columns) ? guide.columns : [];
+  const rows = Array.isArray(guide.rows) ? guide.rows : [];
+  if (product?.sizeGuide || product?.sizeGuideImage || columns.length || rows.length) {
+    const table = columns.length && rows.length
+      ? `<table class="size-table"><thead><tr><th>Size</th>${columns.map((column) => `<th>${escapeHtml(column)}</th>`).join('')}</tr></thead><tbody>${rows.map((row) => `<tr><td>${escapeHtml(row.size)}</td>${columns.map((_, index) => `<td>${escapeHtml(row.values?.[index] || '—')}</td>`).join('')}</tr>`).join('')}</tbody></table>`
+      : '';
+    const image = product.sizeGuideImage ? `<img src="${escapeHtml(product.sizeGuideImage)}" alt="${escapeHtml(product.name)} size guide" style="display:block;width:100%;height:auto;margin:0 0 1rem;border-radius:8px" />` : '';
+    const modal = createModal({ title: 'Size Guide', bodyHTML: `${image}${table}${product.sizeGuide ? `<p class="text-muted" style="font-size:.85rem">${escapeHtml(product.sizeGuide).replace(/\n/g, '<br>')}</p>` : ''}` });
+    modal.open();
+    return;
+  }
   const modal = createModal({
     title: "Size Guide",
 
@@ -1293,13 +1305,13 @@ function openSizeGuide() {
    ========================================================= */
 
 function updateStockLine() {
-  const stock = stockFor(product, selectedSize);
+  const stock = stockFor(product, selectedSize, selectedColor);
 
   const element = document.getElementById("stockLine");
 
   if (!element) return;
 
-  const remaining = selectedSize ? variantStockRemaining(product, selectedSize) : null;
+  const remaining = selectedSize ? variantStockRemaining(product, selectedSize, selectedColor) : null;
   const maxQuantity = selectedSize ? Math.min(10, remaining) : 10;
   selectedQuantity = Math.max(1, Math.min(selectedQuantity, maxQuantity || 1));
   const quantityValue = document.getElementById('qtyValue');

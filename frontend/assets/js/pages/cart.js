@@ -94,7 +94,7 @@ function render() {
           <div>
             <p style="font-weight:600">${escapeHtml(l.name)}</p>
             <p class="text-muted" style="font-size:var(--fs-small);margin-top:.25rem">${escapeHtml(l.color)} · Size ${escapeHtml(l.size)}</p>
-            ${variantStock(l.productId, l.size) === null ? '' : `<p class="text-muted" style="font-size:var(--fs-micro);margin-top:.2rem">${variantStock(l.productId, l.size)} total available in this size</p>`}
+            ${variantStock(l.productId, l.size, l.color) === null ? '' : `<p class="text-muted" style="font-size:var(--fs-micro);margin-top:.2rem">${variantStock(l.productId, l.size, l.color)} available in this color and size</p>`}
           </div>
           <p style="font-weight:600">${formatPrice(l.price * l.quantity)}</p>
         </div>

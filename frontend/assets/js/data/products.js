@@ -77,10 +77,11 @@ export function getProductBySlug(slug) {
   return products.find((p) => p.slug === slug);
 }
 
-export function stockFor(product, size) {
-  return product.inventory?.[size] ?? 0;
+export function stockFor(product, size, color) {
+  return product.inventoryByVariant?.[`${color}::${size}`] ?? product.inventory?.[size] ?? 0;
 }
 
 export function isInStock(product) {
-  return Object.values(product.inventory || {}).some((n) => n > 0);
+  return Object.values(product.inventoryByVariant || {}).some((n) => n > 0)
+    || Object.values(product.inventory || {}).some((n) => n > 0);
 }

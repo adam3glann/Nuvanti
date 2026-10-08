@@ -35,7 +35,7 @@ const productImage = z.string().trim().max(1000).refine((value) => {
   if (/^https:\/\//i.test(value)) { try { return new URL(value).protocol === 'https:'; } catch { return false; } }
   return /^\/?assets\/[\w./-]+(?:\?[\w%=&.-]*)?$/.test(value) && !value.includes('..');
 }, 'Use an HTTPS image URL or an image path under assets/.');
-const productFields = z.object({ slug: z.string().regex(/^[a-z0-9-]+$/).max(160), name: z.string().min(2).max(160), description: z.string().max(5000).optional(), price: z.coerce.number().min(0).max(21474836.47).optional(), priceCents: z.coerce.number().int().min(0).max(2147483647).optional(), cost: z.number().min(0).max(21474836.47).nullable().optional(), category: z.string().min(1).max(80), collection: z.string().max(80).nullable().optional(), images: z.array(productImage).max(12).optional(), colors: z.array(z.string().max(40)).max(20).optional(), colorImages: z.record(z.string().max(40), z.array(productImage).max(12)).optional(), colorSwatches: z.record(z.string().max(40), z.string().regex(/^#[0-9a-fA-F]{6}$/)).optional(), sizes: z.array(z.string().max(20)).max(20).optional(), inventory: z.union([z.coerce.number().int().min(0), z.record(z.coerce.number().int().min(0))]).optional(), status: z.enum(['active', 'draft']).optional(), isActive: z.boolean().optional(), badges: z.array(z.string().max(30)).optional(), featured: z.boolean().optional(), bestseller: z.boolean().optional(), newArrival: z.boolean().optional(), sku: z.string().max(100).optional(), compareAtPrice: z.coerce.number().min(0).max(21474836.47).nullable().optional() });
+const productFields = z.object({ slug: z.string().regex(/^[a-z0-9-]+$/).max(160), name: z.string().min(2).max(160), description: z.string().max(5000).optional(), price: z.coerce.number().min(0).max(21474836.47).optional(), priceCents: z.coerce.number().int().min(0).max(2147483647).optional(), cost: z.number().min(0).max(21474836.47).nullable().optional(), category: z.string().min(1).max(80), collection: z.string().max(80).nullable().optional(), images: z.array(productImage).max(12).optional(), colors: z.array(z.string().max(40)).max(20).optional(), colorImages: z.record(z.string().max(40), z.array(productImage).max(12)).optional(), colorSwatches: z.record(z.string().max(40), z.string().regex(/^#[0-9a-fA-F]{6}$/)).optional(), sizes: z.array(z.string().max(20)).max(20).optional(), inventory: z.union([z.coerce.number().int().min(0), z.record(z.coerce.number().int().min(0))]).optional(), inventoryByVariant: z.record(z.string().max(100), z.coerce.number().int().min(0)).optional(), sizeGuide: z.string().max(2000).optional(), sizeGuideImage: z.string().max(1000).refine((value) => !value || /^https:\/\//i.test(value), 'Use an HTTPS image URL.').optional(), sizeGuideMeasurements: z.object({ columns: z.array(z.string().max(40)).max(10).optional(), rows: z.array(z.object({ size: z.string().max(20), values: z.array(z.string().max(40)).max(10) })).max(20).optional() }).optional(), status: z.enum(['active', 'draft']).optional(), isActive: z.boolean().optional(), badges: z.array(z.string().max(30)).optional(), featured: z.boolean().optional(), bestseller: z.boolean().optional(), newArrival: z.boolean().optional(), sku: z.string().max(100).optional(), compareAtPrice: z.coerce.number().min(0).max(21474836.47).nullable().optional() });
 const productInput = productFields.refine((value) => value.price !== undefined || value.priceCents !== undefined, { message: 'Price is required.' });
 const columns = 'id, slug, name, description, price_cents, category, collection, images, colors, sizes, inventory, is_active, metadata';
 const categoryImage = z.string().trim().max(1000).refine((value) => {
@@ -229,13 +229,13 @@ router.post('/maintenance/reset', requireStoreMaintenanceRole, asyncRoute(async 
 
     // Checkout subtracts stock when an order is placed. Put back quantities
     // from every non-cancelled test order before removing its history.
-    const { rows: soldRows } = await client.query(`SELECT oi.product_id::text AS "productId", oi.size,
+    const { rows: soldRows } = await client.query(`SELECT oi.product_id::text AS "productId", oi.color, oi.size,
         SUM(oi.quantity)::int AS quantity, p.inventory, p.metadata
       FROM order_items oi JOIN orders o ON o.id = oi.order_id
       JOIN products p ON p.id = oi.product_id
       WHERE o.status <> 'cancelled'
-      GROUP BY oi.product_id, oi.size, p.inventory, p.metadata
-      ORDER BY oi.product_id, oi.size`);
+      GROUP BY oi.product_id, oi.color, oi.size, p.inventory, p.metadata
+      ORDER BY oi.product_id, oi.color, oi.size`);
     const stockByProduct = new Map();
     const legacyStockRestore = new Map();
     for (const row of soldRows) {
@@ -247,15 +247,27 @@ router.post('/maintenance/reset', requireStoreMaintenanceRole, asyncRoute(async 
         });
         continue;
       }
+      if (row.metadata?.inventoryByVariant && Object.keys(row.metadata.inventoryByVariant).length) {
+        const color = row.color || 'Default';
+        const key = `${color}::${size}`;
+        const current = stockByProduct.get(row.productId) || {
+          stock: { ...row.metadata.inventory },
+          stockByVariant: { ...row.metadata.inventoryByVariant },
+        };
+        current.stockByVariant[key] = Math.max(0, Number(current.stockByVariant[key]) || 0) + Number(row.quantity);
+        current.stock[size] = Math.max(0, Number(current.stock[size]) || 0) + Number(row.quantity);
+        stockByProduct.set(row.productId, current);
+        continue;
+      }
       const current = stockByProduct.get(row.productId) || { stock: { ...row.metadata.inventory } };
       current.stock[size] = Math.max(0, Number(current.stock[size]) || 0) + Number(row.quantity);
       stockByProduct.set(row.productId, current);
     }
     for (const [productId, current] of stockByProduct) {
-      const inventory = Object.values(current.stock).reduce((total, value) => total + Math.max(0, Number(value) || 0), 0);
+      const inventory = Object.values(current.stockByVariant || current.stock).reduce((total, value) => total + Math.max(0, Number(value) || 0), 0);
       await client.query(`UPDATE products SET inventory = $1,
-        metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{inventory}', $2::jsonb, true), updated_at = NOW()
-        WHERE id = $3`, [inventory, JSON.stringify(current.stock), productId]);
+        metadata = jsonb_set(jsonb_set(COALESCE(metadata, '{}'::jsonb), '{inventory}', $2::jsonb, true), '{inventoryByVariant}', $3::jsonb, true), updated_at = NOW()
+        WHERE id = $4`, [inventory, JSON.stringify(current.stock), JSON.stringify(current.stockByVariant || {}), productId]);
     }
     for (const [productId, current] of legacyStockRestore) {
       await client.query('UPDATE products SET inventory = inventory + $1, updated_at = NOW() WHERE id = $2', [current.quantity, productId]);
@@ -342,8 +354,10 @@ router.post('/email/test', requirePermission('settings.edit'), async (req, res) 
 router.get('/dashboard', requirePermission('analytics.view'), asyncRoute(async (req, res) => {
   const { rows } = await query(`WITH product_stock AS (
     SELECT p.id, p.name,
-      CASE WHEN p.metadata->'inventory' IS NULL OR p.metadata->'inventory' = '{}'::jsonb
-        THEN jsonb_build_object('One Size', p.inventory) ELSE p.metadata->'inventory' END AS stock_by_size
+      CASE WHEN p.metadata->'inventoryByVariant' IS NOT NULL AND p.metadata->'inventoryByVariant' <> '{}'::jsonb
+        THEN p.metadata->'inventoryByVariant'
+        WHEN p.metadata->'inventory' IS NULL OR p.metadata->'inventory' = '{}'::jsonb
+          THEN jsonb_build_object('One Size', p.inventory) ELSE p.metadata->'inventory' END AS stock_by_size
     FROM products p WHERE p.is_active = true
   ), stock_totals AS (
     SELECT p.id, sum(CASE WHEN kv.value #>> '{}' ~ '^-?[0-9]+$'
@@ -654,30 +668,44 @@ router.get('/inventory/history', requirePermission('inventory.view'), async (req
   res.json(rows);
 });
 router.post('/inventory/:productId/:size/adjust', requirePermission('inventory.adjust'), async (req, res) => {
-  const input = z.object({ change: z.number().int().min(-100000).max(100000).refine((value) => value !== 0), reason: z.string().trim().min(2).max(240) }).parse(req.body);
+  const input = z.object({ change: z.number().int().min(-100000).max(100000).refine((value) => value !== 0), color: z.string().max(60).optional(), reason: z.string().trim().min(2).max(240) }).parse(req.body);
   const size = z.string().min(1).max(20).parse(req.params.size);
+  const color = input.color || 'Default';
+  const variantKey = `${color}::${size}`;
   const result = await transaction(async (client) => {
-    const existing = await client.query(`SELECT CASE WHEN metadata->'inventory' IS NULL OR metadata->'inventory' = '{}'::jsonb
+    const existing = await client.query(`SELECT inventory, colors, sizes, metadata->'inventoryByVariant' AS "stockByVariant",
+      CASE WHEN metadata->'inventory' IS NULL OR metadata->'inventory' = '{}'::jsonb
       THEN jsonb_build_object('One Size', inventory) ELSE metadata->'inventory' END AS "stockBySize"
       FROM products WHERE id = $1 FOR UPDATE`, [req.params.productId]);
     if (!existing.rows[0]) return null;
     const stockBySize = existing.rows[0].stockBySize || {};
-    if (!(size in stockBySize)) return { error: 'This size does not exist for the product.' };
-    const currentStock = Number(stockBySize[size]) || 0;
+    let stockByVariant = existing.rows[0].stockByVariant || {};
+    if (!Object.keys(stockByVariant).length) {
+      const legacyColors = existing.rows[0].colors?.length ? existing.rows[0].colors : ['Default'];
+      const legacySizes = existing.rows[0].sizes?.length ? existing.rows[0].sizes : Object.keys(stockBySize);
+      stockByVariant = Object.fromEntries(legacyColors.flatMap((legacyColor, index) => legacySizes.map((legacySize) => [
+        `${legacyColor}::${legacySize}`, index === 0 ? Number(stockBySize[legacySize] || 0) : 0,
+      ])));
+    }
+    const tracked = stockByVariant;
+    const key = variantKey;
+    if (!(key in tracked)) return { error: 'This color and size do not exist for the product.' };
+    const currentStock = Number(tracked[key]) || 0;
     const actualChange = input.change < 0 ? Math.max(input.change, -currentStock) : input.change;
     if (actualChange === 0) return { error: 'This size has no stock left to remove.' };
     const newStock = currentStock + actualChange;
-    stockBySize[size] = newStock;
-    const totalStock = Object.values(stockBySize).reduce((sum, value) => sum + Math.max(0, Number(value) || 0), 0);
+    tracked[key] = newStock;
+    stockBySize[size] = Object.entries(stockByVariant).filter(([variant]) => variant.endsWith(`::${size}`)).reduce((sum, [, value]) => sum + Math.max(0, Number(value) || 0), 0);
+    const totalStock = Object.values(tracked).reduce((sum, value) => sum + Math.max(0, Number(value) || 0), 0);
     await client.query(`UPDATE products SET inventory = $2,
-      metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{inventory}', $3::jsonb, true), updated_at = NOW()
-      WHERE id = $1`, [req.params.productId, totalStock, JSON.stringify(stockBySize)]);
-    await client.query('INSERT INTO inventory_adjustments (product_id, size, change, reason, actor_user_id) VALUES ($1, $2, $3, $4, $5)', [req.params.productId, size, actualChange, input.reason, req.user.sub]);
+      metadata = jsonb_set(jsonb_set(COALESCE(metadata, '{}'::jsonb), '{inventory}', $3::jsonb, true), '{inventoryByVariant}', $4::jsonb, true), updated_at = NOW()
+      WHERE id = $1`, [req.params.productId, totalStock, JSON.stringify(stockBySize), JSON.stringify(stockByVariant)]);
+    await client.query('INSERT INTO inventory_adjustments (product_id, size, change, reason, actor_user_id) VALUES ($1, $2, $3, $4, $5)', [req.params.productId, variantKey, actualChange, input.reason, req.user.sub]);
     return { stock: newStock, change: actualChange };
   });
   if (result === null) return res.status(404).json({ error: 'Product size was not found.' });
   if (result.error) return res.status(400).json(result);
-  await logAudit({ req, action: 'inventory.adjusted', targetType: 'product', targetId: req.params.productId, metadata: { size, change: result.change, reason: input.reason } });
+  await logAudit({ req, action: 'inventory.adjusted', targetType: 'product', targetId: req.params.productId, metadata: { color, size, change: result.change, reason: input.reason } });
   res.json({ stock: result.stock, change: result.change });
 });
 router.delete('/products/:id', requirePermission('products.delete'), async (req, res) => { const result = await query('DELETE FROM products WHERE id = $1', [req.params.id]); if (!result.rowCount) return res.status(404).json({ error: 'Product not found.' }); await logAudit({ req, action: 'product.deleted', targetType: 'product', targetId: req.params.id }); res.status(204).end(); });
@@ -884,9 +912,10 @@ const settingsInput = z.object({
     const compact = value.replace(/[\s().-]/g, '');
     return compact === '' || /^(?:\+?[1-9]\d{7,14}|00[1-9]\d{7,14}|01[0125]\d{8})$/.test(compact);
   }).optional(),
+  shippingLocations: z.array(z.object({ id: z.string().min(1).max(60), name: z.string().trim().min(2).max(100), standard: z.coerce.number().min(0).max(21474836.47), express: z.coerce.number().min(0).max(21474836.47) })).max(100).optional(),
 });
 router.get('/settings', requirePermission('settings.view'), async (req, res) => {
-  const { rows } = await query(`SELECT store_name AS "storeName", support_email AS "supportEmail", currency, standard_shipping_cents AS "standardShippingCents", express_shipping_cents AS "expressShippingCents", free_shipping_threshold_cents AS "freeShippingThresholdCents", online_payment_enabled AS "onlinePaymentEnabled", instapay_enabled AS "instapayEnabled", instapay_recipient AS "instapayRecipient", instapay_whatsapp_phone AS "instapayWhatsappPhone" FROM store_settings WHERE id = 1`);
+  const { rows } = await query(`SELECT store_name AS "storeName", support_email AS "supportEmail", currency, standard_shipping_cents AS "standardShippingCents", express_shipping_cents AS "expressShippingCents", free_shipping_threshold_cents AS "freeShippingThresholdCents", shipping_locations AS "shippingLocations", online_payment_enabled AS "onlinePaymentEnabled", instapay_enabled AS "instapayEnabled", instapay_recipient AS "instapayRecipient", instapay_whatsapp_phone AS "instapayWhatsappPhone" FROM store_settings WHERE id = 1`);
   res.set('Cache-Control', 'no-store').json({ ...rows[0], onlinePaymentConfigured: paymobReady() });
 });
 router.patch('/settings', requirePermission('settings.edit'), async (req, res) => {
@@ -913,10 +942,11 @@ router.patch('/settings', requirePermission('settings.edit'), async (req, res) =
       instapay_enabled = coalesce($8, instapay_enabled),
       instapay_recipient = coalesce($9, instapay_recipient),
       instapay_whatsapp_phone = coalesce($10, instapay_whatsapp_phone),
+      shipping_locations = coalesce($11::jsonb, shipping_locations),
       updated_at = NOW()
     WHERE id = 1
-    RETURNING store_name AS "storeName", support_email AS "supportEmail", currency, standard_shipping_cents AS "standardShippingCents", express_shipping_cents AS "expressShippingCents", free_shipping_threshold_cents AS "freeShippingThresholdCents", online_payment_enabled AS "onlinePaymentEnabled", instapay_enabled AS "instapayEnabled", instapay_recipient AS "instapayRecipient", instapay_whatsapp_phone AS "instapayWhatsappPhone"`,
-    [s.storeName ?? null, s.supportEmail ?? null, s.currency ?? null, s.standardShipping != null ? Math.round(s.standardShipping * 100) : null, s.expressShipping != null ? Math.round(s.expressShipping * 100) : null, s.freeShippingThreshold != null ? Math.round(s.freeShippingThreshold * 100) : null, s.onlinePaymentEnabled ?? null, s.instapayEnabled ?? null, s.instapayRecipient ?? null, s.instapayWhatsappPhone ?? null],
+    RETURNING store_name AS "storeName", support_email AS "supportEmail", currency, standard_shipping_cents AS "standardShippingCents", express_shipping_cents AS "expressShippingCents", free_shipping_threshold_cents AS "freeShippingThresholdCents", shipping_locations AS "shippingLocations", online_payment_enabled AS "onlinePaymentEnabled", instapay_enabled AS "instapayEnabled", instapay_recipient AS "instapayRecipient", instapay_whatsapp_phone AS "instapayWhatsappPhone"`,
+    [s.storeName ?? null, s.supportEmail ?? null, s.currency ?? null, s.standardShipping != null ? Math.round(s.standardShipping * 100) : null, s.expressShipping != null ? Math.round(s.expressShipping * 100) : null, s.freeShippingThreshold != null ? Math.round(s.freeShippingThreshold * 100) : null, s.onlinePaymentEnabled ?? null, s.instapayEnabled ?? null, s.instapayRecipient ?? null, s.instapayWhatsappPhone ?? null, s.shippingLocations == null ? null : JSON.stringify(s.shippingLocations)],
   );
   await logAudit({ req, action: s.instapayEnabled != null || s.instapayRecipient != null || s.instapayWhatsappPhone != null ? 'settings.instapay_updated' : s.onlinePaymentEnabled == null ? 'settings.updated' : 'settings.online_payment_toggled', targetType: 'settings', targetId: '1' });
   res.set('Cache-Control', 'no-store').json({ ...rows[0], onlinePaymentConfigured: paymobReady() });

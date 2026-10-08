@@ -53,7 +53,8 @@ function render() {
         <div class="field"><label for="standardCost">Standard Shipping Cost (EGP)</label><input type="number" min="0" step="0.01" id="standardCost" value="${settings.shipping.standardCost}" ${disabled()} /></div>
         <div class="field"><label for="expressCost">Express Shipping Cost (EGP)</label><input type="number" min="0" step="0.01" id="expressCost" value="${settings.shipping.expressCost}" ${disabled()} /></div>
       </div>
-      <p class="hint">These amounts update the checkout total immediately. The server recalculates the final amount when an order is placed.</p>
+      <div class="field"><label for="shippingLocations">Delivery locations and prices</label><textarea id="shippingLocations" rows="8" placeholder="Cairo | 75 | 150">${escapeHtml(settings.shipping.locations.map((item) => `${item.name} | ${item.standard} | ${item.express}`).join('\n'))}</textarea><small class="hint">One location per line: Location name | Standard price (EGP) | Express price (EGP). Customers must choose one of these at checkout.</small></div>
+      <p class="hint">The server recalculates the location price when an order is placed.</p>
     `);
   } else if (tab === 'payments') {
     const configured = settings.payments.onlinePaymentConfigured;
@@ -84,7 +85,7 @@ function render() {
       <div class="settings-row"><div><p class="settings-row__label">Transactional email</p><p class="settings-row__desc">Password resets, account verification, admin invitations, order confirmations, and newsletter confirmations.</p></div><span class="badge ${ready ? 'badge--success' : 'badge--neutral'}">${escapeHtml(statusLabel)}</span></div>
       ${details}
       ${canEdit ? `<button class="btn btn-primary" id="testEmailBtn" ${ready ? '' : 'disabled'}>Send test email to ${escapeHtml(session.email)}</button>` : '<p class="hint">Only a super administrator can send a test email.</p>'}
-      <p class="hint">Contact form inquiries also appear in Customers → Contact Messages. Email alerts go to the Customer Support Email set in the General tab.</p>
+      <p class="hint">Contact form inquiries also appear in Customers → Contact Messages. Email alerts go to the Customer Support Email and active super administrators.</p>
     </div></div>`;
   }
 }
@@ -119,6 +120,10 @@ document.getElementById('settingsRoot')?.addEventListener('click', async (event)
         freeShippingThreshold: numberValue('freeShippingThreshold'),
         standardCost: numberValue('standardCost'),
         expressCost: numberValue('expressCost'),
+        locations: value('shippingLocations').split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => {
+          const [name, standard, express] = line.split('|').map((part) => part.trim());
+          return { id: slugifyLocation(name || ''), name: name || '', standard: Number(standard), express: Number(express) };
+        }),
       };
   if (sectionName === 'payments' && data.onlinePaymentEnabled && !settings.payments.onlinePaymentEnabled) {
     const accepted = window.confirm('Enable online card payments for customers? Confirm that your Paymob account is ready for live payments. You can turn this off here at any time.');
@@ -132,8 +137,12 @@ document.getElementById('settingsRoot')?.addEventListener('click', async (event)
     showAdminToast('Enter a store name and a valid support email.', 'error');
     return;
   }
-  if (sectionName === 'shipping' && Object.values(data).some((amount) => !Number.isFinite(amount) || amount < 0)) {
+  if (sectionName === 'shipping' && [data.freeShippingThreshold, data.standardCost, data.expressCost].some((amount) => !Number.isFinite(amount) || amount < 0)) {
     showAdminToast('Shipping amounts must be zero or greater.', 'error');
+    return;
+  }
+  if (sectionName === 'shipping' && (data.locations.some((location) => location.name.length < 2 || !Number.isFinite(location.standard) || !Number.isFinite(location.express)) || new Set(data.locations.map((location) => location.id)).size !== data.locations.length)) {
+    showAdminToast('Enter each location as Name | standard price | express price, using unique location names.', 'error');
     return;
   }
   button.disabled = true;
@@ -152,3 +161,4 @@ document.getElementById('settingsRoot')?.addEventListener('click', async (event)
 function disabled() { return canEdit ? '' : 'disabled'; }
 function value(id) { return document.getElementById(id)?.value ?? ''; }
 function numberValue(id) { return Number(value(id)); }
+function slugifyLocation(name) { return name.normalize('NFKC').trim().toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '').slice(0, 60); }

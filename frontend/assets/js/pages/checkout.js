@@ -25,6 +25,7 @@ let savedAddress = null;
 let onlinePaymentEnabled = false;
 let instapayEnabled = false;
 let instapayDetails = null;
+let shippingLocation = null;
 
 let lines = getCart();
 if (lines.length === 0) {
@@ -151,10 +152,8 @@ function render() {
     <section class="checkout-section">
       <h3 class="h3" style="margin-bottom:1.25rem">Shipping Address</h3>
       <div class="field"><label for="address">Street Address</label><input type="text" id="address" value="${escapeAttr(savedAddress?.address1 || '')}" autocomplete="street-address" required /></div>
-      <div class="field-row">
-        <div class="field"><label for="city">City</label><input type="text" id="city" value="${escapeAttr(savedAddress?.city || '')}" autocomplete="address-level2" required /></div>
-        <div class="field"><label for="postal">Postal Code</label><input type="text" id="postal" value="${escapeAttr(savedAddress?.postalCode || '')}" autocomplete="postal-code" /></div>
-      </div>
+      <div class="field"><label for="shippingLocation">Delivery location</label><select id="shippingLocation" required><option value="">Choose where we should deliver</option>${(storeSettings.shippingLocations || []).map((location) => `<option value="${escapeAttr(location.id)}" ${savedAddress?.city === location.name ? 'selected' : ''}>${escapeAttr(location.name)}</option>`).join('')}</select>${!(storeSettings.shippingLocations || []).length ? '<small class="hint">Delivery locations are not configured yet. Please contact the store.</small>' : ''}</div>
+      <div class="field-row"><div class="field"><label for="postal">Postal Code</label><input type="text" id="postal" value="${escapeAttr(savedAddress?.postalCode || '')}" autocomplete="postal-code" /></div></div>
       <div class="field"><label for="country">Country</label>
         <select id="country" required>
           <option selected>Egypt</option>
@@ -196,6 +195,13 @@ function render() {
     document.querySelectorAll('.delivery-option').forEach((el) => (el.dataset.active = String(el.dataset.value === delivery)));
     renderSummary();
   }));
+  document.getElementById('shippingLocation')?.addEventListener('change', (event) => {
+    shippingLocation = storeSettings.shippingLocations?.find((location) => location.id === event.target.value) || null;
+    renderLocationDeliveryPrices();
+    renderSummary();
+  });
+  shippingLocation = storeSettings.shippingLocations?.find((location) => location.id === document.getElementById('shippingLocation')?.value) || null;
+  renderLocationDeliveryPrices();
   bindPaymentOptions();
   renderSummary();
 
@@ -261,9 +267,9 @@ async function refreshPaymentAvailability() {
 
 function renderSummary() {
   const subtotal = cartSubtotal();
-  const shippingCost = delivery === 'express'
-    ? storeSettings.expressShippingCents / 100
-    : (subtotal >= storeSettings.freeShippingThresholdCents / 100 ? 0 : storeSettings.standardShippingCents / 100);
+  const shippingCost = !shippingLocation ? 0 : delivery === 'express'
+    ? shippingLocation.express
+    : (subtotal >= storeSettings.freeShippingThresholdCents / 100 ? 0 : shippingLocation.standard);
   const discount = discountInfo ? discountInfo.discountCents / 100 : 0;
   const total = Math.max(0, subtotal - discount) + shippingCost;
 
@@ -289,7 +295,7 @@ function renderSummary() {
     <div id="promoMsg" style="font-size:var(--fs-micro);margin-bottom:1rem;color:var(--color-error)"></div>
     <div class="summary-row"><span>Subtotal</span><span>${formatPrice(subtotal)}</span></div>
     ${discountInfo ? `<div class="summary-row"><span>Discount (${discountInfo.code})</span><span>-${formatPrice(discount)}</span></div>` : ''}
-    <div class="summary-row"><span>Shipping</span><span>${shippingCost === 0 ? 'Free' : formatPrice(shippingCost)}</span></div>
+    <div class="summary-row"><span>Shipping</span><span>${!shippingLocation ? 'Choose location' : shippingCost === 0 ? 'Free' : formatPrice(shippingCost)}</span></div>
     <div class="summary-row summary-row--total"><span>Total</span><span>${formatPrice(total)}</span></div>
     ${instapayDetails && document.querySelector('input[name="payment"]:checked')?.value === 'instapay' ? `<div class="card" style="margin-top:1rem;padding:1rem"><strong>InstaPay transfer details</strong><p class="text-muted" style="font-size:var(--fs-small);margin:.5rem 0">Transfer exactly ${formatPrice(total)}. Your order remains unpaid until we verify it.</p><div class="summary-row"><span>Recipient</span><span>${escapeHtml(instapayDetails.instapayRecipient)}</span></div><button type="button" class="btn btn-outline btn-sm" id="copyInstaPayDetails">Copy InstaPay details</button></div>` : ''}
   `;
@@ -327,7 +333,7 @@ async function onSubmit(e) {
   e.preventDefault();
   const form = e.target;
   const createAccount = document.getElementById('createGuestAccount')?.checked === true;
-  const requiredIds = ['fullName', 'phone', 'address', 'city', 'country', ...(!currentUser ? ['email'] : []), ...(createAccount ? ['guestPassword', 'guestPasswordConfirm'] : [])];
+  const requiredIds = ['fullName', 'phone', 'address', 'shippingLocation', 'country', ...(!currentUser ? ['email'] : []), ...(createAccount ? ['guestPassword', 'guestPasswordConfirm'] : [])];
   let valid = true;
   requiredIds.forEach((id) => {
     const input = document.getElementById(id);
@@ -348,7 +354,8 @@ async function onSubmit(e) {
   };
   const shipping = {
     address: document.getElementById('address').value,
-    city: document.getElementById('city').value,
+    city: shippingLocation?.name || '',
+    locationId: shippingLocation?.id || '',
     postal: document.getElementById('postal').value,
     country: document.getElementById('country').value,
   };
@@ -383,6 +390,13 @@ async function onSubmit(e) {
   refreshCartDrawer();
   if (paymentMethod === 'paymob' && placedOrder.paymentUrl) { window.location.assign(placedOrder.paymentUrl); return; }
   window.location.href = 'order-success.html';
+}
+
+function renderLocationDeliveryPrices() {
+  const standard = document.querySelector('.delivery-option[data-value="standard"] .delivery-option__price');
+  const express = document.querySelector('.delivery-option[data-value="express"] .delivery-option__price');
+  if (standard) standard.textContent = !shippingLocation ? 'Choose location' : cartSubtotal() >= storeSettings.freeShippingThresholdCents / 100 ? 'Free' : formatPrice(shippingLocation.standard);
+  if (express) express.textContent = shippingLocation ? formatPrice(shippingLocation.express) : 'Choose location';
 }
 
 function escapeHtml(value) {

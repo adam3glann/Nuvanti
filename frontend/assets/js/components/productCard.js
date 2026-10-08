@@ -127,8 +127,9 @@ export function bindProductCardEvents(container, { products, onCartChange } = {}
       const id = quickAdd.dataset.quickAdd;
       const product = binding.products.find((p) => String(p.id) === String(id));
       if (!product) return;
-      const size = product.sizes.find((s) => (product.inventory[s] || 0) > 0) || product.sizes[0];
-      addToCart({ product, size, color: product.colors[0], quantity: 1 });
+      const color = product.colors?.find((candidate) => product.sizes.some((s) => Number(product.inventoryByVariant?.[`${candidate}::${s}`] ?? product.inventory?.[s] ?? 0) > 0)) || product.colors?.[0] || 'Default';
+      const size = product.sizes.find((s) => Number(product.inventoryByVariant?.[`${color}::${s}`] ?? product.inventory?.[s] ?? 0) > 0) || product.sizes[0];
+      addToCart({ product, size, color, quantity: 1 });
       showToast(`${product.name} added to bag`, { icon: 'bag' });
       binding.onCartChange?.();
     }

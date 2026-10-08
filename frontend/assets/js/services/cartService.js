@@ -73,9 +73,9 @@ export function syncCartWithProducts(products) {
       removed.push(line.name);
       return [];
     }
-    const stock = Number(product.inventory?.[line.size] ?? product.inventory?.['One Size'] ?? 0);
+    const stock = Number(product.inventoryByVariant?.[`${line.color}::${line.size}`] ?? product.inventory?.[line.size] ?? product.inventory?.['One Size'] ?? 0);
     if (!Number.isFinite(stock) || stock <= 0) { removed.push(line.name); return []; }
-    const variantKey = `${line.productId}__${line.size}`;
+    const variantKey = `${line.productId}__${line.color}__${line.size}`;
     const remaining = remainingByVariant.has(variantKey) ? remainingByVariant.get(variantKey) : Math.floor(stock);
     const allowed = Math.min(10, remaining);
     if (line.quantity > allowed) {
@@ -98,18 +98,18 @@ export function syncCartWithProducts(products) {
 // Stock is tracked per size (shared across colors). The server remains the
 // source of truth; this helper uses the latest catalog loaded by cart/checkout
 // pages to keep local controls within the current known stock.
-export function variantStockRemaining(product, size) {
+export function variantStockRemaining(product, size, color = 'Default') {
   const productId = String(product?.id || '');
   const stockProduct = product || latestCatalog.get(productId);
-  const stock = Math.max(0, Math.floor(Number(stockProduct?.inventory?.[size] ?? stockProduct?.inventory?.['One Size'] ?? 0)));
-  const inBag = read().filter((line) => String(line.productId) === productId && line.size === size).reduce((sum, line) => sum + line.quantity, 0);
+  const stock = Math.max(0, Math.floor(Number(stockProduct?.inventoryByVariant?.[`${color}::${size}`] ?? stockProduct?.inventory?.[size] ?? stockProduct?.inventory?.['One Size'] ?? 0)));
+  const inBag = read().filter((line) => String(line.productId) === productId && line.size === size && line.color === color).reduce((sum, line) => sum + line.quantity, 0);
   return Math.max(0, stock - inBag);
 }
 
-export function variantStock(productId, size) {
+export function variantStock(productId, size, color = 'Default') {
   const product = latestCatalog.get(String(productId));
   if (!product) return null;
-  const stock = Number(product.inventory?.[size] ?? product.inventory?.['One Size'] ?? 0);
+  const stock = Number(product.inventoryByVariant?.[`${color}::${size}`] ?? product.inventory?.[size] ?? product.inventory?.['One Size'] ?? 0);
   return Number.isFinite(stock) ? Math.max(0, Math.floor(stock)) : 0;
 }
 
@@ -119,8 +119,8 @@ export function canIncreaseQuantity(lineId) {
   if (!line) return false;
   const product = latestCatalog.get(String(line.productId));
   if (!product) return line.quantity < 10;
-  const stock = Math.floor(Number(product.inventory?.[line.size] ?? product.inventory?.['One Size'] ?? 0));
-  const totalInBag = lines.filter((item) => item.productId === line.productId && item.size === line.size).reduce((sum, item) => sum + item.quantity, 0);
+  const stock = Math.floor(Number(product.inventoryByVariant?.[`${line.color}::${line.size}`] ?? product.inventory?.[line.size] ?? product.inventory?.['One Size'] ?? 0));
+  const totalInBag = lines.filter((item) => item.productId === line.productId && item.size === line.size && item.color === line.color).reduce((sum, item) => sum + item.quantity, 0);
   return line.quantity < 10 && totalInBag < stock;
 }
 
@@ -131,8 +131,8 @@ export function addToCart({ product, size, color, quantity = 1 }) {
   const safeColor = String(color || 'Default').slice(0, 60);
   const lineId = `${Number(product.id)}__${safeSize}__${safeColor}`;
   const existing = lines.find((l) => l.lineId === lineId);
-  const stock = Math.max(0, Math.floor(Number(product.inventory?.[safeSize] ?? product.inventory?.['One Size'] ?? 0)));
-  const inBagForSize = lines.filter((line) => line.productId === Number(product.id) && line.size === safeSize).reduce((sum, line) => sum + line.quantity, 0);
+  const stock = Math.max(0, Math.floor(Number(product.inventoryByVariant?.[`${safeColor}::${safeSize}`] ?? product.inventory?.[safeSize] ?? product.inventory?.['One Size'] ?? 0)));
+  const inBagForSize = lines.filter((line) => line.productId === Number(product.id) && line.size === safeSize && line.color === safeColor).reduce((sum, line) => sum + line.quantity, 0);
   const remaining = Math.max(0, stock - inBagForSize);
   if (remaining <= 0) return lines;
   const toAdd = Math.min(10, remaining, Math.max(1, Math.floor(Number(quantity) || 1)));
@@ -158,8 +158,8 @@ export function updateQuantity(lineId, quantity) {
     const target = lines.find((line) => line.lineId === lineId);
     if (!target) return lines;
     const product = latestCatalog.get(String(target?.productId));
-    const stock = product ? Math.floor(Number(product.inventory?.[target.size] ?? product.inventory?.['One Size'] ?? 0)) : 10;
-    const otherLines = lines.filter((line) => line.lineId !== lineId && line.productId === target?.productId && line.size === target?.size).reduce((sum, line) => sum + line.quantity, 0);
+    const stock = product ? Math.floor(Number(product.inventoryByVariant?.[`${target.color}::${target.size}`] ?? product.inventory?.[target.size] ?? product.inventory?.['One Size'] ?? 0)) : 10;
+    const otherLines = lines.filter((line) => line.lineId !== lineId && line.productId === target?.productId && line.size === target?.size && line.color === target?.color).reduce((sum, line) => sum + line.quantity, 0);
     const allowed = Math.max(0, Math.min(10, stock - otherLines));
     lines = lines.flatMap((line) => line.lineId !== lineId ? [line] : allowed > 0 ? [{ ...line, quantity: Math.min(allowed, Math.floor(quantity)) }] : []);
   }

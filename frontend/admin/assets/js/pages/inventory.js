@@ -46,7 +46,7 @@ async function load() {
   tbody.innerHTML = items.map((r) => `
     <tr>
       <td><div style="display:flex;align-items:center;gap:.6rem"><img src="${storeAssetSrc(r.image)}" width="32" height="40" style="object-fit:cover;border-radius:3px" alt="" /><span>${r.productName}</span></div></td>
-      <td>${r.size}</td>
+      <td>${r.color} · ${r.size}</td>
       <td class="mono">${r.sku}</td>
       <td>${r.stock}</td>
       <td>${r.reserved}</td>
@@ -69,7 +69,7 @@ async function load() {
 function openAdjust(id, items) {
   const row = items.find((r) => r.id === id);
   const drawer = createAdminDrawer({
-    title: `Adjust Stock — ${row.productName} (${row.size})`,
+    title: `Adjust Stock — ${row.productName} (${row.color} · ${row.size})`,
     bodyHTML: `
       <p style="color:var(--a-muted);font-size:.85rem;margin-bottom:1rem">Current stock: <strong>${row.stock}</strong></p>
       <div class="field"><label>Adjustment</label><input type="number" id="adjAmount" placeholder="e.g. 20 or -5" /></div>
@@ -93,7 +93,7 @@ function openAdjust(id, items) {
 function openHistory(id, items) {
   const row = items.find((r) => r.id === id);
   const drawer = createAdminDrawer({
-    title: `Stock History — ${row.productName} (${row.size})`,
+    title: `Stock History — ${row.productName} (${row.color} · ${row.size})`,
     bodyHTML: `
       <div style="display:flex;flex-direction:column;gap:.6rem">
         ${row.history.map((h) => `
@@ -115,8 +115,8 @@ async function exportInventory() {
   button.textContent = 'Preparing CSV…';
   try {
     const { items } = await fetchInventory({ query: state.query, status: state.status, page: 1, perPage: 100000 });
-    const columns = ['Product', 'Size', 'SKU', 'Stock', 'Reserved', 'Available', 'Status'];
-    const rows = items.map((row) => [row.productName, row.size, row.sku, row.stock, row.reserved, row.stock - row.reserved, rowStatus(row)]);
+    const columns = ['Product', 'Color', 'Size', 'SKU', 'Stock', 'Reserved', 'Available', 'Status'];
+    const rows = items.map((row) => [row.productName, row.color, row.size, row.sku, row.stock, row.reserved, row.stock - row.reserved, rowStatus(row)]);
     const csv = [columns, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n');
     downloadCsv(csv, 'nuvanti-inventory.csv');
     showAdminToast(`Exported ${items.length} inventory row(s).`, 'success');

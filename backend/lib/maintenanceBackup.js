@@ -172,10 +172,10 @@ export async function restoreStoreBackup(client, backup) {
 
   await insertRows(client, 'store_settings', [
     'id', 'store_name', 'support_email', 'currency', 'standard_shipping_cents',
-    'express_shipping_cents', 'free_shipping_threshold_cents', 'updated_at',
+    'express_shipping_cents', 'free_shipping_threshold_cents', 'shipping_locations', 'updated_at',
   ], backup.storeSettings, (row) => [
     row.id, row.store_name, row.support_email, row.currency, row.standard_shipping_cents,
-    row.express_shipping_cents, row.free_shipping_threshold_cents, row.updated_at,
+    row.express_shipping_cents, row.free_shipping_threshold_cents, row.shipping_locations || [], row.updated_at,
   ]);
 
   await insertRows(client, 'discounts', [

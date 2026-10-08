@@ -38,7 +38,7 @@ const checkout = z.object({
     size: z.string().max(20).optional(),
     image: z.string().max(500).optional(),
   })).min(1).max(30),
-  shipping: z.object({ name: z.string().min(2).max(100), email: z.string().trim().email().max(254).transform((value) => value.toLowerCase()).optional(), phone: z.string().max(30).optional(), address1: z.string().min(3).max(150), city: z.string().min(2).max(80), country: z.literal('Egypt'), postalCode: z.string().min(1).max(20) }),
+  shipping: z.object({ name: z.string().min(2).max(100), email: z.string().trim().email().max(254).transform((value) => value.toLowerCase()).optional(), phone: z.string().max(30).optional(), address1: z.string().min(3).max(150), city: z.string().min(2).max(100), locationId: z.string().min(1).max(60), country: z.literal('Egypt'), postalCode: z.string().min(1).max(20) }),
   delivery: z.enum(['standard', 'express']),
   paymentMethod: z.enum(['cod', 'paymob', 'instapay']).default('cod'),
   discountCode: z.string().max(40).optional(),
@@ -120,6 +120,11 @@ router.post('/', requireCheckoutAvailable, optionalAuth, guestOrderLimiter, asyn
     // the keys so valid cart lines resolve instead of throwing during checkout.
     const map = new Map(products.map((product) => [Number(product.id), {
       ...product,
+      stockByVariant: product.metadata?.inventoryByVariant || Object.fromEntries(
+        ((product.colors || []).length ? product.colors : ['Default']).flatMap((color, index) => (product.sizes || []).map((size) => [
+          `${color}::${size}`, index === 0 ? Number(product.stockBySize?.[size] || 0) : 0,
+        ])),
+      ),
       unitCostCents: product.metadata?.costCents == null ? null : Number(product.metadata.costCents),
     }]));
     const variantQuantities = new Map();
@@ -130,18 +135,19 @@ router.post('/', requireCheckoutAvailable, optionalAuth, guestOrderLimiter, asyn
       const size = item.size || 'One Size';
       if (product.sizes?.length && !product.sizes.includes(size)) { const error = new Error(`${product.name} is no longer available in size ${size}.`); error.status = 409; throw error; }
       if (item.color && product.colors?.length && !product.colors.includes(item.color)) { const error = new Error(`${product.name} is no longer available in ${item.color}.`); error.status = 409; throw error; }
-      const variantKey = `${item.productId}:${size}`;
-      variantQuantities.set(variantKey, { productId: item.productId, size, quantity: (variantQuantities.get(variantKey)?.quantity || 0) + item.quantity });
+      const color = item.color || product.colors?.[0] || 'Default';
+      const variantKey = `${item.productId}:${color}:${size}`;
+      variantQuantities.set(variantKey, { productId: item.productId, color, size, quantity: (variantQuantities.get(variantKey)?.quantity || 0) + item.quantity });
       productQuantities.set(item.productId, (productQuantities.get(item.productId) || 0) + item.quantity);
       subtotal += product.price_cents * item.quantity;
     }
     for (const variant of variantQuantities.values()) {
       const product = map.get(variant.productId);
-      const available = Number(product.stockBySize?.[variant.size] || 0);
-      if (available < variant.quantity) { const error = new Error(`${product.name} does not have enough stock in size ${variant.size}.`); error.status = 409; throw error; }
+      const available = Number(product.stockByVariant?.[`${variant.color}::${variant.size}`] ?? product.stockBySize?.[variant.size] ?? 0);
+      if (available < variant.quantity) { const error = new Error(`${product.name} does not have enough stock in ${variant.color}, size ${variant.size}.`); error.status = 409; throw error; }
     }
 
-    const { rows: settingsRows } = await client.query('SELECT standard_shipping_cents AS "standard", express_shipping_cents AS "express", free_shipping_threshold_cents AS "freeThreshold", online_payment_enabled AS "onlinePaymentEnabled", instapay_enabled AS "instapayEnabled", instapay_recipient AS "instapayRecipient", instapay_whatsapp_phone AS "instapayWhatsappPhone" FROM store_settings WHERE id = 1 FOR SHARE');
+    const { rows: settingsRows } = await client.query('SELECT standard_shipping_cents AS "standard", express_shipping_cents AS "express", free_shipping_threshold_cents AS "freeThreshold", shipping_locations AS "shippingLocations", online_payment_enabled AS "onlinePaymentEnabled", instapay_enabled AS "instapayEnabled", instapay_recipient AS "instapayRecipient", instapay_whatsapp_phone AS "instapayWhatsappPhone" FROM store_settings WHERE id = 1 FOR SHARE');
     const settings = settingsRows[0] || { standard: 7500, express: 15000, freeThreshold: 300000 };
     if (paymentMethod === 'paymob' && settings.onlinePaymentEnabled !== true) {
       const error = new Error('Online payments are currently turned off. Choose Cash on Delivery.'); error.status = 409; throw error;
@@ -149,7 +155,10 @@ router.post('/', requireCheckoutAvailable, optionalAuth, guestOrderLimiter, asyn
     if (paymentMethod === 'instapay' && (settings.instapayEnabled !== true || !settings.instapayRecipient?.trim() || !settings.instapayWhatsappPhone?.trim())) {
       const error = new Error('InstaPay transfer is currently unavailable. Choose Cash on Delivery.'); error.status = 409; throw error;
     }
-    const shippingCents = delivery === 'express' ? settings.express : (subtotal >= settings.freeThreshold ? 0 : settings.standard);
+    const location = (settings.shippingLocations || []).find((entry) => entry.id === shipping.locationId);
+    if (!location) { const error = new Error('Choose a valid delivery location.'); error.status = 400; throw error; }
+    shipping.city = location.name;
+    const shippingCents = Math.round((delivery === 'express' ? location.express : (subtotal >= settings.freeThreshold ? 0 : location.standard)) * 100);
 
     let discountCents = 0;
     let appliedCode = null;
@@ -170,13 +179,17 @@ router.post('/', requireCheckoutAvailable, optionalAuth, guestOrderLimiter, asyn
     for (const [productId, quantity] of productQuantities) {
       const product = map.get(productId);
       const nextStock = { ...product.stockBySize };
+      const nextVariantStock = { ...product.stockByVariant };
       for (const variant of variantQuantities.values()) {
-        if (variant.productId === productId) nextStock[variant.size] -= variant.quantity;
+        if (variant.productId === productId) {
+          nextVariantStock[`${variant.color}::${variant.size}`] -= variant.quantity;
+          nextStock[variant.size] = Math.max(0, Number(nextStock[variant.size] || 0) - variant.quantity);
+        }
       }
-      const totalStock = Object.values(nextStock).reduce((sum, value) => sum + Math.max(0, Number(value) || 0), 0);
+      const totalStock = Object.values(nextVariantStock).reduce((sum, value) => sum + Math.max(0, Number(value) || 0), 0);
       await client.query(`UPDATE products SET inventory = $2,
-        metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{inventory}', $3::jsonb, true), updated_at = NOW()
-        WHERE id = $1`, [productId, totalStock, JSON.stringify(nextStock)]);
+        metadata = jsonb_set(jsonb_set(COALESCE(metadata, '{}'::jsonb), '{inventory}', $3::jsonb, true), '{inventoryByVariant}', $4::jsonb, true), updated_at = NOW()
+        WHERE id = $1`, [productId, totalStock, JSON.stringify(nextStock), JSON.stringify(nextVariantStock)]);
     }
     return {
       order: rows[0],

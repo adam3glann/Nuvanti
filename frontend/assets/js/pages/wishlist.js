@@ -73,8 +73,9 @@ function onClick(e) {
   if (move) {
     const product = products.find((p) => String(p.id) === String(move.dataset.move));
     if (!product || !isInStock(product)) return;
-    const size = product.sizes?.find((s) => (product.inventory[s] || 0) > 0) || product.sizes?.[0] || 'One Size';
-    addToCart({ product, size, color: product.colors?.[0] || 'Default', quantity: 1 });
+    const color = product.colors?.find((candidate) => product.sizes?.some((s) => Number(product.inventoryByVariant?.[`${candidate}::${s}`] ?? product.inventory?.[s] ?? 0) > 0)) || product.colors?.[0] || 'Default';
+    const size = product.sizes?.find((s) => Number(product.inventoryByVariant?.[`${color}::${s}`] ?? product.inventory?.[s] ?? 0) > 0) || product.sizes?.[0] || 'One Size';
+    addToCart({ product, size, color, quantity: 1 });
     removeFromWishlist(product.id);
     showToast('Moved to bag', { icon: 'bag' });
     refreshCartDrawer();
