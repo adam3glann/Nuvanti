@@ -924,8 +924,9 @@ router.patch('/settings', requirePermission('settings.edit'), async (req, res) =
     return res.status(409).json({ error: 'Online payments cannot be enabled until Paymob keys, payment method IDs, and webhook secret are configured.' });
   }
   if (s.instapayEnabled === true) {
-    const recipient = s.instapayRecipient;
-    const phone = s.instapayWhatsappPhone;
+    const { rows: saved } = await query('SELECT instapay_recipient AS "recipient", instapay_whatsapp_phone AS "phone" FROM store_settings WHERE id = 1');
+    const recipient = s.instapayRecipient ?? saved[0]?.recipient;
+    const phone = s.instapayWhatsappPhone ?? saved[0]?.phone;
     if (!recipient?.trim() || !phone || !/^(?:\+?[1-9]\d{7,14}|00[1-9]\d{7,14}|01[0125]\d{8})$/.test(phone.replace(/[\s().-]/g, ''))) {
       return res.status(409).json({ error: 'Add receiving InstaPay details and a valid WhatsApp number with country code before enabling transfers.' });
     }

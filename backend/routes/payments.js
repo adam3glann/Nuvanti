@@ -5,7 +5,6 @@ import { isConfiguredPaymobIntegration, paymobReady, verifyPaymobCallback } from
 import { requireAuth } from '../lib/auth.js';
 import { sendOrderConfirmation } from '../lib/mail.js';
 import { storePublicOrigin } from '../lib/publicOrigins.js';
-import { restoreOrderInventory } from '../lib/orderLifecycle.js';
 
 const router = Router();
 const webhookLimiter = rateLimit({ windowMs: 60 * 1000, limit: 120, standardHeaders: 'draft-7', legacyHeaders: false });
@@ -58,11 +57,10 @@ router.post('/paymob/webhook', webhookLimiter, asyncRoute(async (req, res) => {
       return { refunded: true, order };
     }
     if (obj.pending === true) return { pending: true };
-    if (order.paymentStatus === 'pending' && order.status === 'pending') {
-      await restoreOrderInventory(client, order.id, `Failed Paymob payment for order NV-${order.id}`);
-      if (order.discountCode) await client.query('UPDATE discounts SET used_count = GREATEST(0, used_count - 1) WHERE code = $1', [order.discountCode]);
-      await client.query("UPDATE orders SET status = 'cancelled', payment_status = 'failed', payment_transaction_id = $1, payment_updated_at = NOW() WHERE id = $2", [transactionId, order.id]);
-    }
+    // Paymob may let the customer retry with another card under the same
+    // provider order. Keep the reservation until the expiry sweeper runs;
+    // cancelling on the first failed attempt can make a later successful
+    // retry charge a customer for an already-cancelled order.
     return { failed: true };
   });
   if (result.invalid) return res.status(400).json({ error: 'Payment does not match an order.' });

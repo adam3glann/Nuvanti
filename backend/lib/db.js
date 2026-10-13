@@ -40,6 +40,12 @@ export const pool = new Pool({
   max: 10,
 });
 
+// PostgreSQL emits this when an idle pooled connection drops. Without a
+// listener, Node treats the EventEmitter error as fatal and exits the process.
+pool.on('error', (error) => {
+  console.error('Idle database client error:', error.code || error.message);
+});
+
 export async function query(text, params) {
   return pool.query(text, params);
 }
