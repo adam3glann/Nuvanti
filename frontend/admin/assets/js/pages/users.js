@@ -28,7 +28,7 @@ async function load() {
   try {
     users = await fetchAdminUsers();
   } catch (error) {
-    tbody.innerHTML = `<tr><td colspan="6"><div class="admin-empty"><h3>Couldn't load administrators</h3><p>${error.message}</p></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6"><div class="admin-empty"><h3>Couldn't load administrators</h3><p>${escapeHtml(error.message)}</p></div></td></tr>`;
     return;
   }
 

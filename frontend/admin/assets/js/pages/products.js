@@ -52,7 +52,7 @@ async function load() {
     ({ items, total } = await fetchAdminProducts(state));
   } catch (error) {
     if (requestId !== loadRequestId) return;
-    document.getElementById('productsCard').innerHTML = `<div class="admin-empty"><h3>Couldn't load products</h3><p>${error.message}</p></div>`;
+    document.getElementById('productsCard').innerHTML = `<div class="admin-empty"><h3>Couldn't load products</h3><p>${escapeHtml(error.message)}</p></div>`;
     return;
   }
   if (requestId !== loadRequestId) return;
