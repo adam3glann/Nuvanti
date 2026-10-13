@@ -18,7 +18,8 @@ export function showAdminToast(message, variant = 'info') {
   const el = document.createElement('div');
   el.className = 'a-toast';
   el.dataset.variant = variant;
-  el.innerHTML = `${icon(ICONS[variant] || 'bell')}<span>${message}</span>`;
+  el.innerHTML = `${icon(ICONS[variant] || 'bell')}<span class="a-toast__message"></span>`;
+  el.querySelector('.a-toast__message').textContent = String(message ?? '');
   ensureRegion().appendChild(el);
   setTimeout(() => {
     el.style.transition = 'opacity 200ms ease';

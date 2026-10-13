@@ -94,17 +94,36 @@ export async function onRequest({ request, params, env, context }) {
   // Preserve browser credentials for private requests. The public catalog
   // requests below deliberately omit them so cache entries stay anonymous.
   const upstreamHeaders = new Headers(request.headers);
-  // Express trusts the Pages Function as one proxy hop. Set the rightmost
-  // forwarded address from Cloudflare's edge-provided client IP so per-IP
-  // API limits use the shopper address instead of the proxy's egress address.
+  // Do not forward a caller-supplied identity. The API only accepts this IP
+  // for rate limiting when its HMAC signature verifies with the shared secret.
   const clientIp = request.headers.get("CF-Connecting-IP");
+  upstreamHeaders.delete("X-Nuvanti-Client-IP");
+  upstreamHeaders.delete("X-Nuvanti-Client-IP-Timestamp");
+  upstreamHeaders.delete("X-Nuvanti-Client-IP-Signature");
   if (clientIp) {
     upstreamHeaders.set("X-Forwarded-For", clientIp);
-    upstreamHeaders.set("X-Nuvanti-Client-IP", clientIp);
-  } else {
-    // Do not let a caller-supplied copy of our private forwarding header pass
-    // through when the request did not arrive with Cloudflare's edge IP.
-    upstreamHeaders.delete("X-Nuvanti-Client-IP");
+    const ipSecret = env.NUVANTI_PROXY_IP_SECRET;
+    if (ipSecret && ipSecret.length >= 32) {
+      const timestamp = String(Math.floor(Date.now() / 1000));
+      const key = await crypto.subtle.importKey(
+        "raw",
+        new TextEncoder().encode(ipSecret),
+        { name: "HMAC", hash: "SHA-256" },
+        false,
+        ["sign"],
+      );
+      const signature = await crypto.subtle.sign(
+        "HMAC",
+        key,
+        new TextEncoder().encode(`${clientIp}\n${timestamp}`),
+      );
+      const signatureHex = Array.from(new Uint8Array(signature), (byte) =>
+        byte.toString(16).padStart(2, "0"),
+      ).join("");
+      upstreamHeaders.set("X-Nuvanti-Client-IP", clientIp);
+      upstreamHeaders.set("X-Nuvanti-Client-IP-Timestamp", timestamp);
+      upstreamHeaders.set("X-Nuvanti-Client-IP-Signature", signatureHex);
+    }
   }
   if (isPublicCatalogRead) {
     upstreamHeaders.delete("Cookie");

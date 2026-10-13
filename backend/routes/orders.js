@@ -169,6 +169,7 @@ router.post(
     if (
       !discount ||
       !discount.isActive ||
+      (discount.type === "percent" && discount.value > 100) ||
       (discount.expiresAt && new Date(discount.expiresAt) < new Date()) ||
       (discount.usageLimit && discount.usedCount >= discount.usageLimit)
     ) {
@@ -183,7 +184,7 @@ router.post(
     }
     const discountCents =
       discount.type === "percent"
-        ? Math.round(subtotalCents * (discount.value / 100))
+        ? Math.min(subtotalCents, Math.round(subtotalCents * (discount.value / 100)))
         : Math.min(discount.value * 100, subtotalCents);
     res.json({
       code: discount.code,
@@ -404,6 +405,7 @@ router.post(
           if (
             !discount ||
             !discount.isActive ||
+            (discount.type === "percent" && discount.value > 100) ||
             (discount.expiresAt && new Date(discount.expiresAt) < new Date()) ||
             (discount.usageLimit &&
               discount.usedCount >= discount.usageLimit) ||
@@ -417,7 +419,7 @@ router.post(
           }
           discountCents =
             discount.type === "percent"
-              ? Math.round(subtotal * (discount.value / 100))
+              ? Math.min(subtotal, Math.round(subtotal * (discount.value / 100)))
               : Math.min(discount.value * 100, subtotal);
           appliedCode = discount.code;
           await client.query(

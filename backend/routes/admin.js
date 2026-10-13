@@ -1283,7 +1283,7 @@ router.patch(
       if (!order) return { notFound: true };
       if (order.status === status) return { ...order, unchanged: true };
       if (
-        order.paymentMethod === "instapay" &&
+        ["instapay", "paymob"].includes(order.paymentMethod) &&
         order.paymentStatus !== "paid" &&
         [
           "paid",
@@ -1295,7 +1295,7 @@ router.patch(
       ) {
         return {
           conflict:
-            "Verify the InstaPay transfer and mark the payment paid before advancing this order.",
+            "Confirm the online payment before advancing this order.",
         };
       }
       if (order.status === "cancelled") {
@@ -2381,12 +2381,21 @@ const discountInput = z.object({
     .string()
     .min(2)
     .max(40)
-    .transform((v) => v.toUpperCase().trim()),
+    .transform((v) => v.toUpperCase().trim())
+    .pipe(z.string().regex(/^[A-Z0-9][A-Z0-9_-]{1,39}$/)),
   type: z.enum(["percent", "fixed"]),
   value: z.coerce.number().int().positive(),
   minSubtotal: z.coerce.number().min(0).default(0),
   usageLimit: z.coerce.number().int().positive().optional(),
   expiresAt: z.string().datetime().optional().or(z.literal("")),
+}).superRefine((discount, context) => {
+  if (discount.type === "percent" && discount.value > 100) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["value"],
+      message: "Percentage discounts cannot be greater than 100.",
+    });
+  }
 });
 router.get(
   "/discounts",

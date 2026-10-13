@@ -2,6 +2,8 @@ import "dotenv/config";
 import "./lib/asyncErrors.js";
 import path from "path";
 import { fileURLToPath } from "url";
+import { createHmac, timingSafeEqual } from "node:crypto";
+import { isIP } from "node:net";
 import express from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
@@ -156,6 +158,33 @@ function isProductSearch(req) {
     ["/api/products", "/api/products/"].includes(req.path) &&
     req.query.search !== undefined;
 }
+function verifyForwardedClientIp(req, res, next) {
+  req.trustedClientIp = null;
+  const ip = req.get("X-Nuvanti-Client-IP");
+  const timestamp = req.get("X-Nuvanti-Client-IP-Timestamp");
+  const signature = req.get("X-Nuvanti-Client-IP-Signature");
+  const secret = process.env.NUVANTI_PROXY_IP_SECRET;
+  const timestampSeconds = Number(timestamp);
+  if (
+    !secret ||
+    secret.length < 32 ||
+    !ip ||
+    !isIP(ip) ||
+    !/^\d{1,12}$/.test(timestamp || "") ||
+    !/^[a-f0-9]{64}$/i.test(signature || "") ||
+    !Number.isSafeInteger(timestampSeconds) ||
+    Math.abs(Math.floor(Date.now() / 1000) - timestampSeconds) > 60
+  ) {
+    return next();
+  }
+  const expected = createHmac("sha256", secret)
+    .update(`${ip}\n${timestamp}`)
+    .digest();
+  const received = Buffer.from(signature, "hex");
+  if (received.length === expected.length && timingSafeEqual(received, expected))
+    req.trustedClientIp = ip;
+  next();
+}
 if (process.env.NODE_ENV === "production") {
   if (
     !process.env.JWT_SECRET ||
@@ -217,16 +246,17 @@ const productSearchLimiter = rateLimit({
   limit: 1800,
   standardHeaders: "draft-7",
   legacyHeaders: false,
-  // The Pages Function sets this from Cloudflare's edge-provided client IP;
-  // req.ip alone can resolve to a shared proxy address in the Railway path.
+  // Accept a shopper IP only after HMAC verification. Unverified direct
+  // Railway requests share the immediate peer key instead of spoofing req.ip.
   keyGenerator: (req) =>
-    `search:${req.get("X-Nuvanti-Client-IP") || req.ip}`,
+    `search:${req.trustedClientIp || req.socket?.remoteAddress || "unknown"}`,
   skip: (req) => !isProductSearch(req),
   message: {
     error: "Search request limit reached. Please wait a few minutes and retry.",
   },
 });
 // Mount before the general limiter so it sees the full /api/products path.
+app.use(verifyForwardedClientIp);
 app.use(productSearchLimiter);
 app.use(
   rateLimit({

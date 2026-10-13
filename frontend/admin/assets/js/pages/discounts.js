@@ -1,5 +1,5 @@
 import { initAdminShell } from '../components/shell.js';
-import { formatPrice } from '../components/utils.js';
+import { formatPrice, escapeHtml } from '../components/utils.js';
 import { statusBadge } from '../components/statusBadge.js';
 import { showAdminToast } from '../components/toast.js';
 import { confirmDialog } from '../components/confirmDialog.js';
@@ -28,7 +28,7 @@ async function load() {
   try {
     discounts = await fetchDiscounts();
   } catch (error) {
-    body.innerHTML = `<tr><td colspan="8"><div class="admin-empty"><h3>Couldn't load discounts</h3><p>${error.message}</p></div></td></tr>`;
+    body.innerHTML = `<tr><td colspan="8"><div class="admin-empty"><h3>Couldn't load discounts</h3><p>${escapeHtml(error.message)}</p></div></td></tr>`;
     return;
   }
 
@@ -36,7 +36,7 @@ async function load() {
     const status = discountStatus(d);
     return `
     <tr>
-      <td class="mono" style="font-weight:700">${d.code}</td>
+      <td class="mono" style="font-weight:700">${escapeHtml(d.code)}</td>
       <td style="text-transform:capitalize">${d.type}</td>
       <td>${d.type === 'percent' ? d.value + '%' : formatPrice(d.value)}</td>
       <td>${d.minSubtotalCents ? formatPrice(d.minSubtotalCents / 100) : '—'}</td>
@@ -86,7 +86,7 @@ function openNewDiscount() {
             <option value="fixed">Fixed Amount</option>
           </select>
         </div>
-        <div class="field"><label>Amount</label><input type="number" id="dAmount" placeholder="e.g. 20" min="1" /></div>
+        <div class="field"><label>Amount</label><input type="number" id="dAmount" placeholder="e.g. 20" min="1" max="100" /><span class="hint" id="discountAmountHint">Percentage codes can be up to 100.</span></div>
       </div>
       <div class="field-row">
         <div class="field"><label>Minimum Order (EGP)</label><input type="number" id="dMin" value="0" min="0" /></div>
@@ -96,20 +96,36 @@ function openNewDiscount() {
     `,
     footHTML: `<button class="btn btn-outline" id="mCancel">Cancel</button><button class="btn btn-primary" id="mSave">Create Discount</button>`,
   });
+  modal.root.querySelector('#dType').addEventListener('change', (event) => {
+    const amount = modal.root.querySelector('#dAmount');
+    const hint = modal.root.querySelector('#discountAmountHint');
+    if (event.target.value === 'percent') {
+      amount.max = '100';
+      hint.textContent = 'Percentage codes can be up to 100.';
+    } else {
+      amount.removeAttribute('max');
+      hint.textContent = 'Enter the fixed discount amount in EGP.';
+    }
+  });
   modal.root.querySelector('#mCancel').addEventListener('click', modal.close);
   modal.root.querySelector('#mSave').addEventListener('click', async () => {
     const saveBtn = modal.root.querySelector('#mSave');
     const code = modal.root.querySelector('#dCode').value.trim().toUpperCase();
     const value = Number(modal.root.querySelector('#dAmount').value) || 0;
+    const type = modal.root.querySelector('#dType').value;
     if (!code || value <= 0) {
       showAdminToast('Enter a code and an amount greater than zero.', 'error');
+      return;
+    }
+    if (type === 'percent' && value > 100) {
+      showAdminToast('Percentage discounts cannot be greater than 100.', 'error');
       return;
     }
     saveBtn.disabled = true;
     try {
       await createDiscount({
         code,
-        type: modal.root.querySelector('#dType').value,
+        type,
         value,
         minSubtotal: Number(modal.root.querySelector('#dMin').value) || 0,
         usageLimit: modal.root.querySelector('#dLimit').value ? Number(modal.root.querySelector('#dLimit').value) : null,
