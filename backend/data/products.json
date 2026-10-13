@@ -8,15 +8,8 @@
     "compareAtPrice": 300,
     "category": "tank-tops",
     "collection": "womens",
-    "colors": [
-      "Cup",
-      "Nuvanti Star"
-    ],
-    "sizes": [
-      "S",
-      "M",
-      "L"
-    ],
+    "colors": ["Cup", "Nuvanti Star"],
+    "sizes": ["S", "M", "L"],
     "images": [
       "assets/img/products/embroidered-tank-top/cup-1.webp",
       "assets/img/products/embroidered-tank-top/cup-2.webp",
@@ -26,9 +19,7 @@
     ],
     "material": "Ribbed cotton-elastane blend",
     "sku": "SKU1",
-    "badges": [
-      "SALE"
-    ],
+    "badges": ["SALE"],
     "featured": true,
     "bestseller": true,
     "newArrival": false,
@@ -47,15 +38,8 @@
     "compareAtPrice": 250,
     "category": "tank-tops",
     "collection": "mens",
-    "colors": [
-      "Black",
-      "Grey"
-    ],
-    "sizes": [
-      "S",
-      "M",
-      "L"
-    ],
+    "colors": ["Black", "Grey"],
+    "sizes": ["S", "M", "L"],
     "images": [
       "assets/img/products/men-tank-top/black-1.webp",
       "assets/img/products/men-tank-top/black-2.webp",
@@ -64,9 +48,7 @@
     ],
     "material": "Ribbed cotton",
     "sku": "SKU4",
-    "badges": [
-      "SALE"
-    ],
+    "badges": ["SALE"],
     "featured": true,
     "bestseller": false,
     "newArrival": false,
@@ -85,17 +67,8 @@
     "compareAtPrice": 680,
     "category": "sweatpants",
     "collection": "unisex",
-    "colors": [
-      "Black",
-      "Olive",
-      "Grey"
-    ],
-    "sizes": [
-      "S",
-      "M",
-      "L",
-      "XL"
-    ],
+    "colors": ["Black", "Olive", "Grey"],
+    "sizes": ["S", "M", "L", "XL"],
     "images": [
       "assets/img/products/nuv-sweatpants/olive-1.webp",
       "assets/img/products/nuv-sweatpants/olive-2.webp",
@@ -112,9 +85,7 @@
     ],
     "material": "Premium cotton fleece",
     "sku": "SKU3",
-    "badges": [
-      "LIMITED"
-    ],
+    "badges": ["LIMITED"],
     "featured": true,
     "bestseller": true,
     "newArrival": false,
@@ -134,16 +105,8 @@
     "compareAtPrice": 700,
     "category": "polos",
     "collection": "unisex",
-    "colors": [
-      "Navy",
-      "Off-White",
-      "Olive"
-    ],
-    "sizes": [
-      "M",
-      "L",
-      "XL"
-    ],
+    "colors": ["Navy", "Off-White", "Olive"],
+    "sizes": ["M", "L", "XL"],
     "images": [
       "assets/img/products/knitted-embroidered-polo/navy-1.webp",
       "assets/img/products/knitted-embroidered-polo/navy-2.webp",
@@ -160,10 +123,7 @@
     ],
     "material": "Knitted cotton blend",
     "sku": "SKU2",
-    "badges": [
-      "SALE",
-      "BESTSELLER"
-    ],
+    "badges": ["SALE", "BESTSELLER"],
     "featured": true,
     "bestseller": true,
     "newArrival": true,

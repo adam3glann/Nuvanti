@@ -103,8 +103,8 @@ async function initializeCheckout() {
       const subtotal = cartSubtotal();
       const standard = document.querySelector('.delivery-option[data-value="standard"] .delivery-option__price');
       const express = document.querySelector('.delivery-option[data-value="express"] .delivery-option__price');
-      if (standard) standard.textContent = subtotal >= storeSettings.freeShippingThresholdCents / 100 ? 'Free' : formatPrice(storeSettings.standardShippingCents / 100);
-      if (express) express.textContent = formatPrice(storeSettings.expressShippingCents / 100);
+      if (standard) standard.textContent = shippingLocation ? (subtotal >= storeSettings.freeShippingThresholdCents / 100 ? 'Free' : formatPrice(shippingLocation.standard)) : 'Choose location';
+      if (express) express.textContent = shippingLocation ? formatPrice(shippingLocation.express) : 'Choose location';
       renderSummary();
     }
       await refreshPaymentAvailability();
@@ -166,12 +166,12 @@ function render() {
       <label class="delivery-option" data-active="true" data-value="standard">
         <input type="radio" name="delivery" value="standard" checked style="margin-top:.2rem" />
         <div><strong>Standard Shipping</strong><p class="text-muted" style="font-size:var(--fs-small)">4–7 business days</p></div>
-        <span class="delivery-option__price">${subtotal >= storeSettings.freeShippingThresholdCents / 100 ? 'Free' : formatPrice(storeSettings.standardShippingCents / 100)}</span>
+        <span class="delivery-option__price">Choose location</span>
       </label>
       <label class="delivery-option" data-value="express">
         <input type="radio" name="delivery" value="express" style="margin-top:.2rem" />
         <div><strong>Express Shipping</strong><p class="text-muted" style="font-size:var(--fs-small)">1–2 business days</p></div>
-        <span class="delivery-option__price">${formatPrice(storeSettings.expressShippingCents / 100)}</span>
+        <span class="delivery-option__price">Choose location</span>
       </label>
     </section>
 

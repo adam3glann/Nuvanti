@@ -1342,19 +1342,12 @@ function updateStockLine() {
 
     `;
   } else if (remaining === 0) {
-    element.innerHTML = '<span class="stock-dot stock-dot--out"></span>All available pieces of this size are already in your bag';
-  } else if (remaining <= 4) {
-    element.innerHTML = `
-
-      <span class="stock-dot stock-dot--low"></span>
-      Only ${remaining} left in size ${escapeHtml(selectedSize)}
-
-    `;
+    element.innerHTML = '<span class="stock-dot stock-dot--out"></span>Maximum quantity for this size is already in your bag';
   } else {
     element.innerHTML = `
 
       <span class="stock-dot"></span>
-      ${remaining} available in size ${escapeHtml(selectedSize)} — ships within 2 business days
+      In stock in size ${escapeHtml(selectedSize)} — ships within 2 business days
 
     `;
   }

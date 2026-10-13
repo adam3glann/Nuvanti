@@ -4,6 +4,7 @@ import { searchProducts } from '../services/productService.js';
 import { refreshCartDrawer } from './cartDrawer.js';
 
 let mounted = false;
+let latestSearchId = 0;
 const RECENT_KEY = 'nuvanti_recent_searches_v1';
 const POPULAR = ['Knitted Embroidered Polo', 'Embroidered Tank Top', 'Nuv Sweatpants', 'Men Tank Top'];
 
@@ -45,21 +46,41 @@ export function mountSearchOverlay() {
   let debounceTimer;
   input.addEventListener('input', () => {
     clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => runSearch(input.value.trim()), 200);
+    const searchId = ++latestSearchId;
+    debounceTimer = setTimeout(() => runSearch(input.value.trim(), searchId), 200);
+  });
+  input.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    clearTimeout(debounceTimer);
+    const term = input.value.trim();
+    if (!term) return;
+    saveRecent(term);
+    renderRecentChips();
+    runSearch(term, ++latestSearchId);
   });
 
   wrap.addEventListener('click', (e) => {
     const chip = e.target.closest('[data-term]');
     if (chip) {
       input.value = chip.dataset.term;
-      runSearch(chip.dataset.term);
+      runSearch(chip.dataset.term, ++latestSearchId);
     }
+  });
+
+  resultsWrap.addEventListener('click', (event) => {
+    if (!event.target.closest('a[href*="product.html"]')) return;
+    const term = input.value.trim();
+    if (!term) return;
+    saveRecent(term);
+    renderRecentChips();
   });
 
   bindProductCardEvents(resultsWrap, { products: [], onCartChange: refreshCartDrawer });
 
-  async function runSearch(term) {
+  async function runSearch(term, searchId) {
     if (!term) {
+      if (searchId !== latestSearchId) return;
       defaultWrap.hidden = false;
       resultsWrap.hidden = true;
       return;
@@ -72,11 +93,11 @@ export function mountSearchOverlay() {
     try {
       results = await searchProducts(term);
     } catch {
+      if (searchId !== latestSearchId) return;
       resultsWrap.innerHTML = `<div class="state-block"><h3>Search is unavailable right now</h3><p>Please try again in a moment.</p></div>`;
       return;
     }
-    saveRecent(term);
-    renderRecentChips();
+    if (searchId !== latestSearchId) return;
 
     // Refresh the single delegated listener's live quick-add lookup.
     bindProductCardEvents(resultsWrap, { products: results, onCartChange: refreshCartDrawer });
@@ -131,5 +152,6 @@ export function closeSearchOverlay() {
   const overlay = document.getElementById('searchOverlay');
   if (!overlay) return;
   overlay.dataset.open = 'false';
+  latestSearchId += 1;
   document.body.style.overflow = '';
 }

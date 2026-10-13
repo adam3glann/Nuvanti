@@ -29,7 +29,7 @@ async function load() {
   try {
     ({ items, total } = await fetchAuditLogs(state));
   } catch (error) {
-    document.getElementById('auditBody').innerHTML = `<tr><td colspan="5"><div class="admin-empty"><h3>Couldn't load audit logs</h3><p>${error.message}</p></div></td></tr>`;
+    document.getElementById('auditBody').innerHTML = `<tr><td colspan="5"><div class="admin-empty"><h3>Couldn't load audit logs</h3><p>${escapeHtml(error.message)}</p></div></td></tr>`;
     return;
   }
   document.getElementById('auditBody').innerHTML = items.length ? items.map((l) => `

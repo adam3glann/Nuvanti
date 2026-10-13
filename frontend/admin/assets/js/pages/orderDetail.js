@@ -126,7 +126,7 @@ function render(order) {
     try { const updated = await markInstaPayPaid(order.id); showAdminToast('InstaPay transfer verified and order marked paid.', 'success'); render(updated); }
     catch (error) { showAdminToast(error.message, 'error'); }
   });
-  document.getElementById('contactBtn')?.addEventListener('click', () => { window.location.href = `mailto:${order.customer.email}`; });
+  document.getElementById('contactBtn')?.addEventListener('click', () => { window.location.href = `mailto:${encodeURIComponent(order.customer.email)}`; });
 
   document.getElementById('updateStatusBtn')?.addEventListener('click', async () => {
     const status = document.getElementById('statusSelect').value;

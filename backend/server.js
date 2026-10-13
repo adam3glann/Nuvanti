@@ -19,14 +19,20 @@ import authRouter from "./routes/auth.js";
 import adminRouter from "./routes/admin.js";
 import uploadsRouter from "./routes/uploads.js";
 import paymentsRouter from "./routes/payments.js";
-import { requireAdminMfa, requireAdminPage, requireAuth, requireRole } from "./lib/auth.js";
+import {
+  requireAdminMfa,
+  requireAdminPage,
+  requireAuth,
+  requireRole,
+} from "./lib/auth.js";
 import { requireUnblockedAdminIp } from "./lib/adminLoginSecurity.js";
 import { requireEmergencyLockdownInactive } from "./middleware/emergencyLockdown.js";
 import { errorHandler, notFound, sameOrigin } from "./middleware/security.js";
 import { query } from "./lib/db.js";
 import { emailDeliveryStatus } from "./lib/mail.js";
 import { hasPermission } from "./lib/permissions.js";
-import { expireAbandonedPaymobOrders } from './lib/orderLifecycle.js';
+import { expireAbandonedPaymobOrders } from "./lib/orderLifecycle.js";
+import { cleanupStorefrontPresence, flushStorefrontPageViews } from "./lib/storefrontMetrics.js";
 
 const app = express();
 const STAFF_ROLES = ["staff", "manager", "admin", "super_admin"];
@@ -128,7 +134,9 @@ const adminApiLimiter = rateLimit({
   standardHeaders: "draft-7",
   legacyHeaders: false,
   keyGenerator: (req) => `admin:${req.user.sub}`,
-  message: { error: "Admin request limit reached. Wait a few minutes and retry." },
+  message: {
+    error: "Admin request limit reached. Wait a few minutes and retry.",
+  },
 });
 function isPublicCatalogRead(req) {
   if (req.method !== "GET") return false;
@@ -136,7 +144,17 @@ function isPublicCatalogRead(req) {
     return req.query.search === undefined;
   }
   if (req.path.startsWith("/api/products/")) return true;
-  return ["/api/categories", "/api/categories/", "/api/navigation", "/api/navigation/"].includes(req.path);
+  return [
+    "/api/categories",
+    "/api/categories/",
+    "/api/navigation",
+    "/api/navigation/",
+  ].includes(req.path);
+}
+function isProductSearch(req) {
+  return req.method === "GET" &&
+    ["/api/products", "/api/products/"].includes(req.path) &&
+    req.query.search !== undefined;
 }
 if (process.env.NODE_ENV === "production") {
   if (
@@ -168,7 +186,11 @@ if (trustProxy) app.set("trust proxy", trustProxy);
 app.use(helmet({ crossOriginResourcePolicy: { policy: "same-site" } }));
 app.use(
   cors({
-    origin: [...new Set([...storeOrigins, storePreviewOrigin, adminOrigin].filter(Boolean))],
+    origin: [
+      ...new Set(
+        [...storeOrigins, storePreviewOrigin, adminOrigin].filter(Boolean),
+      ),
+    ],
     credentials: true,
     methods: ["GET", "POST", "PATCH", "DELETE"],
   }),
@@ -180,9 +202,32 @@ const markPrivateResponse = (req, res, next) => {
   next();
 };
 app.use(
-  ["/api/auth", "/api/admin", "/api/addresses", "/api/orders/mine", "/api/orders/track", "/api/payments"],
+  [
+    "/api/auth",
+    "/api/admin",
+    "/api/addresses",
+    "/api/orders/mine",
+    "/api/orders/track",
+    "/api/payments",
+  ],
   markPrivateResponse,
 );
+const productSearchLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 1800,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  // The Pages Function sets this from Cloudflare's edge-provided client IP;
+  // req.ip alone can resolve to a shared proxy address in the Railway path.
+  keyGenerator: (req) =>
+    `search:${req.get("X-Nuvanti-Client-IP") || req.ip}`,
+  skip: (req) => !isProductSearch(req),
+  message: {
+    error: "Search request limit reached. Please wait a few minutes and retry.",
+  },
+});
+// Mount before the general limiter so it sees the full /api/products path.
+app.use(productSearchLimiter);
 app.use(
   rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -192,15 +237,28 @@ app.use(
     // Presence is polled by the authenticated admin header every 2 seconds.
     // Give that endpoint its own tighter limiter after admin authentication so
     // it cannot exhaust the shared API budget and block catalog work.
-    skip: (req) => ["/api/storefront/presence", "/api/storefront/page-view"].includes(req.path)
+    skip: (req) =>
+      ["/api/storefront/presence", "/api/storefront/page-view"].includes(
+        req.path,
+      ) ||
+      // Product search has its own larger budget below.
+      isProductSearch(req) ||
       // Public catalog reads use a separate, higher read-only budget below.
-      || isPublicCatalogRead(req)
-      || req.path === "/api/admin"
-      || req.path.startsWith("/api/admin/"),
+      isPublicCatalogRead(req) ||
+      req.path === "/api/admin" ||
+      req.path.startsWith("/api/admin/"),
   }),
 );
 // Only the HMAC-verified payment callback skips the browser Origin check.
-app.use(sameOrigin({ storeOrigin, storeOrigins, storePreviewOrigin, adminOrigin, signedWebhookPath: "/api/payments/paymob/webhook" }));
+app.use(
+  sameOrigin({
+    storeOrigin,
+    storeOrigins,
+    storePreviewOrigin,
+    adminOrigin,
+    signedWebhookPath: "/api/payments/paymob/webhook",
+  }),
+);
 app.use("/api/payments", paymentsRouter);
 app.use(
   "/api/auth",
@@ -212,15 +270,16 @@ app.use(
     // This limit is for credential and verification attempts. Authenticated
     // reads such as MFA status/session listing must remain usable so staff can
     // finish account recovery and required MFA setup after repeated retries.
-    skip: (req) => !new Set([
-      "/register",
-      "/login",
-      "/login/email-code",
-      "/login/mfa",
-      "/password-reset/request",
-      "/password-reset/confirm",
-      "/verify-email/confirm",
-    ]).has(req.path),
+    skip: (req) =>
+      !new Set([
+        "/register",
+        "/login",
+        "/login/email-code",
+        "/login/mfa",
+        "/password-reset/request",
+        "/password-reset/confirm",
+        "/verify-email/confirm",
+      ]).has(req.path),
   }),
   authRouter,
 );
@@ -239,9 +298,15 @@ const publicCatalogReadLimiter = rateLimit({
   standardHeaders: "draft-7",
   legacyHeaders: false,
   skip: (req) => !isPublicCatalogRead(req),
-  message: { error: "Catalog request limit reached. Please wait a few minutes and retry." },
+  message: {
+    error:
+      "Catalog request limit reached. Please wait a few minutes and retry.",
+  },
 });
-app.use(["/api/products", "/api/categories", "/api/navigation"], publicCatalogReadLimiter);
+app.use(
+  ["/api/products", "/api/categories", "/api/navigation"],
+  publicCatalogReadLimiter,
+);
 app.use("/api/products", productsRouter);
 app.use("/api/categories", categoriesRouter);
 app.use("/api/navigation", navigationRouter);
@@ -250,19 +315,28 @@ app.use("/api/newsletter", newsletterRouter);
 app.use("/api/orders", ordersRouter);
 app.use("/api/addresses", addressesRouter);
 app.use("/api/contact", contactRouter);
-app.use("/api/admin", requireEmergencyLockdownInactive, requireUnblockedAdminIp, requireAuth, requireRole(...STAFF_ROLES), requireAdminMfa, adminApiLimiter, adminRouter);
 app.use(
-  "/api/admin/uploads",
-  requireUnblockedAdminIp,
+  "/api/admin",
+  requireEmergencyLockdownInactive,
   requireAuth,
+  requireUnblockedAdminIp,
   requireRole(...STAFF_ROLES),
   requireAdminMfa,
   adminApiLimiter,
+  adminRouter,
+);
+app.use(
+  "/api/admin/uploads",
   (req, res, next) => {
-    const canManageImages = ["products.create", "products.edit", "content.manage"]
-      .some((permission) => hasPermission(req.user.role, permission));
+    const canManageImages = [
+      "products.create",
+      "products.edit",
+      "content.manage",
+    ].some((permission) => hasPermission(req.user.role, permission));
     if (!canManageImages) {
-      return res.status(403).json({ error: "You do not have permission to upload images." });
+      return res
+        .status(403)
+        .json({ error: "You do not have permission to upload images." });
     }
     next();
   },
@@ -301,16 +375,16 @@ adminApp.use((req, res, next) => {
 });
 adminApp.use(cookieParser());
 // A brand favicon is public, including on the unauthenticated login page.
-  adminApp.get("/favicon.svg", (req, res) =>
-    res.sendFile(path.join(frontendRoot, "admin/favicon.svg")),
-  );
-  // Keep the raster tab and home-screen icons public for mobile browsers too.
-  adminApp.get("/favicon.png", (req, res) =>
-    res.sendFile(path.join(frontendRoot, "admin/favicon.png")),
-  );
-  adminApp.get("/apple-touch-icon.png", (req, res) =>
-    res.sendFile(path.join(frontendRoot, "admin/apple-touch-icon.png")),
-  );
+adminApp.get("/favicon.svg", (req, res) =>
+  res.sendFile(path.join(frontendRoot, "admin/favicon.svg")),
+);
+// Keep the raster tab and home-screen icons public for mobile browsers too.
+adminApp.get("/favicon.png", (req, res) =>
+  res.sendFile(path.join(frontendRoot, "admin/favicon.png")),
+);
+adminApp.get("/apple-touch-icon.png", (req, res) =>
+  res.sendFile(path.join(frontendRoot, "admin/apple-touch-icon.png")),
+);
 adminApp.get("/login.html", (req, res) =>
   res.sendFile(path.join(frontendRoot, "admin/login.html")),
 );
@@ -340,7 +414,12 @@ adminApp.use(
   "/assets/js/pages/login.js",
   express.static(path.join(frontendRoot, "admin/assets/js/pages/login.js")),
 );
-adminApp.use(requireEmergencyLockdownInactive, requireUnblockedAdminIp, requireAdminPage, requireRole(...STAFF_ROLES));
+adminApp.use(
+  requireEmergencyLockdownInactive,
+  requireAdminPage,
+  requireUnblockedAdminIp,
+  requireRole(...STAFF_ROLES),
+);
 adminApp.use(
   "/store-assets",
   express.static(path.join(frontendRoot, "assets")),
@@ -357,9 +436,18 @@ adminApp.use((err, req, res, next) =>
 if (trustProxy) adminApp.set("trust proxy", trustProxy);
 
 await query("SELECT 1");
+const presenceCleanupTimer = setInterval(() => cleanupStorefrontPresence()
+  .catch((error) => console.error('Unable to clean up expired storefront presence:', error)), 60 * 1000);
+presenceCleanupTimer.unref();
+cleanupStorefrontPresence().catch((error) => console.error('Unable to clean up expired storefront presence:', error));
+const pageViewFlushTimer = setInterval(() => flushStorefrontPageViews()
+  .catch((error) => console.error('Unable to flush storefront page views:', error)), 5 * 1000);
+pageViewFlushTimer.unref();
 if (isProduction) {
-  const sweepExpiredPaymobOrders = () => expireAbandonedPaymobOrders()
-    .catch((error) => console.error('Unable to release expired unpaid Paymob orders:', error));
+  const sweepExpiredPaymobOrders = () =>
+    expireAbandonedPaymobOrders().catch((error) =>
+      console.error("Unable to release expired unpaid Paymob orders:", error),
+    );
   const paymobExpiryTimer = setInterval(sweepExpiredPaymobOrders, 60 * 1000);
   paymobExpiryTimer.unref();
   sweepExpiredPaymobOrders();

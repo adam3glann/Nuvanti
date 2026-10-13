@@ -190,6 +190,7 @@ export function amountToFreeShipping() {
 }
 
 export function freeShippingProgress() {
+  if (FREE_SHIPPING_THRESHOLD <= 0) return 100;
   return Math.min(100, Math.round((cartSubtotal() / FREE_SHIPPING_THRESHOLD) * 100));
 }
 

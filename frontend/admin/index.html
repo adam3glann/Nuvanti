@@ -1,130 +1,336 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<link rel="icon" type="image/png" sizes="512x512" href="/favicon.png?v=4" />
-<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=4" />
+  <head>
+    <link rel="icon" type="image/png" sizes="512x512" href="/favicon.png?v=4" />
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="/apple-touch-icon.png?v=4"
+    />
 
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="robots" content="noindex, nofollow" />
-<title>Dashboard — Nuvanti Admin</title>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="assets/css/tokens.css" />
-<link rel="stylesheet" href="assets/css/base.css" />
-<link rel="stylesheet" href="assets/css/components.css" />
-</head>
-<body>
-<div class="admin-shell" id="adminShell">
-  <div id="admin-sidebar-mount"></div>
-  <div class="admin-main">
-    <div id="admin-header-mount"></div>
-    <div class="admin-content">
-      <div class="page-title-row">
-        <div><h1>Dashboard</h1><p>An overview of Nuvanti's store performance.</p></div>
-      </div>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Dashboard — Nuvanti Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="assets/css/tokens.css" />
+    <link rel="stylesheet" href="assets/css/base.css" />
+    <link rel="stylesheet" href="assets/css/components.css" />
+  </head>
+  <body>
+    <div class="admin-shell" id="adminShell">
+      <div id="admin-sidebar-mount"></div>
+      <div class="admin-main">
+        <div id="admin-header-mount"></div>
+        <div class="admin-content">
+          <div class="page-title-row">
+            <div>
+              <h1>Dashboard</h1>
+              <p>An overview of Nuvanti's store performance.</p>
+            </div>
+          </div>
 
-      <h2 style="margin-bottom:.4rem">Business Overview <span class="dash-period">All time · payments received</span></h2>
-      <div class="stat-grid" id="businessGrid">
-        <div class="stat-card"><div class="a-skeleton" style="height:52px"></div></div>
-        <div class="stat-card"><div class="a-skeleton" style="height:52px"></div></div>
-        <div class="stat-card"><div class="a-skeleton" style="height:52px"></div></div>
-        <div class="stat-card"><div class="a-skeleton" style="height:52px"></div></div>
-        <div class="stat-card"><div class="a-skeleton" style="height:52px"></div></div>
-        <div class="stat-card"><div class="a-skeleton" style="height:52px"></div></div>
-        <div class="stat-card"><div class="a-skeleton" style="height:52px"></div></div>
-      </div>
-      <p class="dash-finance-note" id="financeNote">Sales count paid orders after discounts and exclude shipping. Gross profit subtracts recorded product costs only; operating expenses are not included.</p>
+          <h2 style="margin-bottom: 0.4rem">
+            Business Overview
+            <span class="dash-period">All time · payments received</span>
+          </h2>
+          <div class="stat-grid" id="businessGrid">
+            <div class="stat-card">
+              <div class="a-skeleton" style="height: 52px"></div>
+            </div>
+            <div class="stat-card">
+              <div class="a-skeleton" style="height: 52px"></div>
+            </div>
+            <div class="stat-card">
+              <div class="a-skeleton" style="height: 52px"></div>
+            </div>
+            <div class="stat-card">
+              <div class="a-skeleton" style="height: 52px"></div>
+            </div>
+            <div class="stat-card">
+              <div class="a-skeleton" style="height: 52px"></div>
+            </div>
+            <div class="stat-card">
+              <div class="a-skeleton" style="height: 52px"></div>
+            </div>
+            <div class="stat-card">
+              <div class="a-skeleton" style="height: 52px"></div>
+            </div>
+          </div>
+          <p class="dash-finance-note" id="financeNote">
+            Sales count paid orders after discounts and exclude shipping. Gross
+            profit subtracts recorded product costs only; operating expenses are
+            not included.
+          </p>
 
-      <div class="stat-grid" id="statGrid">
-        <div class="stat-card"><div class="a-skeleton" style="height:52px"></div></div>
-        <div class="stat-card"><div class="a-skeleton" style="height:52px"></div></div>
-        <div class="stat-card"><div class="a-skeleton" style="height:52px"></div></div>
-        <div class="stat-card"><div class="a-skeleton" style="height:52px"></div></div>
-        <div class="stat-card"><div class="a-skeleton" style="height:52px"></div></div>
-      </div>
+          <div class="stat-grid" id="statGrid">
+            <div class="stat-card">
+              <div class="a-skeleton" style="height: 52px"></div>
+            </div>
+            <div class="stat-card">
+              <div class="a-skeleton" style="height: 52px"></div>
+            </div>
+            <div class="stat-card">
+              <div class="a-skeleton" style="height: 52px"></div>
+            </div>
+            <div class="stat-card">
+              <div class="a-skeleton" style="height: 52px"></div>
+            </div>
+            <div class="stat-card">
+              <div class="a-skeleton" style="height: 52px"></div>
+            </div>
+          </div>
 
-      <div class="card" style="margin-bottom:1.5rem">
-        <div class="card-head">
-          <h2>Paid Product Sales Over Time</h2>
-          <select id="rangeSelect" style="padding:.4rem .6rem;border:1px solid var(--a-border-strong);border-radius:4px">
-            <option value="7d">Last 7 days</option>
-            <option value="30d" selected>Last 30 days</option>
-            <option value="90d">Last 90 days</option>
-            <option value="1y">Last year</option>
-          </select>
+          <div class="card" style="margin-bottom: 1.5rem">
+            <div class="card-head">
+              <h2>Paid Product Sales Over Time</h2>
+              <select
+                id="rangeSelect"
+                style="
+                  padding: 0.4rem 0.6rem;
+                  border: 1px solid var(--a-border-strong);
+                  border-radius: 4px;
+                "
+              >
+                <option value="7d">Last 7 days</option>
+                <option value="30d" selected>Last 30 days</option>
+                <option value="90d">Last 90 days</option>
+                <option value="1y">Last year</option>
+              </select>
+            </div>
+            <div class="card-pad" id="revenueChart"></div>
+          </div>
+
+          <h2 style="margin-bottom: 0.75rem">Orders by Status</h2>
+          <div class="stat-grid" id="orderStatusGrid"></div>
+
+          <h2 style="margin-bottom: 0.75rem">Catalog Health</h2>
+          <div class="stat-grid" id="productStatGrid"></div>
+
+          <div
+            style="
+              display: grid;
+              grid-template-columns: 1.6fr 1fr;
+              gap: 1.25rem;
+            "
+            class="dash-split"
+          >
+            <div class="card">
+              <div class="card-head">
+                <h2>Recent Orders</h2>
+                <a href="orders.html" class="btn btn-outline btn-sm"
+                  >View All</a
+                >
+              </div>
+              <div class="table-wrap">
+                <table class="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Order</th>
+                      <th>Customer</th>
+                      <th>Date</th>
+                      <th>Total</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="recentOrdersBody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-head"><h2>Low Stock Alerts</h2></div>
+              <div class="card-pad" id="lowStockList"></div>
+              <div class="card-pad" style="padding-top: 0">
+                <a
+                  href="inventory.html"
+                  class="btn btn-outline btn-sm"
+                  style="width: 100%"
+                  >Manage Inventory</a
+                >
+              </div>
+            </div>
+          </div>
+
+          <section
+            class="card maintenance-card"
+            id="storeMaintenance"
+            hidden
+            aria-labelledby="maintenanceTitle"
+          >
+            <div class="card-head">
+              <h2 id="maintenanceTitle">Pre-launch cleanup</h2>
+            </div>
+            <div class="card-pad">
+              <p class="maintenance-intro">
+                Download a private backup before clearing test activity. The
+                backup is a JSON export; keep it somewhere secure because it
+                contains customer and order details.
+              </p>
+              <div class="maintenance-actions">
+                <button
+                  class="btn btn-outline"
+                  id="downloadStoreBackup"
+                  type="button"
+                >
+                  Download store backup
+                </button>
+                <button
+                  class="btn btn-danger"
+                  id="resetStoreData"
+                  type="button"
+                  disabled
+                >
+                  Reset customer, order & dashboard data
+                </button>
+              </div>
+              <p class="maintenance-note" id="maintenanceNote" role="status">
+                Reset stays locked until a backup has downloaded. It deletes
+                customers, orders, saved addresses, messages, newsletter
+                subscribers, inventory adjustment history, visitor sessions and
+                view totals. It restores stock reserved by non-cancelled test
+                orders. Admin accounts, products and stock, photos, categories,
+                collections, homepage slides and text, store settings, and
+                discount codes are kept.
+              </p>
+              <div
+                class="maintenance-restore"
+                id="emergencyLockdownPanel"
+                hidden
+              >
+                <h3>Emergency store lockdown</h3>
+                <p class="maintenance-note">
+                  Downloads the customer and order data snapshot, pauses new
+                  checkout, invalidates all staff and admin sessions, removes
+                  sign-in challenges, and blocks admin pages and new staff
+                  sign-ins. This does not rotate Railway, database, email,
+                  payment, or image-host credentials. The snapshot contains
+                  customer and order personal data; store it privately. Recovery
+                  requires Railway database access.
+                </p>
+                <button
+                  class="btn btn-danger"
+                  id="emergencyLockdown"
+                  type="button"
+                >
+                  Download snapshot & lock down store
+                </button>
+              </div>
+              <div class="maintenance-restore">
+                <h3>Restore from a backup file</h3>
+                <p class="maintenance-note">
+                  Choose a previously downloaded Nuvanti JSON backup. This
+                  replaces the exported store data with that snapshot; current
+                  admin accounts and their passwords and MFA stay unchanged.
+                  Customer passwords, sessions, MFA secrets, Paymob transaction
+                  references, and private tokens are not in the file. Restored
+                  customers will need password resets; restore will not recreate
+                  payment-provider references or old newsletter unsubscribe
+                  links.
+                </p>
+                <label for="restoreBackupFile">Backup file (.json)</label>
+                <input
+                  id="restoreBackupFile"
+                  type="file"
+                  accept=".json,application/json"
+                />
+                <p
+                  class="maintenance-note"
+                  id="restoreBackupPreview"
+                  role="status"
+                  aria-live="polite"
+                >
+                  Select a backup file to preview its contents.
+                </p>
+                <button
+                  class="btn btn-danger"
+                  id="restoreStoreBackup"
+                  type="button"
+                  disabled
+                >
+                  Restore selected backup
+                </button>
+              </div>
+            </div>
+          </section>
         </div>
-        <div class="card-pad" id="revenueChart"></div>
       </div>
-
-      <h2 style="margin-bottom:.75rem">Orders by Status</h2>
-      <div class="stat-grid" id="orderStatusGrid"></div>
-
-      <h2 style="margin-bottom:.75rem">Catalog Health</h2>
-      <div class="stat-grid" id="productStatGrid"></div>
-
-      <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:1.25rem" class="dash-split">
-        <div class="card">
-          <div class="card-head"><h2>Recent Orders</h2><a href="orders.html" class="btn btn-outline btn-sm">View All</a></div>
-          <div class="table-wrap">
-            <table class="admin-table">
-              <thead><tr><th>Order</th><th>Customer</th><th>Date</th><th>Total</th><th>Status</th></tr></thead>
-              <tbody id="recentOrdersBody"></tbody>
-            </table>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-head"><h2>Low Stock Alerts</h2></div>
-          <div class="card-pad" id="lowStockList"></div>
-          <div class="card-pad" style="padding-top:0">
-            <a href="inventory.html" class="btn btn-outline btn-sm" style="width:100%">Manage Inventory</a>
-          </div>
-        </div>
-      </div>
-
-      <section class="card maintenance-card" id="storeMaintenance" hidden aria-labelledby="maintenanceTitle">
-        <div class="card-head"><h2 id="maintenanceTitle">Pre-launch cleanup</h2></div>
-        <div class="card-pad">
-          <p class="maintenance-intro">Download a private backup before clearing test activity. The backup is a JSON export; keep it somewhere secure because it contains customer and order details.</p>
-          <div class="maintenance-actions">
-            <button class="btn btn-outline" id="downloadStoreBackup" type="button">Download store backup</button>
-            <button class="btn btn-danger" id="resetStoreData" type="button" disabled>Reset customer, order & dashboard data</button>
-          </div>
-          <p class="maintenance-note" id="maintenanceNote" role="status">Reset stays locked until a backup has downloaded. It deletes customers, orders, saved addresses, messages, newsletter subscribers, inventory adjustment history, visitor sessions and view totals. It restores stock reserved by non-cancelled test orders. Admin accounts, products and stock, photos, categories, collections, homepage slides and text, store settings, and discount codes are kept.</p>
-          <div class="maintenance-restore" id="emergencyLockdownPanel" hidden>
-            <h3>Emergency store lockdown</h3>
-            <p class="maintenance-note">Downloads the customer and order data snapshot, pauses new checkout, invalidates all staff and admin sessions, removes sign-in challenges, and blocks admin pages and new staff sign-ins. This does not rotate Railway, database, email, payment, or image-host credentials. The snapshot contains customer and order personal data; store it privately. Recovery requires Railway database access.</p>
-            <button class="btn btn-danger" id="emergencyLockdown" type="button">Download snapshot & lock down store</button>
-          </div>
-          <div class="maintenance-restore">
-            <h3>Restore from a backup file</h3>
-            <p class="maintenance-note">Choose a previously downloaded Nuvanti JSON backup. This replaces the exported store data with that snapshot; current admin accounts and their passwords and MFA stay unchanged. Customer passwords, sessions, MFA secrets, Paymob transaction references, and private tokens are not in the file. Restored customers will need password resets; restore will not recreate payment-provider references or old newsletter unsubscribe links.</p>
-            <label for="restoreBackupFile">Backup file (.json)</label>
-            <input id="restoreBackupFile" type="file" accept=".json,application/json" />
-            <p class="maintenance-note" id="restoreBackupPreview" role="status" aria-live="polite">Select a backup file to preview its contents.</p>
-            <button class="btn btn-danger" id="restoreStoreBackup" type="button" disabled>Restore selected backup</button>
-          </div>
-        </div>
-      </section>
     </div>
-  </div>
-</div>
-<style>
-.dash-period{font-size:.75rem;font-weight:500;color:var(--a-muted);margin-left:.35rem}
-.dash-finance-note{font-size:.78rem;color:var(--a-muted);margin:-.75rem 0 1.5rem}
-.dash-finance-card .stat-card__value{font-size:clamp(1.15rem,2vw,1.6rem);overflow-wrap:anywhere}
-.maintenance-card{margin-top:1.5rem;border-color:var(--a-danger,#b94b4b)}
-#storeMaintenance[hidden]{display:none}
-.maintenance-intro,.maintenance-note{font-size:.84rem;line-height:1.6;color:var(--a-muted);max-width:78rem}
-.maintenance-actions{display:flex;flex-wrap:wrap;gap:.75rem;margin:1rem 0}
-.maintenance-actions .btn-danger{background:var(--a-danger,#a33);color:#fff;border-color:var(--a-danger,#a33)}
-.maintenance-restore{border-top:1px solid var(--a-border);margin-top:1.5rem;padding-top:1.25rem;max-width:52rem}
-.maintenance-restore h3{margin:0 0 .5rem;font-size:1rem}
-.maintenance-restore label{display:block;margin:.75rem 0 .4rem;font-size:.85rem;font-weight:600}
-.maintenance-restore input[type=file]{display:block;max-width:100%;margin-bottom:.75rem}
-.maintenance-actions button:disabled{opacity:.5;cursor:not-allowed}
-@media (max-width:960px){ .dash-split{ grid-template-columns:1fr !important; } }
-</style>
-<script type="module" src="assets/js/pages/dashboard.js"></script>
-</body>
+    <style>
+      .dash-period {
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: var(--a-muted);
+        margin-left: 0.35rem;
+      }
+      .dash-finance-note {
+        font-size: 0.78rem;
+        color: var(--a-muted);
+        margin: -0.75rem 0 1.5rem;
+      }
+      .dash-finance-card .stat-card__value {
+        font-size: clamp(1.15rem, 2vw, 1.6rem);
+        overflow-wrap: anywhere;
+      }
+      .maintenance-card {
+        margin-top: 1.5rem;
+        border-color: var(--a-danger, #b94b4b);
+      }
+      #storeMaintenance[hidden] {
+        display: none;
+      }
+      .maintenance-intro,
+      .maintenance-note {
+        font-size: 0.84rem;
+        line-height: 1.6;
+        color: var(--a-muted);
+        max-width: 78rem;
+      }
+      .maintenance-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin: 1rem 0;
+      }
+      .maintenance-actions .btn-danger {
+        background: var(--a-danger, #a33);
+        color: #fff;
+        border-color: var(--a-danger, #a33);
+      }
+      .maintenance-restore {
+        border-top: 1px solid var(--a-border);
+        margin-top: 1.5rem;
+        padding-top: 1.25rem;
+        max-width: 52rem;
+      }
+      .maintenance-restore h3 {
+        margin: 0 0 0.5rem;
+        font-size: 1rem;
+      }
+      .maintenance-restore label {
+        display: block;
+        margin: 0.75rem 0 0.4rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+      }
+      .maintenance-restore input[type="file"] {
+        display: block;
+        max-width: 100%;
+        margin-bottom: 0.75rem;
+      }
+      .maintenance-actions button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      @media (max-width: 960px) {
+        .dash-split {
+          grid-template-columns: 1fr !important;
+        }
+      }
+    </style>
+    <script type="module" src="assets/js/pages/dashboard.js"></script>
+  </body>
 </html>

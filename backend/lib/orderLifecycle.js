@@ -1,31 +1,65 @@
-import { transaction } from './db.js';
+import { transaction } from "./db.js";
 
 // Caller must lock and validate the order before releasing its stock reservation.
-export async function restoreOrderInventory(client, orderId, reason, actorUserId = null) {
-  const { rows: items } = await client.query(`SELECT product_id AS "productId",
+export async function restoreOrderInventory(
+  client,
+  orderId,
+  reason,
+  actorUserId = null,
+) {
+  const { rows: items } = await client.query(
+    `SELECT product_id AS "productId",
       COALESCE(color, 'Default') AS color, COALESCE(size, 'One Size') AS size, SUM(quantity)::int AS quantity
     FROM order_items WHERE order_id = $1
     GROUP BY product_id, COALESCE(color, 'Default'), COALESCE(size, 'One Size')
-    ORDER BY product_id, COALESCE(color, 'Default'), COALESCE(size, 'One Size')`, [orderId]);
+    ORDER BY product_id, COALESCE(color, 'Default'), COALESCE(size, 'One Size')`,
+    [orderId],
+  );
   for (const item of items) {
-    const { rows: products } = await client.query(`SELECT inventory, metadata->'inventoryByVariant' AS "stockByVariant",
+    const { rows: products } = await client.query(
+      `SELECT inventory, metadata->'inventoryByVariant' AS "stockByVariant",
         CASE WHEN metadata->'inventory' IS NULL OR metadata->'inventory' = '{}'::jsonb
           THEN jsonb_build_object('One Size', inventory) ELSE metadata->'inventory' END AS "stockBySize"
-      FROM products WHERE id = $1 FOR UPDATE`, [item.productId]);
+      FROM products WHERE id = $1 FOR UPDATE`,
+      [item.productId],
+    );
     if (!products[0]) continue;
-    const stockBySize = products[0].stockBySize || { 'One Size': products[0].inventory };
+    const stockBySize = products[0].stockBySize || {
+      "One Size": products[0].inventory,
+    };
     const stockByVariant = products[0].stockByVariant || {};
     const variantKey = `${item.color}::${item.size}`;
-    if (variantKey in stockByVariant) stockByVariant[variantKey] = Math.max(0, Number(stockByVariant[variantKey]) || 0) + Number(item.quantity);
-    stockBySize[item.size] = Math.max(0, Number(stockBySize[item.size]) || 0) + Number(item.quantity);
+    if (variantKey in stockByVariant)
+      stockByVariant[variantKey] =
+        Math.max(0, Number(stockByVariant[variantKey]) || 0) +
+        Number(item.quantity);
+    stockBySize[item.size] =
+      Math.max(0, Number(stockBySize[item.size]) || 0) + Number(item.quantity);
     const totalStock = Object.keys(stockByVariant).length
-      ? Object.values(stockByVariant).reduce((sum, value) => sum + Math.max(0, Number(value) || 0), 0)
-      : Object.values(stockBySize).reduce((sum, value) => sum + Math.max(0, Number(value) || 0), 0);
-    await client.query(`UPDATE products SET inventory = $2,
+      ? Object.values(stockByVariant).reduce(
+          (sum, value) => sum + Math.max(0, Number(value) || 0),
+          0,
+        )
+      : Object.values(stockBySize).reduce(
+          (sum, value) => sum + Math.max(0, Number(value) || 0),
+          0,
+        );
+    await client.query(
+      `UPDATE products SET inventory = $2,
       metadata = jsonb_set(jsonb_set(COALESCE(metadata, '{}'::jsonb), '{inventory}', $3::jsonb, true), '{inventoryByVariant}', $4::jsonb, true), updated_at = NOW()
-      WHERE id = $1`, [item.productId, totalStock, JSON.stringify(stockBySize), JSON.stringify(stockByVariant)]);
-    await client.query(`INSERT INTO inventory_adjustments (product_id, size, change, reason, actor_user_id)
-      VALUES ($1, $2, $3, $4, $5)`, [item.productId, variantKey, item.quantity, reason, actorUserId]);
+      WHERE id = $1`,
+      [
+        item.productId,
+        totalStock,
+        JSON.stringify(stockBySize),
+        JSON.stringify(stockByVariant),
+      ],
+    );
+    await client.query(
+      `INSERT INTO inventory_adjustments (product_id, size, change, reason, actor_user_id)
+      VALUES ($1, $2, $3, $4, $5)`,
+      [item.productId, variantKey, item.quantity, reason, actorUserId],
+    );
   }
 }
 
@@ -33,7 +67,8 @@ export async function restoreOrderInventory(client, orderId, reason, actorUserId
 // avoids releasing stock while a valid provider callback is still in flight.
 export async function expireAbandonedPaymobOrders() {
   return transaction(async (client) => {
-    const { rows: orders } = await client.query(`SELECT id, discount_code AS "discountCode"
+    const { rows: orders } =
+      await client.query(`SELECT id, discount_code AS "discountCode"
       FROM orders
       WHERE status = 'pending' AND payment_method = 'paymob' AND payment_status = 'pending'
         AND payment_provider_order_id IS NOT NULL
@@ -41,12 +76,22 @@ export async function expireAbandonedPaymobOrders() {
       ORDER BY payment_updated_at
       LIMIT 25 FOR UPDATE SKIP LOCKED`);
     for (const order of orders) {
-      await restoreOrderInventory(client, order.id, `Expired unpaid Paymob order NV-${order.id}`);
+      await restoreOrderInventory(
+        client,
+        order.id,
+        `Expired unpaid Paymob order NV-${order.id}`,
+      );
       if (order.discountCode) {
-        await client.query('UPDATE discounts SET used_count = GREATEST(0, used_count - 1) WHERE code = $1', [order.discountCode]);
+        await client.query(
+          "UPDATE discounts SET used_count = GREATEST(0, used_count - 1) WHERE code = $1",
+          [order.discountCode],
+        );
       }
-      await client.query(`UPDATE orders SET status = 'cancelled', payment_status = 'failed', payment_updated_at = NOW()
-        WHERE id = $1 AND status = 'pending' AND payment_status = 'pending'`, [order.id]);
+      await client.query(
+        `UPDATE orders SET status = 'cancelled', payment_status = 'failed', payment_updated_at = NOW()
+        WHERE id = $1 AND status = 'pending' AND payment_status = 'pending'`,
+        [order.id],
+      );
     }
     return orders.length;
   });

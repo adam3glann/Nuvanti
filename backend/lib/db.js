@@ -1,9 +1,11 @@
-import pg from 'pg';
+import pg from "pg";
 
 const { Pool } = pg;
 
 if (!process.env.DATABASE_URL) {
-  throw new Error('DATABASE_URL is missing. For Railway, add it under your service Variables; locally, set it in backend/.env.');
+  throw new Error(
+    "DATABASE_URL is missing. For Railway, add it under your service Variables; locally, set it in backend/.env.",
+  );
 }
 
 // Keep TLS certificate verification enabled in production. Supabase's
@@ -13,37 +15,43 @@ if (!process.env.DATABASE_URL) {
 // explicit `ssl` object (including its CA certificate).
 function getProductionConnectionString(connectionString) {
   const url = new URL(connectionString);
-  for (const key of ['sslmode', 'sslrootcert', 'sslcert', 'sslkey']) {
+  for (const key of ["sslmode", "sslrootcert", "sslcert", "sslkey"]) {
     url.searchParams.delete(key);
   }
   return url.toString();
 }
 
 function getSslConfig() {
-  if (process.env.NODE_ENV !== 'production') return false;
+  if (process.env.NODE_ENV !== "production") return false;
 
-  const rawCa = process.env.DATABASE_SSL_CA?.replace(/\\r?\\n/g, '\n').trim();
+  const rawCa = process.env.DATABASE_SSL_CA?.replace(/\\r?\\n/g, "\n").trim();
   // Environment-variable forms may flatten pasted PEM newlines. Rebuild the
   // standard PEM layout before passing it to Node's TLS implementation.
-  const caMatch = rawCa?.match(/-----BEGIN CERTIFICATE-----([\s\S]*?)-----END CERTIFICATE-----/);
+  const caMatch = rawCa?.match(
+    /-----BEGIN CERTIFICATE-----([\s\S]*?)-----END CERTIFICATE-----/,
+  );
   const ca = caMatch
-    ? `-----BEGIN CERTIFICATE-----\n${caMatch[1].replace(/\s+/g, '').match(/.{1,64}/g).join('\n')}\n-----END CERTIFICATE-----`
+    ? `-----BEGIN CERTIFICATE-----\n${caMatch[1]
+        .replace(/\s+/g, "")
+        .match(/.{1,64}/g)
+        .join("\n")}\n-----END CERTIFICATE-----`
     : rawCa;
   return { rejectUnauthorized: true, ...(ca ? { ca } : {}) };
 }
 
 export const pool = new Pool({
-  connectionString: process.env.NODE_ENV === 'production'
-    ? getProductionConnectionString(process.env.DATABASE_URL)
-    : process.env.DATABASE_URL,
+  connectionString:
+    process.env.NODE_ENV === "production"
+      ? getProductionConnectionString(process.env.DATABASE_URL)
+      : process.env.DATABASE_URL,
   ssl: getSslConfig(),
   max: 10,
 });
 
 // PostgreSQL emits this when an idle pooled connection drops. Without a
 // listener, Node treats the EventEmitter error as fatal and exits the process.
-pool.on('error', (error) => {
-  console.error('Idle database client error:', error.code || error.message);
+pool.on("error", (error) => {
+  console.error("Idle database client error:", error.code || error.message);
 });
 
 export async function query(text, params) {
@@ -53,12 +61,12 @@ export async function query(text, params) {
 export async function transaction(work) {
   const client = await pool.connect();
   try {
-    await client.query('BEGIN');
+    await client.query("BEGIN");
     const result = await work(client);
-    await client.query('COMMIT');
+    await client.query("COMMIT");
     return result;
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query("ROLLBACK");
     throw error;
   } finally {
     client.release();

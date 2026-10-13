@@ -1,25 +1,32 @@
-import crypto from 'crypto';
-import jwt from 'jsonwebtoken';
-import { query } from './db.js';
+import crypto from "crypto";
+import jwt from "jsonwebtoken";
+import { query } from "./db.js";
 
-const secureCookies = process.env.NODE_ENV === 'production';
+const secureCookies = process.env.NODE_ENV === "production";
 // __Host- cookies cannot be set for sibling domains or weaker paths. In local
 // HTTP development, use unprefixed names because browsers require Secure for
 // the __Host- prefix.
-const cookiePrefix = secureCookies ? '__Host-' : '';
+const cookiePrefix = secureCookies ? "__Host-" : "";
 const cookieName = `${cookiePrefix}nuvanti_session`;
 const challengeCookieName = `${cookiePrefix}nuvanti_mfa_challenge`;
 const emailChallengeCookieName = `${cookiePrefix}nuvanti_admin_email_challenge`;
 // Both frontends call the API through same-origin routes (Railway for admin,
 // Cloudflare Pages Functions for the store). Lax keeps these cookies first-party
 // on mobile browsers while blocking cross-site cookie attachment.
-const cookieSameSite = 'lax';
-const staffRoles = ['staff', 'manager', 'admin', 'super_admin'];
-const cookieOptions = (maxAge) => ({ httpOnly: true, secure: secureCookies, sameSite: cookieSameSite, maxAge, path: '/' });
+const cookieSameSite = "lax";
+const staffRoles = ["staff", "manager", "admin", "super_admin"];
+const cookieOptions = (maxAge) => ({
+  httpOnly: true,
+  secure: secureCookies,
+  sameSite: cookieSameSite,
+  maxAge,
+  path: "/",
+});
 
 function secret() {
   const value = process.env.JWT_SECRET;
-  if (!value || value.length < 32) throw new Error('JWT_SECRET must be at least 32 characters.');
+  if (!value || value.length < 32)
+    throw new Error("JWT_SECRET must be at least 32 characters.");
   return value;
 }
 
@@ -32,12 +39,23 @@ export async function issueSession(user, req) {
   await query(
     `INSERT INTO auth_sessions (id, user_id, session_version, user_agent, expires_at)
      VALUES ($1, $2, $3, $4, NOW() + INTERVAL '8 hours')`,
-    [id, user.id, sessionVersion, String(req.get('user-agent') || '').slice(0, 500)],
+    [
+      id,
+      user.id,
+      sessionVersion,
+      String(req.get("user-agent") || "").slice(0, 500),
+    ],
   );
   const token = jwt.sign(
-    { sub: String(user.id), role: user.role, email: user.email, ver: sessionVersion, jti: id },
+    {
+      sub: String(user.id),
+      role: user.role,
+      email: user.email,
+      ver: sessionVersion,
+      jti: id,
+    },
     secret(),
-    { expiresIn: '8h', issuer: 'nuvanti-api', audience: 'nuvanti-web' },
+    { expiresIn: "8h", issuer: "nuvanti-api", audience: "nuvanti-web" },
   );
   return token;
 }
@@ -46,9 +64,14 @@ export function readSession(req) {
   const token = req.cookies?.[cookieName];
   if (!token) return null;
   try {
-    const session = jwt.verify(token, secret(), { issuer: 'nuvanti-api', audience: 'nuvanti-web' });
-    return typeof session.jti === 'string' ? session : null;
-  } catch { return null; }
+    const session = jwt.verify(token, secret(), {
+      issuer: "nuvanti-api",
+      audience: "nuvanti-web",
+    });
+    return typeof session.jti === "string" ? session : null;
+  } catch {
+    return null;
+  }
 }
 
 export function setSessionCookie(res, token) {
@@ -57,9 +80,13 @@ export function setSessionCookie(res, token) {
 
 export function setMfaChallengeCookie(res, user) {
   const token = jwt.sign(
-    { sub: String(user.id), ver: Number(user.sessionVersion ?? 0), purpose: 'mfa' },
+    {
+      sub: String(user.id),
+      ver: Number(user.sessionVersion ?? 0),
+      purpose: "mfa",
+    },
     secret(),
-    { expiresIn: '5m', issuer: 'nuvanti-api', audience: 'nuvanti-mfa' },
+    { expiresIn: "5m", issuer: "nuvanti-api", audience: "nuvanti-mfa" },
   );
   res.cookie(challengeCookieName, token, cookieOptions(5 * 60 * 1000));
 }
@@ -70,9 +97,18 @@ export function clearMfaChallengeCookie(res) {
 
 export function setAdminEmailChallengeCookie(res, user, challengeId) {
   const token = jwt.sign(
-    { sub: String(user.id), ver: Number(user.sessionVersion ?? 0), jti: challengeId, purpose: 'admin_email_login' },
+    {
+      sub: String(user.id),
+      ver: Number(user.sessionVersion ?? 0),
+      jti: challengeId,
+      purpose: "admin_email_login",
+    },
     secret(),
-    { expiresIn: '10m', issuer: 'nuvanti-api', audience: 'nuvanti-admin-email' },
+    {
+      expiresIn: "10m",
+      issuer: "nuvanti-api",
+      audience: "nuvanti-admin-email",
+    },
   );
   res.cookie(emailChallengeCookieName, token, cookieOptions(10 * 60 * 1000));
 }
@@ -81,9 +117,17 @@ export function readAdminEmailChallenge(req) {
   try {
     const token = req.cookies?.[emailChallengeCookieName];
     if (!token) return null;
-    const challenge = jwt.verify(token, secret(), { issuer: 'nuvanti-api', audience: 'nuvanti-admin-email' });
-    return challenge.purpose === 'admin_email_login' && typeof challenge.jti === 'string' ? challenge : null;
-  } catch { return null; }
+    const challenge = jwt.verify(token, secret(), {
+      issuer: "nuvanti-api",
+      audience: "nuvanti-admin-email",
+    });
+    return challenge.purpose === "admin_email_login" &&
+      typeof challenge.jti === "string"
+      ? challenge
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 export function clearAdminEmailChallengeCookie(res) {
@@ -94,9 +138,14 @@ export function readMfaChallenge(req) {
   try {
     const token = req.cookies?.[challengeCookieName];
     if (!token) return null;
-    const challenge = jwt.verify(token, secret(), { issuer: 'nuvanti-api', audience: 'nuvanti-mfa' });
-    return challenge.purpose === 'mfa' ? challenge : null;
-  } catch { return null; }
+    const challenge = jwt.verify(token, secret(), {
+      issuer: "nuvanti-api",
+      audience: "nuvanti-mfa",
+    });
+    return challenge.purpose === "mfa" ? challenge : null;
+  } catch {
+    return null;
+  }
 }
 
 export function clearSession(res) {
@@ -131,10 +180,12 @@ export async function resolveSession(session) {
 
 export async function requireAuth(req, res, next) {
   const session = readSession(req);
-  if (!session) return res.status(401).json({ error: 'Authentication required.' });
+  if (!session)
+    return res.status(401).json({ error: "Authentication required." });
   try {
     const user = await resolveSession(session);
-    if (!user) return res.status(401).json({ error: 'Authentication required.' });
+    if (!user)
+      return res.status(401).json({ error: "Authentication required." });
     req.user = {
       ...session,
       sub: String(user.id),
@@ -144,21 +195,29 @@ export async function requireAuth(req, res, next) {
       totpEnabledAt: user.totpEnabledAt,
     };
     next();
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 }
 
 export async function requireVerifiedEmail(req, res, next) {
-  if (!req.user) return res.status(401).json({ error: 'Authentication required.' });
-  if (!req.user.emailVerifiedAt) return res.status(403).json({ code: 'EMAIL_NOT_VERIFIED', error: 'Confirm your email before placing an order.' });
+  if (!req.user)
+    return res.status(401).json({ error: "Authentication required." });
+  if (!req.user.emailVerifiedAt)
+    return res.status(403).json({
+      code: "EMAIL_NOT_VERIFIED",
+      error: "Confirm your email before placing an order.",
+    });
   next();
 }
 
 export async function requireAdminPage(req, res, next) {
   const session = readSession(req);
-  if (!session) return res.redirect('/login.html');
+  if (!session) return res.redirect("/login.html");
   try {
     const user = await resolveSession(session);
-    if (!user || !staffRoles.includes(user.role)) return res.redirect('/login.html');
+    if (!user || !staffRoles.includes(user.role))
+      return res.redirect("/login.html");
     req.user = {
       ...session,
       sub: String(user.id),
@@ -171,19 +230,23 @@ export async function requireAdminPage(req, res, next) {
     // may reach the Security page and its static assets only. Admin data APIs
     // are separately guarded by requireAdminMfa.
     if (
-      !user.totpEnabledAt
-      && req.path !== '/security.html'
-      && !req.path.startsWith('/assets/')
-    ) return res.redirect('/security.html');
+      !user.totpEnabledAt &&
+      req.path !== "/security.html" &&
+      !req.path.startsWith("/assets/")
+    )
+      return res.redirect("/security.html");
     next();
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 }
 
 export function requireAdminMfa(req, res, next) {
   if (!req.user?.totpEnabledAt) {
     return res.status(403).json({
-      code: 'MFA_SETUP_REQUIRED',
-      error: 'Set up authenticator two-factor authentication to access admin data.',
+      code: "MFA_SETUP_REQUIRED",
+      error:
+        "Set up authenticator two-factor authentication to access admin data.",
     });
   }
   next();
@@ -191,7 +254,10 @@ export function requireAdminMfa(req, res, next) {
 
 export function requireRole(...roles) {
   return (req, res, next) => {
-    if (!req.user || !roles.includes(req.user.role)) return res.status(403).json({ error: 'You do not have permission for this action.' });
+    if (!req.user || !roles.includes(req.user.role))
+      return res
+        .status(403)
+        .json({ error: "You do not have permission for this action." });
     next();
   };
 }

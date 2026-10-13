@@ -159,7 +159,7 @@ function renderForm(product, cats, cols) {
   `;
 
   renderImages(product.images || []);
-  renderVariants(product);
+  renderVariants(product, isNew);
   renderGuideRows(product.sizes || [], product.sizeGuideMeasurements || {});
   document.getElementById('uploadSizeGuideImage').addEventListener('click', () => {
     const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/jpeg,image/png,image/webp,image/gif';
@@ -200,7 +200,7 @@ function renderForm(product, cats, cols) {
       Object.assign(stock, readInventory(product));
       const inventoryByVariant = { ...(product.inventoryByVariant || {}), ...readVariantInventory() };
       const colors = splitList(val('fColors'));
-      renderVariants({ ...product, colors, sizes: splitList(val('fSizes')), inventory: stock, inventoryByVariant });
+      renderVariants({ ...product, colors, sizes: splitList(val('fSizes')), inventory: stock, inventoryByVariant }, isNew);
       renderGuideRows(splitList(val('fSizes')), readSizeGuideMeasurements());
       renderColorPalette(colors, colorSwatches);
       renderColorImageSets(colors, colorImages);
@@ -238,12 +238,14 @@ function renderForm(product, cats, cols) {
       colorImages: Object.fromEntries(colors.filter((color) => colorImages[color]?.length).map((color) => [color, colorImages[color]])),
       colorSwatches: Object.fromEntries(colors.map((color) => [color, validHex(colorSwatches[color]) || defaultColorHex(color)])),
       sizes,
-      inventory: readInventory(stockProduct),
-      inventoryByVariant: readVariantInventory(),
       sizeGuide: val('fSizeGuide').trim(),
       sizeGuideImage: val('fSizeGuideImage').trim(),
       sizeGuideMeasurements: readSizeGuideMeasurements(),
     };
+    if (isNew) {
+      patch.inventory = readInventory(stockProduct);
+      patch.inventoryByVariant = readVariantInventory();
+    }
     button.disabled = true;
     button.textContent = isNew ? 'Creating…' : 'Saving…';
     try {
@@ -384,7 +386,7 @@ function renderImages(images) {
   }));
 }
 
-function renderVariants(product) {
+function renderVariants(product, editable = false) {
   const rows = [];
   ((product.colors || []).length ? product.colors : ['Default']).forEach((color) => {
     (product.sizes || []).forEach((size) => {
@@ -395,11 +397,12 @@ function renderVariants(product) {
     <tr>
       <td>${esc(r.color)}</td><td>${esc(r.size)}</td>
       <td class="mono">${esc(r.sku)}</td>
-      <td><div class="variant-stock-control"><input class="variant-stock-input" type="number" min="0" step="1" value="${Math.max(0, Number(r.stock) || 0)}" data-stock-color="${esc(r.color)}" data-stock-size="${esc(r.size)}" aria-label="Available stock for ${esc(r.color)} size ${esc(r.size)}" /><span class="variant-stock-count variant-stock-count--${stockState(r.stock)}" data-stock-label="${esc(r.color)}::${esc(r.size)}">${stockLabel(r.stock)}</span></div></td>
+      <td><div class="variant-stock-control"><input class="variant-stock-input" type="number" min="0" step="1" value="${Math.max(0, Number(r.stock) || 0)}" data-stock-color="${esc(r.color)}" data-stock-size="${esc(r.size)}" aria-label="Available stock for ${esc(r.color)} size ${esc(r.size)}" ${editable ? '' : 'disabled'} /><span class="variant-stock-count variant-stock-count--${stockState(r.stock)}" data-stock-label="${esc(r.color)}::${esc(r.size)}">${stockLabel(r.stock)}</span></div></td>
     </tr>
-  `).join('') + `<tr><td colspan="4" class="variant-stock-note">Each color and size combination has its own stock count.</td></tr>`
+  `).join('') + `<tr><td colspan="4" class="variant-stock-note">${editable ? 'Set initial stock for each variant.' : 'To change stock, use the Inventory page. Product edits never change stock.'}</td></tr>`
     : `<tr><td colspan="4" style="color:var(--a-muted)">No variants yet — add colors and sizes to generate variant rows.</td></tr>`;
 
+  if (!editable) return;
   document.getElementById('variantBody').querySelectorAll('[data-stock-size]').forEach((input) => {
     input.addEventListener('input', () => {
       const stock = Math.max(0, Number(input.value) || 0);
@@ -412,7 +415,7 @@ function renderVariants(product) {
 
 function stockState(value) {
   const stock = Math.max(0, Number(value) || 0);
-  return stock === 0 ? 'out' : stock <= 4 ? 'low' : 'in';
+  return stock === 0 ? 'out' : stock <= 5 ? 'low' : 'in';
 }
 
 function stockLabel(value) {
