@@ -44,7 +44,7 @@ async function initializeCheckout() {
     lines = getCart();
     if (!lines.length) { window.location.href = 'cart.html'; return; }
     if (cartChanges.removed.length || cartChanges.adjusted.length) {
-      sessionStorage.setItem('nuvanti_cart_notice', 'Your bag was updated because some items or quantities are no longer available. Review it before checkout.');
+      try { sessionStorage.setItem('nuvanti_cart_notice', 'Your bag was updated because some items or quantities are no longer available. Review it before checkout.'); } catch { /* The cart page will still sync stock when opened. */ }
       window.location.href = 'cart.html';
       return;
     }
@@ -371,7 +371,7 @@ async function onSubmit(e) {
         const currentProducts = await Promise.all([...new Set(getCart().map((line) => line.slug))].map(fetchProductBySlug));
         const changes = syncCartWithProducts(currentProducts);
         if (changes.adjusted.length || changes.removed.length) {
-          sessionStorage.setItem('nuvanti_cart_notice', 'Stock changed while you were checking out. Your bag was adjusted to the pieces still available; review it before placing the order.');
+          try { sessionStorage.setItem('nuvanti_cart_notice', 'Stock changed while you were checking out. Your bag was adjusted to the pieces still available; review it before placing the order.'); } catch { /* The cart page will still show current stock. */ }
           window.location.href = 'cart.html';
           return;
         }
@@ -389,6 +389,7 @@ async function onSubmit(e) {
   clearDiscountCode();
   refreshCartDrawer();
   if (paymentMethod === 'paymob' && placedOrder.paymentUrl) { window.location.assign(placedOrder.paymentUrl); return; }
+  if (placedOrder.storageUnavailable && placedOrder.trackingUrl) { window.location.assign(placedOrder.trackingUrl); return; }
   window.location.href = 'order-success.html';
 }
 

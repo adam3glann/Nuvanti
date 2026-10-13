@@ -17,10 +17,13 @@ function init() {
   startLiveRefresh(load, 12000);
 }
 
+let loadRequestId = 0;
 async function load() {
+  const requestId = ++loadRequestId;
   let result;
   try { result = await fetchAdminCustomers(state); }
-  catch (error) { document.getElementById('custBody').innerHTML = `<tr><td colspan="7"><div class="admin-empty"><h3>Customers could not be loaded</h3><p>${escapeHtml(error.message)}</p></div></td></tr>`; return; }
+  catch (error) { if (requestId !== loadRequestId) return; document.getElementById('custBody').innerHTML = `<tr><td colspan="7"><div class="admin-empty"><h3>Customers could not be loaded</h3><p>${escapeHtml(error.message)}</p></div></td></tr>`; return; }
+  if (requestId !== loadRequestId) return;
   const { items, total } = result;
   document.getElementById('custBody').innerHTML = items.length ? items.map((c) => `
     <tr>

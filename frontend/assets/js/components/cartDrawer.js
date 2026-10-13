@@ -1,7 +1,7 @@
 import { icon } from './icons.js';
 import { formatPrice, escapeHtml } from './productCard.js';
 import {
-  getCart, updateQuantity, removeFromCart, cartSubtotal,
+  getCart, updateQuantity, removeFromCart, cartSubtotal, canIncreaseQuantity,
   amountToFreeShipping, freeShippingProgress, FREE_SHIPPING_THRESHOLD,
 } from '../services/cartService.js';
 import { refreshHeaderCounts } from './header.js';
@@ -93,7 +93,7 @@ function render() {
           <div class="qty-stepper">
             <button data-dec="${escapeHtml(l.lineId)}" aria-label="Decrease quantity">${icon('minus')}</button>
             <span>${Number(l.quantity)}</span>
-            <button data-inc="${escapeHtml(l.lineId)}" aria-label="Increase quantity" ${Number(l.quantity) >= 10 ? 'disabled' : ''}>${icon('plus')}</button>
+            <button data-inc="${escapeHtml(l.lineId)}" aria-label="Increase quantity" ${canIncreaseQuantity(l.lineId) ? '' : 'disabled'}>${icon('plus')}</button>
           </div>
           <span>${formatPrice(l.price * l.quantity)}</span>
         </div>

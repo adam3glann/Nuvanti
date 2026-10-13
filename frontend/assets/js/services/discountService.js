@@ -19,11 +19,11 @@ export async function checkDiscount(code, subtotal) {
 }
 
 export function getSavedDiscountCode() {
-  return sessionStorage.getItem(STORAGE_KEY) || null;
+  try { return sessionStorage.getItem(STORAGE_KEY) || null; } catch { return null; }
 }
 export function saveDiscountCode(code) {
-  sessionStorage.setItem(STORAGE_KEY, code);
+  try { sessionStorage.setItem(STORAGE_KEY, code); } catch { /* Optional convenience only. */ }
 }
 export function clearDiscountCode() {
-  sessionStorage.removeItem(STORAGE_KEY);
+  try { sessionStorage.removeItem(STORAGE_KEY); } catch { /* Optional convenience only. */ }
 }

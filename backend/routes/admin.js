@@ -82,14 +82,14 @@ const productFields = z.object({
   category: z.string().min(1).max(80),
   collection: z.string().max(80).nullable().optional(),
   images: z.array(productImage).max(12).optional(),
-  colors: z.array(z.string().max(40)).max(20).optional(),
+  colors: z.array(z.string().max(40).refine((value) => !value.includes("::"), "Color names cannot contain ::.")).max(20).optional(),
   colorImages: z
     .record(z.string().max(40), z.array(productImage).max(12))
     .optional(),
   colorSwatches: z
     .record(z.string().max(40), z.string().regex(/^#[0-9a-fA-F]{6}$/))
     .optional(),
-  sizes: z.array(z.string().max(20)).max(20).optional(),
+  sizes: z.array(z.string().max(20).refine((value) => !value.includes("::"), "Size names cannot contain ::.")).max(20).optional(),
   inventory: z
     .union([
       z.coerce.number().int().min(0),
@@ -574,7 +574,7 @@ router.get(
           `SELECT id::text, name, email, message, is_read AS "isRead", created_at AS "createdAt" FROM contact_messages ORDER BY id`,
         ),
         read(
-          `SELECT id::text, email, consented_at AS "consentedAt", confirmed_at AS "confirmedAt", unsubscribed_at AS "unsubscribedAt", created_at AS "createdAt" FROM newsletter_subscribers ORDER BY id`,
+          `SELECT id::text, email, consented_at AS "consentedAt", confirmed_at AS "confirmedAt", unsubscribed_at AS "unsubscribedAt", unsubscribe_token_hash AS "unsubscribeTokenHash", created_at AS "createdAt" FROM newsletter_subscribers ORDER BY id`,
         ),
         read(
           `SELECT id::text, product_id::text AS "productId", size, change, reason, actor_user_id::text AS "actorUserId", created_at AS "createdAt" FROM inventory_adjustments ORDER BY id`,
@@ -1094,7 +1094,7 @@ router.get(
   SELECT to_char(days.day, 'YYYY-MM-DD') AS date,
     coalesce(sum(GREATEST(o.subtotal_cents - COALESCE(o.discount_cents, 0), 0))
       FILTER (WHERE (o.status = 'fulfilled' OR (o.payment_status = 'paid' AND o.status <> 'cancelled')) AND o.payment_status <> 'refunded'), 0)::bigint AS "revenueCents",
-    count(o.id) FILTER (WHERE o.status <> 'cancelled')::int AS orders
+    count(o.id) FILTER (WHERE (o.status = 'fulfilled' OR (o.payment_status = 'paid' AND o.status <> 'cancelled')) AND o.payment_status <> 'refunded')::int AS orders
   FROM days LEFT JOIN orders o ON COALESCE(o.payment_updated_at, o.created_at) >= (days.day::timestamp AT TIME ZONE 'Africa/Cairo')
     AND COALESCE(o.payment_updated_at, o.created_at) < ((days.day + interval '1 day')::timestamp AT TIME ZONE 'Africa/Cairo')
   GROUP BY days.day ORDER BY days.day`,
@@ -1207,6 +1207,25 @@ router.get(
   "/orders",
   requirePermission("orders.view"),
   asyncRoute(async (req, res) => {
+    const paginated = ["page", "perPage", "search", "status", "payment", "sort"].some((key) => req.query[key] !== undefined);
+    if (paginated) {
+      const page = z.coerce.number().int().min(1).max(1000000).default(1).parse(req.query.page);
+      const perPage = z.coerce.number().int().min(1).max(100).default(10).parse(req.query.perPage);
+      const search = z.string().trim().max(100).default("").parse(req.query.search || "");
+      const status = z.enum(["pending", "paid", "processing", "shipped", "out_for_delivery", "fulfilled", "cancelled"]).or(z.literal("")).default("").parse(req.query.status || "");
+      const payment = z.enum(["pending", "paid", "failed", "refunded"]).or(z.literal("")).default("").parse(req.query.payment || "");
+      const sort = z.enum(["newest", "oldest", "total-desc", "total-asc"]).default("newest").parse(req.query.sort || "newest");
+      const escapedSearch = search.replace(/[\\%_]/g, (character) => `\\${character}`);
+      const conditions = `($1 = '' OR o.id::text ILIKE '%' || $1 || '%' ESCAPE '\\' OR coalesce(u.name, o.shipping_address->>'name', '') ILIKE '%' || $1 || '%' ESCAPE '\\' OR coalesce(u.email, o.shipping_address->>'email', '') ILIKE '%' || $1 || '%' ESCAPE '\\') AND ($2 = '' OR o.status = $2) AND ($3 = '' OR coalesce(o.payment_status, CASE WHEN o.status IN ('paid','fulfilled') THEN 'paid' ELSE 'pending' END) = $3)`;
+      const orderBy = { newest: "o.created_at DESC", oldest: "o.created_at ASC", "total-desc": "o.total_cents DESC", "total-asc": "o.total_cents ASC" }[sort];
+      const [{ rows: countRows }, { rows }] = await Promise.all([
+        query(`SELECT count(*)::int AS total FROM orders o LEFT JOIN users u ON u.id = o.user_id WHERE ${conditions}`, [escapedSearch, status, payment]),
+        query(`SELECT o.id, o.status, o.payment_status AS "paymentStatus", o.payment_transaction_id AS "paymentTransactionId", o.total_cents AS "totalCents", o.subtotal_cents AS "subtotalCents", o.shipping_cents AS "shippingCents", o.delivery, o.payment_method AS "paymentMethod", o.created_at AS "createdAt", o.shipping_address AS "shippingAddress", coalesce(u.email, o.shipping_address->>'email') AS email, coalesce(u.name, o.shipping_address->>'name') AS name,
+          coalesce(json_agg(json_build_object('productId', i.product_id, 'name', i.product_name, 'price', i.unit_price_cents::numeric / 100, 'quantity', i.quantity, 'color', i.color, 'size', i.size, 'image', i.image_url)) FILTER (WHERE i.id IS NOT NULL), '[]') AS items
+          FROM orders o LEFT JOIN users u ON u.id = o.user_id LEFT JOIN order_items i ON i.order_id = o.id WHERE ${conditions} GROUP BY o.id, u.email, u.name ORDER BY ${orderBy}, o.id DESC LIMIT $4 OFFSET $5`, [escapedSearch, status, payment, perPage, (page - 1) * perPage]),
+      ]);
+      return res.json({ items: rows.map(mapAdminOrder), total: countRows[0].total, page, perPage });
+    }
     const limit =
       req.query.limit === undefined
         ? 100
@@ -1217,8 +1236,11 @@ router.get(
     FROM orders o LEFT JOIN users u ON u.id = o.user_id LEFT JOIN order_items i ON i.order_id = o.id GROUP BY o.id, u.email, u.name ORDER BY o.created_at DESC LIMIT $1`,
       [limit],
     );
-    res.json(
-      rows.map((row) => ({
+    res.json(rows.map(mapAdminOrder));
+  }),
+);
+function mapAdminOrder(row) {
+  return {
         id: `NV-${row.id}`,
         dbId: String(row.id),
         status: row.status,
@@ -1247,8 +1269,20 @@ router.get(
         transactionRef: row.paymentTransactionId || null,
         items: row.items,
         notes: [],
-      })),
+  };
+}
+router.get(
+  "/orders/:id",
+  requirePermission("orders.view"),
+  asyncRoute(async (req, res) => {
+    const id = z.coerce.number().int().positive().parse(String(req.params.id).replace(/^NV-/i, ""));
+    const { rows } = await query(
+      `SELECT o.id, o.status, o.payment_status AS "paymentStatus", o.payment_transaction_id AS "paymentTransactionId", o.total_cents AS "totalCents", o.subtotal_cents AS "subtotalCents", o.shipping_cents AS "shippingCents", o.delivery, o.payment_method AS "paymentMethod", o.created_at AS "createdAt", o.shipping_address AS "shippingAddress", coalesce(u.email, o.shipping_address->>'email') AS email, coalesce(u.name, o.shipping_address->>'name') AS name,
+        coalesce(json_agg(json_build_object('productId', i.product_id, 'name', i.product_name, 'price', i.unit_price_cents::numeric / 100, 'quantity', i.quantity, 'color', i.color, 'size', i.size, 'image', i.image_url)) FILTER (WHERE i.id IS NOT NULL), '[]') AS items
+        FROM orders o LEFT JOIN users u ON u.id = o.user_id LEFT JOIN order_items i ON i.order_id = o.id WHERE o.id = $1 GROUP BY o.id, u.email, u.name`, [id],
     );
+    if (!rows[0]) return res.status(404).json({ error: "Order not found." });
+    res.json(mapAdminOrder(rows[0]));
   }),
 );
 router.patch(
@@ -1624,11 +1658,18 @@ router.delete(
   "/categories/:id",
   requirePermission("products.delete"),
   async (req, res) => {
-    const result = await query("DELETE FROM categories WHERE id = $1", [
-      req.params.id,
-    ]);
-    if (!result.rowCount)
+    const result = await transaction(async (client) => {
+      const { rows } = await client.query("SELECT slug FROM categories WHERE id = $1 FOR UPDATE", [req.params.id]);
+      if (!rows[0]) return { missing: true };
+      const { rows: assigned } = await client.query("SELECT count(*)::int AS count FROM products WHERE category = $1", [rows[0].slug]);
+      if (assigned[0].count) return { assigned: assigned[0].count };
+      await client.query("DELETE FROM categories WHERE id = $1", [req.params.id]);
+      return { deleted: true };
+    });
+    if (result.missing)
       return res.status(404).json({ error: "Category not found." });
+    if (result.assigned)
+      return res.status(409).json({ error: `This category is assigned to ${result.assigned} product(s). Reassign those products before deleting it.` });
     await logAudit({
       req,
       action: "category.deleted",
@@ -1815,11 +1856,18 @@ router.delete(
   "/collections/:id",
   requirePermission("products.delete"),
   async (req, res) => {
-    const result = await query("DELETE FROM collections WHERE id = $1", [
-      req.params.id,
-    ]);
-    if (!result.rowCount)
+    const result = await transaction(async (client) => {
+      const { rows } = await client.query("SELECT slug FROM collections WHERE id = $1 FOR UPDATE", [req.params.id]);
+      if (!rows[0]) return { missing: true };
+      const { rows: assigned } = await client.query("SELECT count(*)::int AS count FROM products WHERE collection = $1", [rows[0].slug]);
+      if (assigned[0].count) return { assigned: assigned[0].count };
+      await client.query("DELETE FROM collections WHERE id = $1", [req.params.id]);
+      return { deleted: true };
+    });
+    if (result.missing)
       return res.status(404).json({ error: "Collection not found." });
+    if (result.assigned)
+      return res.status(409).json({ error: `This collection is assigned to ${result.assigned} product(s). Remove those assignments before deleting it.` });
     await logAudit({
       req,
       action: "collection.deleted",
@@ -1899,31 +1947,41 @@ router.patch(
   "/products/:id",
   requirePermission("products.edit"),
   async (req, res) => {
-    const existing = await query(
-      `SELECT ${columns} FROM products WHERE id = $1`,
-      [req.params.id],
-    );
-    if (!existing.rows[0])
-      return res.status(404).json({ error: "Product not found." });
-    const current = toAdminProduct(existing.rows[0]);
     const patch = productFields.partial().parse(req.body);
-    const merged = { ...current, ...patch }; // The public product includes both EGP and cents; drop the stale counterpart when either is explicitly changed.
-    if (patch.priceCents !== undefined && patch.price === undefined)
-      merged.price = undefined;
-    else merged.priceCents = undefined;
-    // Stock belongs to the Inventory workflow. Preserve live values in SQL
-    // so a stale product form cannot overwrite recent sales.
-    delete merged.inventory;
-    delete merged.inventoryByVariant;
-    const p = productPayload(productInput.parse(merged));
-    delete p.metadata.inventory;
-    delete p.metadata.inventoryByVariant;
-    const { rows } = await query(
-      `UPDATE products SET slug=$1,name=$2,description=$3,price_cents=$4,category=$5,collection=$6,images=$7::jsonb,colors=$8::jsonb,sizes=$9::jsonb,is_active=$10,
-       metadata = (COALESCE(metadata, '{}'::jsonb) - 'inventory' - 'inventoryByVariant') || $11::jsonb || jsonb_build_object(
-         'inventory', COALESCE(metadata->'inventory', '{}'::jsonb),
-         'inventoryByVariant', COALESCE(metadata->'inventoryByVariant', '{}'::jsonb)
-       ), updated_at=NOW() WHERE id=$12 RETURNING ${columns}`,
+    const updated = await transaction(async (client) => {
+      const existing = await client.query(
+        `SELECT ${columns} FROM products WHERE id = $1 FOR UPDATE`,
+        [req.params.id],
+      );
+      if (!existing.rows[0]) return null;
+      const current = toAdminProduct(existing.rows[0]);
+      const merged = { ...current, ...patch }; // The public product includes both EGP and cents; drop the stale counterpart when either is explicitly changed.
+      if (patch.priceCents !== undefined && patch.price === undefined)
+        merged.price = undefined;
+      else merged.priceCents = undefined;
+      // Stock belongs to the Inventory workflow. Preserve live values in SQL
+      // so a stale product form cannot overwrite recent sales.
+      delete merged.inventory;
+      delete merged.inventoryByVariant;
+      const p = productPayload(productInput.parse(merged));
+      delete p.metadata.inventory;
+      delete p.metadata.inventoryByVariant;
+      const oldVariantStock = current.inventoryByVariant || {};
+      const colors = p.colors.length ? p.colors : ["Default"];
+      const sizes = p.sizes.length ? p.sizes : ["One Size"];
+      const inventoryByVariant = Object.fromEntries(colors.flatMap((color) =>
+        sizes.map((size) => [`${color}::${size}`, Math.max(0, Number(oldVariantStock[`${color}::${size}`]) || 0)]),
+      ));
+      const inventory = Object.fromEntries(sizes.map((size) => [size,
+        Object.entries(inventoryByVariant).filter(([key]) => key.endsWith(`::${size}`))
+          .reduce((sum, [, amount]) => sum + amount, 0),
+      ]));
+      const totalInventory = Object.values(inventory).reduce((sum, amount) => sum + amount, 0);
+      const { rows } = await client.query(
+      `UPDATE products SET slug=$1,name=$2,description=$3,price_cents=$4,category=$5,collection=$6,images=$7::jsonb,colors=$8::jsonb,sizes=$9::jsonb,is_active=$10,inventory=$11,
+       metadata = (COALESCE(metadata, '{}'::jsonb) - 'inventory' - 'inventoryByVariant') || $12::jsonb || jsonb_build_object(
+         'inventory', $13::jsonb, 'inventoryByVariant', $14::jsonb
+       ), updated_at=NOW() WHERE id=$15 RETURNING ${columns}`,
       [
         p.slug,
         p.name,
@@ -1935,11 +1993,17 @@ router.patch(
         JSON.stringify(p.colors),
         JSON.stringify(p.sizes),
         p.isActive,
+        totalInventory,
         JSON.stringify(p.metadata),
+        JSON.stringify(inventory),
+        JSON.stringify(inventoryByVariant),
         req.params.id,
       ],
-    );
-    res.json(toAdminProduct(rows[0]));
+      );
+      return rows[0];
+    });
+    if (!updated) return res.status(404).json({ error: "Product not found." });
+    res.json(toAdminProduct(updated));
   },
 );
 router.get(
@@ -1964,7 +2028,7 @@ router.post(
           .min(-100000)
           .max(100000)
           .refine((value) => value !== 0),
-        color: z.string().max(60).optional(),
+        color: z.string().max(60).refine((value) => !value.includes("::"), "Color cannot contain ::").optional(),
         reason: z.string().trim().min(2).max(240),
       })
       .parse(req.body);
@@ -2056,9 +2120,14 @@ router.delete(
   "/products/:id",
   requirePermission("products.delete"),
   async (req, res) => {
-    const result = await query("DELETE FROM products WHERE id = $1", [
-      req.params.id,
-    ]);
+    let result;
+    try {
+      result = await query("DELETE FROM products WHERE id = $1", [req.params.id]);
+    } catch (error) {
+      if (error.code === "23503")
+        return res.status(409).json({ error: "This product appears in order history and cannot be deleted. Unpublish it to remove it from the storefront." });
+      throw error;
+    }
     if (!result.rowCount)
       return res.status(404).json({ error: "Product not found." });
     await logAudit({
@@ -2523,6 +2592,17 @@ const settingsInput = z.object({
       }),
     )
     .max(100)
+    .superRefine((locations, context) => {
+      const ids = new Set();
+      for (const [index, location] of locations.entries()) {
+        if (ids.has(location.id)) context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [index, "id"],
+          message: "Delivery location IDs must be unique.",
+        });
+        ids.add(location.id);
+      }
+    })
     .optional(),
 });
 router.get(

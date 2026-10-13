@@ -23,7 +23,7 @@ const state = { query: params.get('q') || '', category: '', status: '', page: 1,
 let selected = new Set();
 
 async function init() {
-  const cats = await fetchCategories();
+  const cats = await fetchCategories().catch(() => []);
   document.getElementById('categoryFilter').innerHTML = `<option value="">All Categories</option>${cats.map((c) => `<option value="${escapeHtml(c.slug)}">${escapeHtml(c.name)}</option>`).join('')}`;
   document.getElementById('searchInput').value = state.query;
 
@@ -42,16 +42,20 @@ async function init() {
   startLiveRefresh(load, 12000, { pauseWhileEditing: true });
 }
 
+let loadRequestId = 0;
 async function load() {
+  const requestId = ++loadRequestId;
   const tbody = document.getElementById('productsBody');
   tbody.innerHTML = `<tr><td colspan="7"><div class="a-skeleton" style="height:40px"></div></td></tr>`.repeat(1);
   let items, total;
   try {
     ({ items, total } = await fetchAdminProducts(state));
   } catch (error) {
+    if (requestId !== loadRequestId) return;
     document.getElementById('productsCard').innerHTML = `<div class="admin-empty"><h3>Couldn't load products</h3><p>${error.message}</p></div>`;
     return;
   }
+  if (requestId !== loadRequestId) return;
 
   if (items.length === 0) {
     document.getElementById('productsCard').innerHTML = `

@@ -1,5 +1,5 @@
 import { initAdminShell } from '../components/shell.js';
-import { paginationHTML, storeAssetSrc } from '../components/utils.js';
+import { paginationHTML, storeAssetSrc, escapeHtml } from '../components/utils.js';
 import { statusBadge } from '../components/statusBadge.js';
 import { showAdminToast } from '../components/toast.js';
 import { createAdminDrawer } from '../components/modal.js';
@@ -12,8 +12,8 @@ const session = initAdminShell({ page: 'inventory', title: 'Inventory' });
 if (session) init();
 
 async function init() {
-  const stats = await inventoryStats();
-  document.getElementById('statGrid').innerHTML = `
+  const stats = await inventoryStats().catch(() => null);
+  if (stats) document.getElementById('statGrid').innerHTML = `
     <div class="stat-card"><p class="stat-card__label">Tracked SKUs</p><p class="stat-card__value">${stats.total}</p></div>
     <div class="stat-card"><p class="stat-card__label">Low Stock</p><p class="stat-card__value" style="color:var(--a-warning)">${stats.low}</p></div>
     <div class="stat-card"><p class="stat-card__label">Out of Stock</p><p class="stat-card__value" style="color:var(--a-danger)">${stats.out}</p></div>
@@ -26,35 +26,38 @@ async function init() {
   load();
   startLiveRefresh(async () => {
     await load();
-    const nextStats = await inventoryStats();
-    document.getElementById('statGrid').innerHTML = `
+    const nextStats = await inventoryStats().catch(() => null);
+    if (nextStats) document.getElementById('statGrid').innerHTML = `
       <div class="stat-card"><p class="stat-card__label">Tracked SKUs</p><p class="stat-card__value">${nextStats.total}</p></div>
       <div class="stat-card"><p class="stat-card__label">Low Stock</p><p class="stat-card__value" style="color:var(--a-warning)">${nextStats.low}</p></div>
       <div class="stat-card"><p class="stat-card__label">Out of Stock</p><p class="stat-card__value" style="color:var(--a-danger)">${nextStats.out}</p></div>`;
   }, 8000);
 }
 
+let loadRequestId = 0;
 async function load() {
+  const requestId = ++loadRequestId;
   const tbody = document.getElementById('invBody');
   let items, total;
   try {
     ({ items, total } = await fetchInventory(state));
   } catch (error) {
-    tbody.innerHTML = `<tr><td colspan="7"><div class="admin-empty"><h3>Couldn't load inventory</h3><p>${error.message}</p></div></td></tr>`;
+    if (requestId === loadRequestId) tbody.innerHTML = `<tr><td colspan="7"><div class="admin-empty"><h3>Couldn't load inventory</h3><p>${escapeHtml(error.message)}</p></div></td></tr>`;
     return;
   }
+  if (requestId !== loadRequestId) return;
   tbody.innerHTML = items.map((r) => `
     <tr>
-      <td><div style="display:flex;align-items:center;gap:.6rem"><img src="${storeAssetSrc(r.image)}" width="32" height="40" style="object-fit:cover;border-radius:3px" alt="" /><span>${r.productName}</span></div></td>
-      <td>${r.color} · ${r.size}</td>
-      <td class="mono">${r.sku}</td>
+      <td><div style="display:flex;align-items:center;gap:.6rem"><img src="${escapeHtml(storeAssetSrc(r.image))}" width="32" height="40" style="object-fit:cover;border-radius:3px" alt="" /><span>${escapeHtml(r.productName)}</span></div></td>
+      <td>${escapeHtml(r.color)} · ${escapeHtml(r.size)}</td>
+      <td class="mono">${escapeHtml(r.sku)}</td>
       <td>${r.stock}</td>
       <td>${r.reserved}</td>
       <td>${r.stock - r.reserved}</td>
       <td>${statusBadge(rowStatus(r))}</td>
       <td style="text-align:right">
-        <button class="btn btn-outline btn-sm" data-adjust="${r.id}">Adjust</button>
-        <button class="btn btn-ghost btn-sm" data-history="${r.id}">History</button>
+        <button class="btn btn-outline btn-sm" data-adjust="${escapeHtml(r.id)}">Adjust</button>
+        <button class="btn btn-ghost btn-sm" data-history="${escapeHtml(r.id)}">History</button>
       </td>
     </tr>
   `).join('');
@@ -69,7 +72,7 @@ async function load() {
 function openAdjust(id, items) {
   const row = items.find((r) => r.id === id);
   const drawer = createAdminDrawer({
-    title: `Adjust Stock — ${row.productName} (${row.color} · ${row.size})`,
+    title: `Adjust Stock — ${escapeHtml(row.productName)} (${escapeHtml(row.color)} · ${escapeHtml(row.size)})`,
     bodyHTML: `
       <p style="color:var(--a-muted);font-size:.85rem;margin-bottom:1rem">Current stock: <strong>${row.stock}</strong></p>
       <div class="field"><label>Adjustment</label><input type="number" id="adjAmount" placeholder="e.g. 20 or -5" /></div>

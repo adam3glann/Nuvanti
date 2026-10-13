@@ -315,8 +315,13 @@ router.post(
             error.status = 409;
             throw error;
           }
+          if (product.colors?.length && !item.color) {
+            const error = new Error(`Choose a color for ${product.name}.`);
+            error.status = 400;
+            throw error;
+          }
           const color = item.color || product.colors?.[0] || "Default";
-          const variantKey = `${item.productId}:${color}:${size}`;
+          const variantKey = JSON.stringify([item.productId, color, size]);
           variantQuantities.set(variantKey, {
             productId: item.productId,
             color,
@@ -463,7 +468,7 @@ router.post(
               p.price_cents,
               p.unitCostCents,
               item.quantity,
-              item.color || null,
+              item.color || p.colors?.[0] || "Default",
               item.size || null,
               selectedCatalogImage(p, item.image),
             ],
@@ -513,7 +518,7 @@ router.post(
             name: map.get(item.productId).name,
             priceCents: map.get(item.productId).price_cents,
             quantity: item.quantity,
-            color: item.color || "",
+            color: item.color || map.get(item.productId).colors?.[0] || "Default",
             size: item.size || "",
             image: selectedCatalogImage(map.get(item.productId), item.image),
           })),

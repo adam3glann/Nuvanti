@@ -14,14 +14,15 @@ async function buildRows() {
   ]);
   const historyById = new Map();
   history.forEach((entry) => {
-    const key = `${entry.productId}__${entry.size}`;
+    const [color, size] = String(entry.size).split('::');
+    const key = JSON.stringify([String(entry.productId), color, size]);
     if (!historyById.has(key)) historyById.set(key, []);
     historyById.get(key).push({ change: Number(entry.change), reason: entry.reason, at: entry.createdAt, actor: entry.actorName });
   });
   return items.flatMap((product) => Object.entries(product.inventoryByVariant || {}).map(([variant, stock]) => {
     const [color, size] = variant.split('::');
-    const id = `${product.id}__${color}__${size}`;
-    const historyKey = `${product.id}__${color}::${size}`;
+    const id = JSON.stringify([String(product.id), color, size]);
+    const historyKey = JSON.stringify([String(product.id), color, size]);
     return { id, productId: product.id, productName: product.name, image: product.colorImages?.[color]?.[0] || product.images?.[0], sku: `${product.sku}-${color}-${size}`, color, size, stock: Number(stock), reserved: 0, lowStockThreshold: 5, history: historyById.get(historyKey) || [] };
   }));
 }
@@ -35,7 +36,7 @@ export async function fetchInventory({ query, status, page = 1, perPage = 12 } =
 }
 export function rowStatus(row) { const available = row.stock - row.reserved; return available <= 0 ? 'out' : available <= row.lowStockThreshold ? 'low' : 'in'; }
 export async function adjustStock(id, delta, reason) {
-  const [productId, color, size] = id.split('__');
+  const [productId, color, size] = JSON.parse(id);
   const result = await request(`/inventory/${encodeURIComponent(productId)}/${encodeURIComponent(size)}/adjust`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ change: Number(delta), color, reason: reason || (delta >= 0 ? 'Manual increase' : 'Manual decrease') }),

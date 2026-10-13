@@ -18,7 +18,7 @@ export function renderAdminHeader({ title, session }) {
       </div>
       <div class="admin-search">
         ${icon('search')}
-        <input type="search" id="globalSearch" placeholder="Search orders, products, customers, SKUs…" />
+        <input type="search" id="globalSearch" placeholder="Search products and SKUs…" aria-label="Search products and SKUs" />
       </div>
       <div class="admin-header__right">
         <div class="admin-presence" id="storePresence" data-state="loading" role="status" aria-live="polite" title="Live storefront visitor count">

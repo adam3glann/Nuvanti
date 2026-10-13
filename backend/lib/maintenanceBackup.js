@@ -130,6 +130,7 @@ export async function restoreStoreBackup(client, backup) {
   const generatedPasswordHash = passwordlessCustomers.length
     ? await bcrypt.hash(crypto.randomBytes(48).toString("base64url"), 12)
     : null;
+  const restoredCustomerIds = new Map();
 
   // The file is a complete snapshot of exported store data. Existing staff
   // accounts and their authentication/MFA state are deliberately preserved.
@@ -153,32 +154,16 @@ export async function restoreStoreBackup(client, backup) {
     DELETE FROM users WHERE role = 'customer';
   `);
 
-  await insertRows(
-    client,
-    "users",
-    [
-      "id",
-      "email",
-      "name",
-      "password_hash",
-      "role",
-      "is_active",
-      "email_verified_at",
-      "created_at",
-    ],
-    backup.customers,
-    (row) => [
-      row.id,
-      row.email,
-      row.name,
-      hashesByEmail.get(String(row.email || "").toLowerCase()) ||
-        generatedPasswordHash,
-      "customer",
-      row.isActive !== false,
-      row.emailVerifiedAt || null,
-      row.createdAt,
-    ],
-  );
+  for (const row of backup.customers) {
+    const { rows } = await client.query(
+      `INSERT INTO users (email, name, password_hash, role, is_active, email_verified_at, created_at)
+       VALUES ($1,$2,$3,'customer',$4,$5,$6) RETURNING id`,
+      [row.email, row.name,
+        hashesByEmail.get(String(row.email || "").toLowerCase()) || generatedPasswordHash,
+        row.isActive !== false, row.emailVerifiedAt || null, row.createdAt],
+    );
+    restoredCustomerIds.set(String(row.id), String(rows[0].id));
+  }
 
   await insertRows(
     client,
@@ -452,7 +437,7 @@ export async function restoreStoreBackup(client, backup) {
     backup.orders,
     (row) => [
       row.id,
-      row.userId,
+      row.userId == null ? null : restoredCustomerIds.get(String(row.userId)) || null,
       row.status,
       row.subtotalCents,
       row.shippingCents,
@@ -521,7 +506,7 @@ export async function restoreStoreBackup(client, backup) {
     backup.addresses,
     (row) => [
       row.id,
-      row.userId,
+      restoredCustomerIds.get(String(row.userId)) || null,
       row.label,
       row.name,
       row.phone || null,
@@ -551,7 +536,7 @@ export async function restoreStoreBackup(client, backup) {
 
   const subscribers = backup.newsletterSubscribers.map((row) => ({
     ...row,
-    restoreUnsubscribeHash: crypto
+    restoreUnsubscribeHash: row.unsubscribeTokenHash || crypto
       .createHash("sha256")
       .update(crypto.randomBytes(32))
       .digest("hex"),

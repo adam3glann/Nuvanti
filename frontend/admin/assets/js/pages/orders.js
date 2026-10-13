@@ -22,20 +22,20 @@ function init() {
   startLiveRefresh(() => load(false), 5000);
 }
 
-let loading = false;
+let loadRequestId = 0;
 async function load(showLoading = true) {
-  if (loading) return;
-  loading = true;
+  const requestId = ++loadRequestId;
   const tbody = document.getElementById('ordersBody');
   if (showLoading) tbody.innerHTML = `<tr><td colspan="7"><div class="a-skeleton" style="height:36px"></div></td></tr>`;
   let items, total;
   try {
     ({ items, total } = await fetchAdminOrders(state));
   } catch (error) {
+    if (requestId !== loadRequestId) return;
     tbody.innerHTML = `<tr><td colspan="7"><div class="admin-empty"><h3>Couldn't load orders</h3><p>${escapeHtml(error.message)}</p></div></td></tr>`;
-    loading = false;
     return;
   }
+  if (requestId !== loadRequestId) return;
 
   tbody.innerHTML = items.length ? items.map((o) => `
     <tr>
@@ -51,7 +51,6 @@ async function load(showLoading = true) {
 
   document.getElementById('paginationWrap').innerHTML = paginationHTML(state.page, state.perPage, total);
   document.querySelectorAll('#paginationWrap [data-page]').forEach((btn) => btn.addEventListener('click', () => { state.page = Number(btn.dataset.page); load(); }));
-  loading = false;
 }
 
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }

@@ -20,7 +20,8 @@ export async function createOrder({ lines, customer, shipping, delivery, discoun
   const discountAmount = (body.order.discountCents || 0) / 100;
   const shippingCost = Number(body.order.shippingCents) / 100;
   const order = { id: String(body.order.id), paymentMethod: body.order.paymentMethod || paymentMethod, paymentStatus: 'pending', paymentUrl: body.order.paymentUrl || null, transferDetails: body.order.transferDetails || null, emailDelivery: body.order.emailDelivery || { sent: false, configured: false }, isGuest: body.order.guest === true, accountCreated: body.order.accountCreated === true, orderNumber: `NV-${body.order.id}`, createdAt: body.order.createdAt, trackingUrl: body.order.trackingUrl, lines: orderLines, customer, shipping, delivery, subtotal, shippingCost, discountCode: body.order.discountCode || null, discountAmount, total: Number(body.order.totalCents) / 100, estimatedDelivery: delivery === 'express' ? '1–2 business days' : '4–7 business days' };
-  sessionStorage.setItem(STORAGE_KEY, JSON.stringify(order));
+  try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(order)); }
+  catch { order.storageUnavailable = true; }
   return order;
 }
 export function getLastOrder() { try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY)); } catch { return null; } }

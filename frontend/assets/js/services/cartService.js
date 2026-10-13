@@ -33,7 +33,7 @@ function normalizeLine(line) {
   const image = String(line.image || '');
   const safeImage = /^https:\/\//i.test(image) || /^\/?assets\/[\w./-]+(?:\?[\w%=&.-]*)?$/.test(image) && !image.includes('..');
   return {
-    lineId: `${productId}__${size}__${color}`,
+    lineId: JSON.stringify([productId, size, color]),
     productId,
     slug: String(line.slug || '').slice(0, 160),
     name: String(line.name || 'Nuvanti item').slice(0, 160),
@@ -45,7 +45,8 @@ function normalizeLine(line) {
   };
 }
 function write(lines) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(lines));
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(lines)); }
+  catch { /* Keep this tab's UI responsive if browser storage is unavailable. */ }
   listeners.forEach((fn) => fn(lines));
 }
 
@@ -75,7 +76,7 @@ export function syncCartWithProducts(products) {
     }
     const stock = Number(product.inventoryByVariant?.[`${line.color}::${line.size}`] ?? product.inventory?.[line.size] ?? product.inventory?.['One Size'] ?? 0);
     if (!Number.isFinite(stock) || stock <= 0) { removed.push(line.name); return []; }
-    const variantKey = `${line.productId}__${line.color}__${line.size}`;
+    const variantKey = JSON.stringify([line.productId, line.color, line.size]);
     const remaining = remainingByVariant.has(variantKey) ? remainingByVariant.get(variantKey) : Math.floor(stock);
     const allowed = Math.min(10, remaining);
     if (line.quantity > allowed) {
@@ -129,7 +130,7 @@ export function addToCart({ product, size, color, quantity = 1 }) {
   const lines = read();
   const safeSize = String(size || 'One Size').slice(0, 20);
   const safeColor = String(color || 'Default').slice(0, 60);
-  const lineId = `${Number(product.id)}__${safeSize}__${safeColor}`;
+  const lineId = JSON.stringify([Number(product.id), safeSize, safeColor]);
   const existing = lines.find((l) => l.lineId === lineId);
   const stock = Math.max(0, Math.floor(Number(product.inventoryByVariant?.[`${safeColor}::${safeSize}`] ?? product.inventory?.[safeSize] ?? product.inventory?.['One Size'] ?? 0)));
   const inBagForSize = lines.filter((line) => line.productId === Number(product.id) && line.size === safeSize && line.color === safeColor).reduce((sum, line) => sum + line.quantity, 0);

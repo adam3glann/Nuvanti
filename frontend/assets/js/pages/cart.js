@@ -15,8 +15,11 @@ initShell({ currentPage: 'shop' });
 let discountInfo = null;
 let listenerBound = false;
 let storeSettings = null;
-let catalogNotice = sessionStorage.getItem('nuvanti_cart_notice') || '';
-sessionStorage.removeItem('nuvanti_cart_notice');
+let catalogNotice = '';
+try {
+  catalogNotice = sessionStorage.getItem('nuvanti_cart_notice') || '';
+  sessionStorage.removeItem('nuvanti_cart_notice');
+} catch { /* A browser may block storage; the cart can still load normally. */ }
 
 initializeCart();
 

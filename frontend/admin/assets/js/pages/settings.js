@@ -161,4 +161,7 @@ document.getElementById('settingsRoot')?.addEventListener('click', async (event)
 function disabled() { return canEdit ? '' : 'disabled'; }
 function value(id) { return document.getElementById(id)?.value ?? ''; }
 function numberValue(id) { return Number(value(id)); }
-function slugifyLocation(name) { return name.normalize('NFKC').trim().toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '').slice(0, 60); }
+function slugifyLocation(name) {
+  const base = name.normalize('NFKC').trim().toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '').slice(0, 48) || 'location';
+  return `${base}-${Array.from(name.normalize('NFKC').trim()).reduce((hash, char) => ((hash * 31) + char.codePointAt(0)) >>> 0, 7).toString(36)}`;
+}
