@@ -33,7 +33,7 @@ import { errorHandler, notFound, sameOrigin } from "./middleware/security.js";
 import { query } from "./lib/db.js";
 import { emailDeliveryStatus } from "./lib/mail.js";
 import { hasPermission } from "./lib/permissions.js";
-import { expireAbandonedPaymobOrders } from "./lib/orderLifecycle.js";
+import { expireAbandonedOrders } from "./lib/orderLifecycle.js";
 import { cleanupStorefrontPresence, flushStorefrontPageViews } from "./lib/storefrontMetrics.js";
 
 const app = express();
@@ -474,13 +474,13 @@ const pageViewFlushTimer = setInterval(() => flushStorefrontPageViews()
   .catch((error) => console.error('Unable to flush storefront page views:', error)), 5 * 1000);
 pageViewFlushTimer.unref();
 if (isProduction) {
-  const sweepExpiredPaymobOrders = () =>
-    expireAbandonedPaymobOrders().catch((error) =>
-      console.error("Unable to release expired unpaid Paymob orders:", error),
+  const sweepExpiredOrders = () =>
+    expireAbandonedOrders().catch((error) =>
+      console.error("Unable to release expired unpaid orders:", error),
     );
-  const paymobExpiryTimer = setInterval(sweepExpiredPaymobOrders, 60 * 1000);
-  paymobExpiryTimer.unref();
-  sweepExpiredPaymobOrders();
+  const orderExpiryTimer = setInterval(sweepExpiredOrders, 60 * 1000);
+  orderExpiryTimer.unref();
+  sweepExpiredOrders();
 }
 if (process.env.NODE_ENV === "production") {
   // Railway exposes one service port for both the API and protected admin.

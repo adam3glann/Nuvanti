@@ -555,9 +555,29 @@ router.post(
           error,
         );
         await cancelUnpaidOrder(order.id);
+        if (registeredUser) {
+          try {
+            setSessionCookie(res, await issueSession(registeredUser, req));
+          } catch (sessionError) {
+            console.error(
+              `Checkout account session could not be started for NV-${order.id}:`,
+              sessionError,
+            );
+          }
+          sendVerificationLink(registeredUser).catch((emailError) =>
+            console.error(
+              `Checkout account verification email failed for NV-${order.id}:`,
+              emailError,
+            ),
+          );
+        }
         return res.status(502).json({
+          code: registeredUser ? "ACCOUNT_CREATED_PAYMENT_FAILED" : "PAYMENT_SETUP_FAILED",
+          accountCreated: Boolean(registeredUser),
           error:
-            "Online payment could not start. Your order was not placed; please try again or choose Cash on Delivery.",
+            registeredUser
+              ? "Online payment could not start, so the order was cancelled. Your account was created and we sent an email verification link. Verify your email, then sign in to place the order again."
+              : "Online payment could not start. Your order was not placed; please try again or choose Cash on Delivery.",
         });
       }
     }
@@ -599,7 +619,7 @@ router.post(
       configured: emailDeliveryStatus().configured,
     };
     try {
-      if (paymentMethod === "cod" || !req.user) {
+      if (paymentMethod === "cod") {
         await sendOrderConfirmation({
           to: customerEmail,
           name: shipping.name,

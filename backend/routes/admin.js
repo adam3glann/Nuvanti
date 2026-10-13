@@ -827,7 +827,6 @@ router.post(
         "UPDATE storefront_metrics SET total_views = 0, updated_at = NOW() WHERE id = 1",
       );
       await client.query("UPDATE discounts SET used_count = 0");
-      await client.query("DELETE FROM audit_logs");
       return {
         orders: orders.rowCount,
         customers: deletedCustomers.rowCount,
@@ -1381,7 +1380,10 @@ router.patch(
       .parse(req.body);
     const result = await transaction(async (client) => {
       const { rows } = await client.query(
-        'SELECT id, status, payment_method AS "paymentMethod", payment_status AS "paymentStatus" FROM orders WHERE id = $1 FOR UPDATE',
+        `SELECT o.id, o.status, o.payment_method AS "paymentMethod", o.payment_status AS "paymentStatus",
+          tracking_token AS "trackingToken", coalesce(u.email, o.shipping_address->>'email') AS email,
+          coalesce(u.name, o.shipping_address->>'name') AS name
+        FROM orders o LEFT JOIN users u ON u.id = o.user_id WHERE o.id = $1 FOR UPDATE OF o`,
         [req.params.id],
       );
       const order = rows[0];
@@ -1397,7 +1399,12 @@ router.patch(
         "UPDATE orders SET payment_status = 'paid', payment_updated_at = NOW(), status = CASE WHEN status = 'pending' THEN 'paid' ELSE status END WHERE id = $1 RETURNING id, status, payment_status AS \"paymentStatus\"",
         [order.id],
       );
-      return updated[0];
+      return {
+        ...updated[0],
+        email: order.email,
+        name: order.name,
+        trackingToken: order.trackingToken,
+      };
     });
     if (result.notFound)
       return res.status(404).json({ error: "Order not found." });
@@ -1415,6 +1422,16 @@ router.patch(
       status: result.status,
       paymentStatus: result.paymentStatus,
     });
+    if (result.email && !result.unchanged) {
+      const trackingUrl = `${storePublicOrigin()}/track.html?order=${result.id}&token=${encodeURIComponent(result.trackingToken)}`;
+      sendOrderStatusUpdate({
+        to: result.email,
+        name: result.name || "Customer",
+        orderId: result.id,
+        status: "paid",
+        trackingUrl,
+      }).catch((error) => console.error("InstaPay confirmation email failed:", error));
+    }
   },
 );
 router.get(

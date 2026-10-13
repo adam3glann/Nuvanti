@@ -65,21 +65,25 @@ export async function restoreOrderInventory(
 
 // Paymob intentions expire after 30 minutes. A 15-minute callback grace period
 // avoids releasing stock while a valid provider callback is still in flight.
-export async function expireAbandonedPaymobOrders() {
+// InstaPay orders stay reserved for 24 hours so customers have time to transfer.
+export async function expireAbandonedOrders() {
   return transaction(async (client) => {
     const { rows: orders } =
-      await client.query(`SELECT id, discount_code AS "discountCode"
+      await client.query(`SELECT id, discount_code AS "discountCode", payment_method AS "paymentMethod"
       FROM orders
-      WHERE status = 'pending' AND payment_method = 'paymob' AND payment_status = 'pending'
-        AND payment_provider_order_id IS NOT NULL
-        AND payment_updated_at < NOW() - INTERVAL '45 minutes'
-      ORDER BY payment_updated_at
+      WHERE status = 'pending' AND payment_status = 'pending'
+        AND ((payment_method = 'paymob'
+              AND payment_provider_order_id IS NOT NULL
+              AND payment_updated_at < NOW() - INTERVAL '45 minutes')
+          OR (payment_method = 'instapay'
+              AND created_at < NOW() - INTERVAL '24 hours'))
+      ORDER BY created_at
       LIMIT 25 FOR UPDATE SKIP LOCKED`);
     for (const order of orders) {
       await restoreOrderInventory(
         client,
         order.id,
-        `Expired unpaid Paymob order NV-${order.id}`,
+        `Expired unpaid ${order.paymentMethod} order NV-${order.id}`,
       );
       if (order.discountCode) {
         await client.query(
