@@ -977,6 +977,7 @@ function renderInfo() {
   `;
 
   bindInfoEvents();
+  bindSizeAdvisor('productInfo', sizeGuideColumns, sizeGuideRows);
   updateStockLine();
 }
 
@@ -1176,7 +1177,6 @@ function bindInfoEvents() {
   if (sizeGuide) {
     sizeGuide.addEventListener("click", openSizeGuide);
   }
-  bindSizeAdvisor('productInfo', sizeGuideColumns, sizeGuideRows);
 }
 
 /* =========================================================
