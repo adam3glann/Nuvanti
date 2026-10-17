@@ -703,6 +703,10 @@ function renderInfo() {
   if (!container) return;
 
   const wished = isWishlisted(product.id);
+  const sizeGuideData = product?.sizeGuideMeasurements || {};
+  const sizeGuideColumns = Array.isArray(sizeGuideData.columns) ? sizeGuideData.columns : [];
+  const sizeGuideRows = Array.isArray(sizeGuideData.rows) ? sizeGuideData.rows : [];
+  const sizeAdvisor = buildSizeAdvisorMarkup(sizeGuideColumns, sizeGuideRows);
 
   const productInStock = isInStock(product);
 
@@ -837,6 +841,8 @@ function renderInfo() {
       </div>
 
     </div>
+
+    ${sizeAdvisor}
 
 
     <!-- QUANTITY -->
@@ -1170,6 +1176,7 @@ function bindInfoEvents() {
   if (sizeGuide) {
     sizeGuide.addEventListener("click", openSizeGuide);
   }
+  bindSizeAdvisor('productInfo', sizeGuideColumns, sizeGuideRows);
 }
 
 /* =========================================================
@@ -1205,10 +1212,8 @@ function openSizeGuide() {
       ? `<table class="size-table"><thead><tr><th>Size</th>${columns.map((column) => `<th>${escapeHtml(column)}</th>`).join('')}</tr></thead><tbody>${rows.map((row) => `<tr><td>${escapeHtml(row.size)}</td>${columns.map((_, index) => `<td>${escapeHtml(row.values?.[index] || '—')}</td>`).join('')}</tr>`).join('')}</tbody></table>`
       : '';
     const image = product.sizeGuideImage ? `<img src="${escapeHtml(product.sizeGuideImage)}" alt="${escapeHtml(product.name)} size guide" style="display:block;width:100%;height:auto;margin:0 0 1rem;border-radius:8px" />` : '';
-    const advisor = buildSizeAdvisorMarkup(columns, rows);
-    const modal = createModal({ title: 'Size Guide', bodyHTML: `${image}${table}${product.sizeGuide ? `<p class="text-muted" style="font-size:.85rem">${escapeHtml(product.sizeGuide).replace(/\n/g, '<br>')}</p>` : ''}${advisor}` });
+    const modal = createModal({ title: 'Size Guide', bodyHTML: `${image}${table}${product.sizeGuide ? `<p class="text-muted" style="font-size:.85rem">${escapeHtml(product.sizeGuide).replace(/\n/g, '<br>')}</p>` : ''}` });
     modal.open();
-    bindSizeAdvisor(modal.id, columns, rows);
     return;
   }
   const modal = createModal({
@@ -1334,18 +1339,16 @@ function sizeGuideProfileDimensions(columns) {
 function buildSizeAdvisorMarkup(columns, rows) {
   const bodyDimensions = sizeGuideDimensions(columns);
   const profileDimensions = sizeGuideProfileDimensions(columns);
-  if (!rows.length || !rows.some((row) => row?.size) || (!bodyDimensions.length && !profileDimensions.length)) {
-    return `<section class="size-advisor"><h4>Find your size</h4><p class="text-muted">A reliable recommendation needs this product’s editable height/weight ranges or chest/bust, waist, or hip measurements. Use the guide above for now, or contact us for help.</p></section>`;
-  }
   const hasProfileChart = profileDimensions.length > 0;
   const requiredProfileKeys = new Set(profileDimensions.map(({ key }) => key));
+  const chartReady = rows.length > 0 && rows.some((row) => row?.size) && (bodyDimensions.length > 0 || hasProfileChart);
   return `<section class="size-advisor" aria-labelledby="sizeAdvisorTitle">
-    <h4 id="sizeAdvisorTitle">Find your size</h4>
-    <p class="text-muted">${hasProfileChart ? 'This product has height/weight ranges in its size chart. Enter your details for a chart-based suggestion.' : 'Height and weight alone can’t reliably predict clothing fit. Enter at least one body measurement to compare against this product’s garment chart.'}</p>
+    <h4 id="sizeAdvisorTitle">Find my size</h4>
+    <p class="text-muted">${!chartReady ? 'Enter your height and weight. This product’s size chart still needs recommendation measurements, so contact us if you need help choosing.' : hasProfileChart ? 'Enter your details to compare with this product’s size ranges.' : 'Height and weight alone can’t reliably predict clothing fit. Add at least one body measurement to compare with this product’s chart.'}</p>
     <form data-size-advisor novalidate>
       <div class="size-advisor__context">
-        <label>Height (cm)<input name="height" type="number" min="100" max="230" step="1" ${requiredProfileKeys.has('height') ? 'required' : ''} inputmode="numeric" placeholder="e.g. 168" /></label>
-        <label>Weight (kg)<input name="weight" type="number" min="25" max="250" step="0.1" ${requiredProfileKeys.has('weight') ? 'required' : ''} inputmode="decimal" placeholder="e.g. 62" /></label>
+        <label>Height (cm)<input name="height" type="number" min="100" max="230" step="1" ${requiredProfileKeys.has('height') || !chartReady ? 'required' : ''} inputmode="numeric" placeholder="e.g. 168" /></label>
+        <label>Weight (kg)<input name="weight" type="number" min="25" max="250" step="0.1" ${requiredProfileKeys.has('weight') || !chartReady ? 'required' : ''} inputmode="decimal" placeholder="e.g. 62" /></label>
       </div>
       ${bodyDimensions.length ? `<label>How do you like your clothes to fit?
         <select name="fit"><option value="regular">Regular</option><option value="snug">Closer fit</option><option value="relaxed">Relaxed fit</option></select>
@@ -1356,9 +1359,9 @@ function buildSizeAdvisorMarkup(columns, rows) {
   </section>`;
 }
 
-function bindSizeAdvisor(modalId, columns, rows) {
-  const modal = document.getElementById(modalId);
-  const form = modal?.querySelector('[data-size-advisor]');
+function bindSizeAdvisor(containerId, columns, rows) {
+  const container = document.getElementById(containerId);
+  const form = container?.querySelector('[data-size-advisor]');
   if (!form) return;
   form.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -1372,7 +1375,7 @@ function bindSizeAdvisor(modalId, columns, rows) {
       .map(({ key, label, columnIndex }) => ({ key, label, value: Number(data.get(key)), columnIndex }))
       .filter((measurement) => Number.isFinite(measurement.value) && measurement.value > 0);
     if (!measurements.length && !profile.length) {
-      result.textContent = 'Enter at least one body measurement, or complete height/weight when this product’s chart includes those ranges.';
+      result.textContent = 'This product’s size chart is not set up for automatic recommendations yet. Please use the Size Guide or contact the shop.';
       return;
     }
     const fit = String(data.get('fit') || 'regular');
@@ -1428,7 +1431,6 @@ function bindSizeAdvisor(modalId, columns, rows) {
         return;
       }
       sizeButton.click();
-      modal.querySelector(`#${modalId}-close`)?.click();
     });
   });
 }
