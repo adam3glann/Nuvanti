@@ -616,7 +616,9 @@
 .size-advisor fieldset { min-width: 0; padding: var(--space-4); border: 1px solid var(--color-border); border-radius: 10px; }
 .size-advisor legend { padding-inline: .25rem; font-size: var(--fs-small); font-weight: 600; }
 .size-advisor fieldset small { display: block; margin-top: var(--space-3); color: var(--color-muted); }
-.size-advisor__result { margin: 0; font-weight: 600; }
+.size-advisor__result { margin: 0; padding: .8rem 1rem; border: 1px solid var(--color-error); border-left-width: 4px; border-radius: 8px; color: var(--color-error); background: color-mix(in srgb, var(--color-error) 9%, var(--color-surface)); font-weight: 600; }
+.size-advisor__result[hidden] { display: none; }
+.size-advisor__result--recommendation strong { display: block; margin-bottom: .2rem; font-size: 1.05em; }
 @media (max-width: 480px) {
   .size-advisor__context,
   .size-advisor__measurements { grid-template-columns: 1fr; }

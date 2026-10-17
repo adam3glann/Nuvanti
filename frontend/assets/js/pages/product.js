@@ -1347,14 +1347,14 @@ function buildSizeAdvisorMarkup(columns, rows) {
     <p class="text-muted">${!chartReady ? 'Enter your height and weight. This product’s size chart still needs recommendation measurements, so contact us if you need help choosing.' : hasProfileChart ? 'Enter your details to compare with this product’s size ranges.' : 'Height and weight alone can’t reliably predict clothing fit. Add at least one body measurement to compare with this product’s chart.'}</p>
     <form data-size-advisor novalidate>
       <div class="size-advisor__context">
-        <label>Height (cm)<input name="height" type="number" min="100" max="230" step="1" ${requiredProfileKeys.has('height') || !chartReady ? 'required' : ''} inputmode="numeric" placeholder="e.g. 168" /></label>
-        <label>Weight (kg)<input name="weight" type="number" min="25" max="250" step="0.1" ${requiredProfileKeys.has('weight') || !chartReady ? 'required' : ''} inputmode="decimal" placeholder="e.g. 62" /></label>
+        <label>Height (cm)<input name="height" type="number" min="100" max="230" step="1" ${requiredProfileKeys.has('height') ? 'required' : ''} inputmode="numeric" placeholder="e.g. 168" /></label>
+        <label>Weight (kg)<input name="weight" type="number" min="25" max="250" step="0.1" ${requiredProfileKeys.has('weight') ? 'required' : ''} inputmode="decimal" placeholder="e.g. 62" /></label>
       </div>
       ${bodyDimensions.length ? `<label>How do you like your clothes to fit?
         <select name="fit"><option value="regular">Regular</option><option value="snug">Closer fit</option><option value="relaxed">Relaxed fit</option></select>
       </label><fieldset><legend>Your body measurements (cm)</legend><div class="size-advisor__measurements">${bodyDimensions.map((dimension) => `<label>${dimension.label}<input name="${dimension.key}" type="number" min="40" max="180" step="0.5" inputmode="decimal" placeholder="Optional" /></label>`).join('')}</div><small>Measure around your body with a soft tape. For garment measurements laid flat, the calculator accounts for that.</small></fieldset>` : ''}
       <button class="btn btn-primary" type="submit">Recommend my size</button>
-      <p class="size-advisor__result" data-size-result role="status" aria-live="polite"></p>
+      <p class="size-advisor__result" data-size-result role="status" aria-live="polite" hidden></p>
     </form>
   </section>`;
 }
@@ -1363,10 +1363,19 @@ function bindSizeAdvisor(containerId, columns, rows) {
   const container = document.getElementById(containerId);
   const form = container?.querySelector('[data-size-advisor]');
   if (!form) return;
+  const result = form.querySelector('[data-size-result]');
+  form.addEventListener('input', () => {
+    result.hidden = true;
+    result.textContent = '';
+    result.className = 'size-advisor__result';
+  });
   form.addEventListener('submit', (event) => {
     event.preventDefault();
-    const result = form.querySelector('[data-size-result]');
+    result.hidden = true;
+    result.textContent = '';
     if (!form.reportValidity()) return;
+    result.hidden = false;
+    result.className = 'size-advisor__result size-advisor__result--error';
     const data = new FormData(form);
     const profile = sizeGuideProfileDimensions(columns)
       .map(({ key, columnIndex }) => ({ key, value: Number(data.get(key)), columnIndex }))
@@ -1422,16 +1431,11 @@ function bindSizeAdvisor(containerId, columns, rows) {
     const alternative = ranked[1] && ranked[1].score - best.score <= 2.5 ? ranked[1] : null;
     const caution = best.tooSmall || best.score > 18
       ? ' The chart suggests this may be a close fit; please double-check the measurements before ordering.'
-      : ' This is an estimate based on the product measurements you entered.';
-    result.innerHTML = `<strong>Suggested size: ${escapeHtml(best.size)}</strong>${alternative ? ` (also consider ${escapeHtml(alternative.size)} if you prefer more room)` : ''}.${escapeHtml(caution)} <button class="btn-text" type="button" data-select-suggested-size="${escapeAttribute(best.size)}">Select ${escapeHtml(best.size)}</button>`;
-    result.querySelector('[data-select-suggested-size]')?.addEventListener('click', () => {
-      const sizeButton = document.querySelector(`#sizeOptions [data-size="${CSS.escape(best.size)}"]`);
-      if (!sizeButton || sizeButton.disabled) {
-        result.textContent = `Size ${best.size} is no longer available. Please choose another in-stock size.`;
-        return;
-      }
-      sizeButton.click();
-    });
+      : ' This recommendation is calculated from the measurements and size ranges in this product’s chart.';
+    const recommendation = document.createElement('strong');
+    recommendation.textContent = `Recommended size: ${best.size}`;
+    result.replaceChildren(recommendation, document.createTextNode(`${alternative ? ` (also consider ${alternative.size} if you prefer more room).` : '.'}${caution}`));
+    result.className = 'size-advisor__result size-advisor__result--recommendation';
   });
 }
 
