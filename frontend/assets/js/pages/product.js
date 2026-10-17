@@ -1353,7 +1353,7 @@ function buildSizeAdvisorMarkup(columns, rows) {
       ${bodyDimensions.length ? `<label>How do you like your clothes to fit?
         <select name="fit"><option value="regular">Regular</option><option value="snug">Closer fit</option><option value="relaxed">Relaxed fit</option></select>
       </label><fieldset><legend>Your body measurements (cm)</legend><div class="size-advisor__measurements">${bodyDimensions.map((dimension) => `<label>${dimension.label}<input name="${dimension.key}" type="number" min="40" max="180" step="0.5" inputmode="decimal" placeholder="Optional" /></label>`).join('')}</div><small>Measure around your body with a soft tape. For garment measurements laid flat, the calculator accounts for that.</small></fieldset>` : ''}
-      <button class="btn btn-primary" type="submit">Recommend my size</button>
+      <button class="btn btn-primary" type="button" data-size-advisor-submit>Recommend my size</button>
       <p class="size-advisor__result" data-size-result role="status" aria-live="polite" hidden></p>
     </form>
   </section>`;
@@ -1369,7 +1369,7 @@ function bindSizeAdvisor(containerId, columns, rows) {
     result.textContent = '';
     result.className = 'size-advisor__result';
   });
-  form.addEventListener('submit', (event) => {
+  const calculateRecommendation = (event) => {
     event.preventDefault();
     result.hidden = true;
     result.textContent = '';
@@ -1436,6 +1436,13 @@ function bindSizeAdvisor(containerId, columns, rows) {
     recommendation.textContent = `Recommended size: ${best.size}`;
     result.replaceChildren(recommendation, document.createTextNode(`${alternative ? ` (also consider ${alternative.size} if you prefer more room).` : '.'}${caution}`));
     result.className = 'size-advisor__result size-advisor__result--recommendation';
+  };
+  form.addEventListener('submit', calculateRecommendation);
+  form.querySelector('[data-size-advisor-submit]')?.addEventListener('click', calculateRecommendation);
+  form.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' || !event.target.matches('input')) return;
+    event.preventDefault();
+    calculateRecommendation(event);
   });
 }
 
