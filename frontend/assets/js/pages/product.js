@@ -1365,6 +1365,7 @@ function bindSizeAdvisor(containerId, columns, rows) {
   if (!form) return;
   const result = form.querySelector('[data-size-result]');
   form.addEventListener('input', () => {
+    form.querySelectorAll('[aria-invalid="true"]').forEach((field) => field.removeAttribute('aria-invalid'));
     result.hidden = true;
     result.textContent = '';
     result.className = 'size-advisor__result';
@@ -1373,9 +1374,18 @@ function bindSizeAdvisor(containerId, columns, rows) {
     event.preventDefault();
     result.hidden = true;
     result.textContent = '';
-    if (!form.reportValidity()) return;
     result.hidden = false;
     result.className = 'size-advisor__result size-advisor__result--error';
+    const invalidField = form.querySelector(':invalid');
+    if (invalidField) {
+      const label = ({ height: 'Height', weight: 'Weight', chest: 'Chest', waist: 'Waist', hips: 'Hips' })[invalidField.name] || 'Measurement';
+      result.textContent = invalidField.validationMessage
+        ? `${label}: ${invalidField.validationMessage}`
+        : `Please enter a valid ${label.toLowerCase()} before requesting a recommendation.`;
+      invalidField.setAttribute('aria-invalid', 'true');
+      invalidField.focus();
+      return;
+    }
     const data = new FormData(form);
     const profile = sizeGuideProfileDimensions(columns)
       .map(({ key, columnIndex }) => ({ key, value: Number(data.get(key)), columnIndex }))
