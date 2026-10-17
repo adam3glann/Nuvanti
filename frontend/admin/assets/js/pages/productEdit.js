@@ -102,7 +102,7 @@ function renderForm(product, cats, cols) {
             <div class="field"><label>Measurement table (one row per size)</label>
               <div class="field-row"><input id="guideColumns" aria-label="Measurement columns" placeholder="Chest (cm), Length (cm)" value="${esc((product.sizeGuideMeasurements?.columns || []).join(', '))}" /></div>
               <div id="guideRows"></div>
-              <small class="hint">Enter column names separated by commas. Rows follow the product sizes.</small>
+              <small class="hint">Enter column names separated by commas. Garment measurements should be in cm (laid flat). For an automatic height/weight recommendation, add columns such as “Height range (cm)” and “Weight range (kg)” with ranges like “160-170” and “55-65” in each size row.</small>
             </div>
           </div>
         </div>

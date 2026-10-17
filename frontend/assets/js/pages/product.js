@@ -1205,8 +1205,10 @@ function openSizeGuide() {
       ? `<table class="size-table"><thead><tr><th>Size</th>${columns.map((column) => `<th>${escapeHtml(column)}</th>`).join('')}</tr></thead><tbody>${rows.map((row) => `<tr><td>${escapeHtml(row.size)}</td>${columns.map((_, index) => `<td>${escapeHtml(row.values?.[index] || '—')}</td>`).join('')}</tr>`).join('')}</tbody></table>`
       : '';
     const image = product.sizeGuideImage ? `<img src="${escapeHtml(product.sizeGuideImage)}" alt="${escapeHtml(product.name)} size guide" style="display:block;width:100%;height:auto;margin:0 0 1rem;border-radius:8px" />` : '';
-    const modal = createModal({ title: 'Size Guide', bodyHTML: `${image}${table}${product.sizeGuide ? `<p class="text-muted" style="font-size:.85rem">${escapeHtml(product.sizeGuide).replace(/\n/g, '<br>')}</p>` : ''}` });
+    const advisor = buildSizeAdvisorMarkup(columns, rows);
+    const modal = createModal({ title: 'Size Guide', bodyHTML: `${image}${table}${product.sizeGuide ? `<p class="text-muted" style="font-size:.85rem">${escapeHtml(product.sizeGuide).replace(/\n/g, '<br>')}</p>` : ''}${advisor}` });
     modal.open();
+    bindSizeAdvisor(modal.id, columns, rows);
     return;
   }
   const modal = createModal({
@@ -1298,6 +1300,137 @@ function openSizeGuide() {
   });
 
   modal.open();
+}
+
+const SIZE_MEASUREMENTS = [
+  { key: 'chest', label: 'Chest / bust', aliases: ['chest', 'bust', 'pit to pit', 'underarm'] },
+  { key: 'waist', label: 'Waist', aliases: ['waist'] },
+  { key: 'hips', label: 'Hips', aliases: ['hip', 'hips', 'seat'] },
+];
+
+function sizeGuideDimensions(columns) {
+  return SIZE_MEASUREMENTS.map((measurement) => ({
+    ...measurement,
+    columnIndex: columns.findIndex((column) => {
+      const name = String(column || '').toLowerCase();
+      return measurement.aliases.some((alias) => name.includes(alias));
+    }),
+  })).filter((measurement) => measurement.columnIndex >= 0);
+}
+
+function sizeGuideProfileDimensions(columns) {
+  return [
+    { key: 'height', aliases: ['height'] },
+    { key: 'weight', aliases: ['weight'] },
+  ].map((measurement) => ({
+    ...measurement,
+    columnIndex: columns.findIndex((column) => {
+      const name = String(column || '').toLowerCase();
+      return measurement.aliases.some((alias) => name.includes(alias));
+    }),
+  })).filter((measurement) => measurement.columnIndex >= 0);
+}
+
+function buildSizeAdvisorMarkup(columns, rows) {
+  const bodyDimensions = sizeGuideDimensions(columns);
+  const profileDimensions = sizeGuideProfileDimensions(columns);
+  if (!rows.length || !rows.some((row) => row?.size) || (!bodyDimensions.length && !profileDimensions.length)) {
+    return `<section class="size-advisor"><h4>Find your size</h4><p class="text-muted">A reliable recommendation needs this product’s editable height/weight ranges or chest/bust, waist, or hip measurements. Use the guide above for now, or contact us for help.</p></section>`;
+  }
+  const hasProfileChart = profileDimensions.length > 0;
+  const requiredProfileKeys = new Set(profileDimensions.map(({ key }) => key));
+  return `<section class="size-advisor" aria-labelledby="sizeAdvisorTitle">
+    <h4 id="sizeAdvisorTitle">Find your size</h4>
+    <p class="text-muted">${hasProfileChart ? 'This product has height/weight ranges in its size chart. Enter your details for a chart-based suggestion.' : 'Height and weight alone can’t reliably predict clothing fit. Enter at least one body measurement to compare against this product’s garment chart.'}</p>
+    <form data-size-advisor novalidate>
+      <div class="size-advisor__context">
+        <label>Height (cm)<input name="height" type="number" min="100" max="230" step="1" ${requiredProfileKeys.has('height') ? 'required' : ''} inputmode="numeric" placeholder="e.g. 168" /></label>
+        <label>Weight (kg)<input name="weight" type="number" min="25" max="250" step="0.1" ${requiredProfileKeys.has('weight') ? 'required' : ''} inputmode="decimal" placeholder="e.g. 62" /></label>
+      </div>
+      ${bodyDimensions.length ? `<label>How do you like your clothes to fit?
+        <select name="fit"><option value="regular">Regular</option><option value="snug">Closer fit</option><option value="relaxed">Relaxed fit</option></select>
+      </label><fieldset><legend>Your body measurements (cm)</legend><div class="size-advisor__measurements">${bodyDimensions.map((dimension) => `<label>${dimension.label}<input name="${dimension.key}" type="number" min="40" max="180" step="0.5" inputmode="decimal" placeholder="Optional" /></label>`).join('')}</div><small>Measure around your body with a soft tape. For garment measurements laid flat, the calculator accounts for that.</small></fieldset>` : ''}
+      <button class="btn btn-primary" type="submit">Recommend my size</button>
+      <p class="size-advisor__result" data-size-result role="status" aria-live="polite"></p>
+    </form>
+  </section>`;
+}
+
+function bindSizeAdvisor(modalId, columns, rows) {
+  const modal = document.getElementById(modalId);
+  const form = modal?.querySelector('[data-size-advisor]');
+  if (!form) return;
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const result = form.querySelector('[data-size-result]');
+    if (!form.reportValidity()) return;
+    const data = new FormData(form);
+    const profile = sizeGuideProfileDimensions(columns)
+      .map(({ key, columnIndex }) => ({ key, value: Number(data.get(key)), columnIndex }))
+      .filter((item) => Number.isFinite(item.value) && item.value > 0);
+    const measurements = sizeGuideDimensions(columns)
+      .map(({ key, label, columnIndex }) => ({ key, label, value: Number(data.get(key)), columnIndex }))
+      .filter((measurement) => Number.isFinite(measurement.value) && measurement.value > 0);
+    if (!measurements.length && !profile.length) {
+      result.textContent = 'Enter at least one body measurement, or complete height/weight when this product’s chart includes those ranges.';
+      return;
+    }
+    const fit = String(data.get('fit') || 'regular');
+    const targetEase = { snug: 5, regular: 9, relaxed: 15 }[fit] || 9;
+    const ranked = rows.map((row) => {
+      if (product?.sizes?.length && (!product.sizes.includes(String(row.size)) || stockFor(product, String(row.size), selectedColor) <= 0)) return null;
+      let totalScore = 0;
+      let used = 0;
+      let tooSmall = false;
+      for (const item of profile) {
+        const raw = String(row.values?.[item.columnIndex] || '').replace(',', '.');
+        const values = [...raw.matchAll(/\d+(?:\.\d+)?/g)].map((match) => Number(match[0]));
+        if (!values.length) continue;
+        const low = Math.min(...values);
+        const high = values.length > 1 ? Math.max(...values) : low;
+        const midpoint = (low + high) / 2;
+        const outside = item.value < low ? low - item.value : item.value > high ? item.value - high : 0;
+        totalScore += outside * 2 + Math.abs(item.value - midpoint) * 0.05;
+        used += 1;
+      }
+      for (const measurement of measurements) {
+        const column = String(columns[measurement.columnIndex] || '').toLowerCase();
+        const raw = String(row.values?.[measurement.columnIndex] || '').replace(',', '.');
+        const numberMatch = raw.match(/-?\d+(?:\.\d+)?/);
+        if (!numberMatch) continue;
+        let garment = Number(numberMatch[0]);
+        const inches = /\b(in|inch|inches)\b/.test(column);
+        if (inches) garment *= 2.54;
+        const alreadyCircumference = /circumference|around|full/.test(column);
+        if (!alreadyCircumference) garment *= 2;
+        const ease = garment - measurement.value;
+        if (ease < 0) tooSmall = true;
+        const deficit = Math.max(0, targetEase - ease);
+        totalScore += Math.abs(ease - targetEase) + deficit * 2;
+        used += 1;
+      }
+      return used ? { size: String(row.size), score: totalScore / used, tooSmall } : null;
+    }).filter(Boolean).sort((a, b) => a.score - b.score);
+    if (!ranked.length) {
+      result.textContent = 'No in-stock size has matching measurements in this chart. Please use the chart or contact us for help.';
+      return;
+    }
+    const best = ranked[0];
+    const alternative = ranked[1] && ranked[1].score - best.score <= 2.5 ? ranked[1] : null;
+    const caution = best.tooSmall || best.score > 18
+      ? ' The chart suggests this may be a close fit; please double-check the measurements before ordering.'
+      : ' This is an estimate based on the product measurements you entered.';
+    result.innerHTML = `<strong>Suggested size: ${escapeHtml(best.size)}</strong>${alternative ? ` (also consider ${escapeHtml(alternative.size)} if you prefer more room)` : ''}.${escapeHtml(caution)} <button class="btn-text" type="button" data-select-suggested-size="${escapeAttribute(best.size)}">Select ${escapeHtml(best.size)}</button>`;
+    result.querySelector('[data-select-suggested-size]')?.addEventListener('click', () => {
+      const sizeButton = document.querySelector(`#sizeOptions [data-size="${CSS.escape(best.size)}"]`);
+      if (!sizeButton || sizeButton.disabled) {
+        result.textContent = `Size ${best.size} is no longer available. Please choose another in-stock size.`;
+        return;
+      }
+      sizeButton.click();
+      modal.querySelector(`#${modalId}-close`)?.click();
+    });
+  });
 }
 
 /* =========================================================

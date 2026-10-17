@@ -600,6 +600,27 @@
   text-transform: uppercase;
   letter-spacing: var(--ls-label);
 }
+.size-advisor {
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-border);
+}
+.size-advisor h4 { margin-bottom: var(--space-2); }
+.size-advisor > p { font-size: var(--fs-small); margin-bottom: var(--space-4); }
+.size-advisor form { display: grid; gap: var(--space-4); }
+.size-advisor__context,
+.size-advisor__measurements { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.size-advisor label { display: grid; gap: .35rem; font-size: var(--fs-small); font-weight: 600; }
+.size-advisor input,
+.size-advisor select { width: 100%; min-height: 44px; padding: .65rem .75rem; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface); color: var(--color-text); font: inherit; }
+.size-advisor fieldset { min-width: 0; padding: var(--space-4); border: 1px solid var(--color-border); border-radius: 10px; }
+.size-advisor legend { padding-inline: .25rem; font-size: var(--fs-small); font-weight: 600; }
+.size-advisor fieldset small { display: block; margin-top: var(--space-3); color: var(--color-muted); }
+.size-advisor__result { margin: 0; font-weight: 600; }
+@media (max-width: 480px) {
+  .size-advisor__context,
+  .size-advisor__measurements { grid-template-columns: 1fr; }
+}
 
 /* ---- 404 ---- */
 .not-found {
