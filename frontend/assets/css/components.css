@@ -2731,3 +2731,31 @@
     flex-basis: 34px;
   }
 }
+
+/* Keep storefront products open and borderless; inherit the existing palette. */
+.product-card {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.section--ink .product-card {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.product-card__media,
+.section--ink .product-card__media {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.product-card__wishlist {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
