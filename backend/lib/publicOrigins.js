@@ -1,9 +1,10 @@
 const isProduction = process.env.NODE_ENV === "production";
-const railwayOrigin = process.env.RAILWAY_PUBLIC_DOMAIN
+const deploymentOrigin = process.env.RAILWAY_PUBLIC_DOMAIN
   ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
-  : isProduction
+  : process.env.RENDER_EXTERNAL_URL ||
+  (isProduction
     ? "https://nuvanti-production.up.railway.app"
-    : "http://localhost:4000";
+    : "http://localhost:4000");
 
 function originFrom(value, fallback) {
   const raw = String(value || "")
@@ -34,11 +35,11 @@ export function storePublicOrigin() {
 
 export function adminPublicOrigin() {
   return originFrom(
-    process.env.ADMIN_APP_URL || process.env.ADMIN_ORIGIN || railwayOrigin,
-    isProduction ? railwayOrigin : "http://localhost:4001",
+    deploymentOrigin || process.env.ADMIN_APP_URL || process.env.ADMIN_ORIGIN,
+    isProduction ? deploymentOrigin : "http://localhost:4001",
   );
 }
 
 export function apiPublicOrigin() {
-  return originFrom(process.env.API_PUBLIC_URL || railwayOrigin, railwayOrigin);
+  return originFrom(deploymentOrigin || process.env.API_PUBLIC_URL, deploymentOrigin);
 }

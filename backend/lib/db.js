@@ -4,7 +4,7 @@ const { Pool } = pg;
 
 if (!process.env.DATABASE_URL) {
   throw new Error(
-    "DATABASE_URL is missing. For Railway, add it under your service Variables; locally, set it in backend/.env.",
+    "DATABASE_URL is missing. Add it to your hosting service's environment variables; locally, set it in backend/.env.",
   );
 }
 

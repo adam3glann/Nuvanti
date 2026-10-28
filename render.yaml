@@ -1,0 +1,79 @@
+services:
+  - type: web
+    name: nuvanti-api
+    runtime: node
+    plan: 0.5c-512mb
+    region: frankfurt
+    rootDir: backend
+    buildCommand: npm ci
+    preDeployCommand: npm run migrate
+    startCommand: npm run bootstrap:initial && npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY
+        value: "1"
+      - key: STORE_ORIGIN
+        value: https://nuvanti-shop.pages.dev
+      - key: COOKIE_DOMAIN
+        value: ""
+      - key: API_PUBLIC_URL
+        fromService:
+          type: web
+          name: nuvanti-api
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: ADMIN_ORIGIN
+        fromService:
+          type: web
+          name: nuvanti-api
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: ADMIN_APP_URL
+        fromService:
+          type: web
+          name: nuvanti-api
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_SSL_CA
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: MFA_ENCRYPTION_KEY
+        sync: false
+      - key: NUVANTI_PROXY_IP_SECRET
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_SECURE
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: PAYMOB_SECRET_KEY
+        sync: false
+      - key: PAYMOB_PUBLIC_KEY
+        sync: false
+      - key: PAYMOB_PAYMENT_METHODS
+        sync: false
+      - key: PAYMOB_HMAC_SECRET
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_WHATSAPP_FROM
+        sync: false

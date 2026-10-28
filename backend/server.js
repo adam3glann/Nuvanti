@@ -44,6 +44,7 @@ const isProduction = process.env.NODE_ENV === "production";
 const railwayOrigin = process.env.RAILWAY_PUBLIC_DOMAIN
   ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
   : "";
+const deploymentOrigin = railwayOrigin || process.env.RENDER_EXTERNAL_URL || "";
 
 function publicOrigin(name, rawValue, fallback) {
   const raw = String(rawValue || "")
@@ -86,7 +87,7 @@ const storeOrigin = safePublicOrigin(
   defaultStoreOrigin,
 );
 // Keep the shipped Cloudflare Pages storefront trusted even if STORE_ORIGIN
-// was accidentally set to the Railway API/admin domain. Additional custom
+// was accidentally set to the backend API/admin domain. Additional custom
 // storefront domains still have to be explicitly configured above.
 const storeOrigins = [...new Set([storeOrigin, defaultStoreOrigin])];
 const storePreviewOrigin = process.env.STORE_PREVIEW_ORIGIN
@@ -98,28 +99,28 @@ const storePreviewOrigin = process.env.STORE_PREVIEW_ORIGIN
   : "";
 const notYetExposedOrigin = "https://nuvanti-railway-pending.invalid";
 const defaultAdminOrigin = isProduction
-  ? railwayOrigin || notYetExposedOrigin
+  ? deploymentOrigin || notYetExposedOrigin
   : `http://localhost:${ADMIN_PORT}`;
 let adminOrigin = safePublicOrigin(
   "ADMIN_ORIGIN",
-  railwayOrigin || process.env.ADMIN_ORIGIN,
+  deploymentOrigin || process.env.ADMIN_ORIGIN,
   defaultAdminOrigin,
 );
 if (isProduction && adminOrigin === storeOrigin) {
   console.warn(
-    "ADMIN_ORIGIN matches STORE_ORIGIN; using the Railway admin origin fallback.",
+    "ADMIN_ORIGIN matches STORE_ORIGIN; using the backend service origin fallback.",
   );
   adminOrigin = defaultAdminOrigin;
 }
 const adminAppUrl = safePublicOrigin(
   "ADMIN_APP_URL",
-  railwayOrigin || process.env.ADMIN_APP_URL,
+  deploymentOrigin || process.env.ADMIN_APP_URL,
   adminOrigin,
 );
 const apiPublicUrl = safePublicOrigin(
   "API_PUBLIC_URL",
-  railwayOrigin || process.env.API_PUBLIC_URL,
-  railwayOrigin || adminOrigin,
+  deploymentOrigin || process.env.API_PUBLIC_URL,
+  deploymentOrigin || adminOrigin,
 );
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const frontendRoot = path.resolve(__dirname, "../frontend");
@@ -483,7 +484,7 @@ if (isProduction) {
   sweepExpiredOrders();
 }
 if (process.env.NODE_ENV === "production") {
-  // Railway exposes one service port for both the API and protected admin.
+  // Production exposes one service port for both the API and protected admin.
   // The storefront is hosted separately; every non-API request to this
   // service goes through the protected admin gateway, except the bare root:
   // it is the public entry point people commonly try, so send it to the store.
