@@ -52,12 +52,18 @@ function initStoreMaintenance(adminSession) {
   const restoreFileInput = document.getElementById('restoreBackupFile');
   const restorePreview = document.getElementById('restoreBackupPreview');
   const restoreButton = document.getElementById('restoreStoreBackup');
+  const canRestoreStore = adminSession.role === 'super_admin';
+  if (!canRestoreStore) {
+    resetButton.hidden = true;
+    restoreButton.closest('.maintenance-restore').hidden = true;
+    note.textContent = 'Store backup is available to administrators. Only a super admin can reset store data or restore a backup.';
+  }
   let backupDownloaded = false;
   let selectedRestoreFile = null;
 
   const updateActionButtons = () => {
-    resetButton.disabled = !backupDownloaded;
-    restoreButton.disabled = !backupDownloaded || !selectedRestoreFile;
+    resetButton.disabled = !canRestoreStore || !backupDownloaded;
+    restoreButton.disabled = !canRestoreStore || !backupDownloaded || !selectedRestoreFile;
   };
 
   backupButton.addEventListener('click', async () => {
@@ -66,7 +72,9 @@ function initStoreMaintenance(adminSession) {
       await downloadStoreBackup();
       backupDownloaded = true;
       updateActionButtons();
-      note.textContent = 'Backup downloaded. The reset button is unlocked; it will still ask you to confirm the destructive action.';
+      note.textContent = canRestoreStore
+        ? 'Backup downloaded. Reset and restore are unlocked; each still requires confirmation.'
+        : 'Backup downloaded. Only a super admin can reset store data or restore a backup.';
       showAdminToast('Store backup downloaded.', 'success');
     } catch (error) {
       showAdminToast(error.message, 'error');

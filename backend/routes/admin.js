@@ -38,7 +38,6 @@ const adminPresenceLimiter = rateLimit({
 const asyncRoute = (handler) => (req, res, next) =>
   Promise.resolve(handler(req, res, next)).catch(next);
 const MANAGEABLE_ROLES = ["staff", "manager", "admin", "super_admin"];
-const RESETTABLE_ROLES = ["admin", "super_admin"];
 const STAFF_ROLES = ["staff", "manager", "admin", "super_admin"];
 const SUPER_ADMIN_GUARD_LOCK = 724062;
 const restoreBackupUpload = multer({
@@ -46,10 +45,17 @@ const restoreBackupUpload = multer({
   limits: { fileSize: 25 * 1024 * 1024, files: 1 },
 });
 function requireStoreMaintenanceRole(req, res, next) {
-  if (!RESETTABLE_ROLES.includes(req.user?.role))
+  if (!["admin", "super_admin"].includes(req.user?.role))
     return res
       .status(403)
-      .json({ error: "Only an administrator can export or reset store data." });
+      .json({ error: "Only an administrator can export store data." });
+  next();
+}
+function requireSuperAdmin(req, res, next) {
+  if (req.user?.role !== "super_admin")
+    return res
+      .status(403)
+      .json({ error: "Only a super admin can restore or reset store data." });
   next();
 }
 const productImage = z
@@ -683,7 +689,7 @@ router.post(
 
 router.post(
   "/maintenance/restore",
-  requireStoreMaintenanceRole,
+  requireSuperAdmin,
   restoreBackupUpload.single("backupFile"),
   asyncRoute(async (req, res) => {
     if (req.body?.confirmation !== "RESTORE STORE BACKUP") {
@@ -723,7 +729,7 @@ router.post(
 
 router.post(
   "/maintenance/reset",
-  requireStoreMaintenanceRole,
+  requireSuperAdmin,
   asyncRoute(async (req, res) => {
     if (req.body?.confirmation !== "RESET STORE DATA") {
       return res

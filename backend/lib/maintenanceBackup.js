@@ -136,13 +136,12 @@ export async function restoreStoreBackup(client, backup) {
   // accounts and their authentication/MFA state are deliberately preserved.
   await client.query(`LOCK TABLE users, products, categories, collections, homepage_slides,
     store_settings, discounts, orders, order_items, addresses, contact_messages,
-    newsletter_subscribers, inventory_adjustments, audit_logs, storefront_metrics
+    newsletter_subscribers, inventory_adjustments, storefront_metrics
     IN SHARE ROW EXCLUSIVE MODE`);
   await client.query(`
     DELETE FROM orders;
     DELETE FROM addresses;
     DELETE FROM inventory_adjustments;
-    DELETE FROM audit_logs;
     DELETE FROM contact_messages;
     DELETE FROM newsletter_subscribers;
     DELETE FROM discounts;
@@ -593,34 +592,6 @@ export async function restoreStoreBackup(client, backup) {
     ],
   );
 
-  await insertRows(
-    client,
-    "audit_logs",
-    [
-      "id",
-      "actor_user_id",
-      "actor_email",
-      "action",
-      "target_type",
-      "target_id",
-      "metadata",
-      "ip",
-      "created_at",
-    ],
-    backup.auditLogs,
-    (row) => [
-      row.id,
-      null,
-      row.actorEmail || null,
-      row.action,
-      row.targetType || null,
-      row.targetId || null,
-      json(row.metadata, {}),
-      null,
-      row.createdAt,
-    ],
-  );
-
   if (backup.storefrontMetrics) {
     await client.query(
       `INSERT INTO storefront_metrics (id, total_views, updated_at) VALUES (1, $1, $2)
@@ -649,7 +620,6 @@ export async function restoreStoreBackup(client, backup) {
     "contact_messages",
     "newsletter_subscribers",
     "inventory_adjustments",
-    "audit_logs",
   ]) {
     await advanceSequence(client, table);
   }
