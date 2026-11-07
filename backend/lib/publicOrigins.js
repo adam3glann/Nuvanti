@@ -35,11 +35,11 @@ export function storePublicOrigin() {
 
 export function adminPublicOrigin() {
   return originFrom(
-    deploymentOrigin || process.env.ADMIN_APP_URL || process.env.ADMIN_ORIGIN,
+    process.env.ADMIN_APP_URL || process.env.ADMIN_ORIGIN || deploymentOrigin,
     isProduction ? deploymentOrigin : "http://localhost:4001",
   );
 }
 
 export function apiPublicOrigin() {
-  return originFrom(deploymentOrigin || process.env.API_PUBLIC_URL, deploymentOrigin);
+  return originFrom(process.env.API_PUBLIC_URL || deploymentOrigin, deploymentOrigin);
 }

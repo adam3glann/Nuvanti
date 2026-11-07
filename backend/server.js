@@ -103,7 +103,7 @@ const defaultAdminOrigin = isProduction
   : `http://localhost:${ADMIN_PORT}`;
 let adminOrigin = safePublicOrigin(
   "ADMIN_ORIGIN",
-  deploymentOrigin || process.env.ADMIN_ORIGIN,
+  process.env.ADMIN_ORIGIN || deploymentOrigin,
   defaultAdminOrigin,
 );
 if (isProduction && adminOrigin === storeOrigin) {
@@ -114,12 +114,12 @@ if (isProduction && adminOrigin === storeOrigin) {
 }
 const adminAppUrl = safePublicOrigin(
   "ADMIN_APP_URL",
-  deploymentOrigin || process.env.ADMIN_APP_URL,
+  process.env.ADMIN_APP_URL || deploymentOrigin,
   adminOrigin,
 );
 const apiPublicUrl = safePublicOrigin(
   "API_PUBLIC_URL",
-  deploymentOrigin || process.env.API_PUBLIC_URL,
+  process.env.API_PUBLIC_URL || deploymentOrigin,
   deploymentOrigin || adminOrigin,
 );
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
