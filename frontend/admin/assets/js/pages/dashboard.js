@@ -13,7 +13,7 @@ if (session) {
   document.getElementById('rangeSelect').addEventListener('change', (e) => renderChart(e.target.value));
   initStoreMaintenance(session);
   render();
-  startLiveRefresh(() => { clearAnalyticsCache(); return render(); }, 10000);
+  startLiveRefresh(() => { clearAnalyticsCache(); return render(); }, 30000);
 }
 
 function initStoreMaintenance(adminSession) {

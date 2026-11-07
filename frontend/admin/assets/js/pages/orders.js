@@ -19,7 +19,7 @@ function init() {
   document.getElementById('paymentFilter').addEventListener('change', (e) => { state.payment = e.target.value; state.page = 1; load(); });
   document.getElementById('sortSelect').addEventListener('change', (e) => { state.sort = e.target.value; state.page = 1; load(); });
   load();
-  startLiveRefresh(() => load(false), 5000);
+  startLiveRefresh(() => load(false), 15000);
 }
 
 let loadRequestId = 0;

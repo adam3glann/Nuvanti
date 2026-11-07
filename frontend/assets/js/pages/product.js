@@ -98,7 +98,7 @@ async function init() {
   await loadRelated();
 
   await loadRecentlyViewed();
-  startLiveRefresh(refreshProduct, 10000);
+  startLiveRefresh(refreshProduct, 30000);
 }
 
 async function refreshProduct() {

@@ -105,6 +105,9 @@ async function loadHeroSlides() {
     if (hasLoadedRemoteSlides) return;
     slides = fallbackSlides;
   }
+  // The built-in hero is the stable first paint. An empty admin slide list
+  // must not make it flash and then disappear after the API responds.
+  if (!Array.isArray(slides) || slides.length === 0) slides = fallbackSlides;
   const signature = JSON.stringify(slides);
   if (signature === lastHeroSlides) return;
   lastHeroSlides = signature;

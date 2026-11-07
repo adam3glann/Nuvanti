@@ -2,7 +2,7 @@ import { API_ORIGIN } from '../config.js';
 
 // Keep the admin's visitor count close to real time without holding an open
 // connection; visitor heartbeats and page-close events are reflected quickly.
-const refreshIntervalMs = 2 * 1000;
+const refreshIntervalMs = 10 * 1000;
 
 export function watchStorePresence() {
   const badge = document.getElementById('storePresence');

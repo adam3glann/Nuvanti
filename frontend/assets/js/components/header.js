@@ -152,7 +152,9 @@ export function renderHeader({ transparentOnHero = false, currentPage = '' } = {
     });
   };
   refreshMenuLinks().catch((error) => console.warn('Store menu links unavailable:', error));
-  startLiveRefresh(refreshMenuLinks, 5000);
+  // Navigation changes are infrequent; avoid reloading this shared data every
+  // five seconds on every storefront page.
+  startLiveRefresh(refreshMenuLinks, 60000);
 
   document.getElementById('openCart').addEventListener('click', () => openCartDrawer());
   document.getElementById('openSearch').addEventListener('click', () => openSearchOverlay());

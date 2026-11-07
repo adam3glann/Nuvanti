@@ -5,7 +5,7 @@ import { fetchMessages, setMessageRead } from '../services/messageService.js';
 import { startLiveRefresh } from '../services/liveRefresh.js';
 
 const session = initAdminShell({ page: 'messages', title: 'Contact Messages' });
- if (session) { load(); startLiveRefresh(load, 10000); }
+ if (session) { load(); startLiveRefresh(load, 30000); }
 
 async function load() {
   const root = document.getElementById('messagesRoot');
