@@ -55,7 +55,14 @@ Checkout supports guests and registered customers. Guests provide an email for t
 
 Both messages include a tracking link: `GET /api/orders/track/:id?token=...`, a public (no-login) endpoint guarded by a random per-order token (not the order's numeric id — that alone proves nothing). It returns order status, items, delivery method, and city/country only — no email, phone, or full address. The storefront's `track.html` page renders it, and also offers a manual order-number + tracking-code lookup for someone who lost the link. Signed-in customers see the same link for every past order under **My Account → Orders**, which now lists real order history instead of only the most recent order in that browser.
 
-For production deployment, configure mail through the service's environment variables. Gmail SMTP works without owning a custom domain: enable two-step verification and create a Google **App Password**, never use the normal Gmail password. Keep the app password private and never commit it:
+For production deployment, configure mail through the service's environment variables. On Railway plans where outbound SMTP is unavailable, use a transactional email HTTP API. SendGrid supports verifying a single sender address by email, so a custom domain is not required (domain authentication is recommended for deliverability). Create a **Mail Send** API key and verify the sender address in SendGrid, then set:
+
+```env
+SENDGRID_API_KEY=your-sendgrid-mail-send-api-key
+MAIL_FROM="Nuvanti <your-verified-sender@gmail.com>"
+```
+
+Alternatively, Resend requires a verified domain. Gmail SMTP works only where the host permits outbound SMTP; enable two-step verification and create a Google **App Password**, never use the normal Gmail password. Keep API keys and app passwords private and never commit them:
 
 ```env
 SMTP_HOST=smtp.gmail.com

@@ -12,13 +12,21 @@ function hasValue(key) {
 export function emailDeliveryStatus() {
   const senderReady = hasValue("MAIL_FROM");
   const resendReady = hasValue("RESEND_API_KEY") && senderReady;
+  const sendGridReady = hasValue("SENDGRID_API_KEY") && senderReady;
   const smtpReady =
     ["SMTP_HOST", "SMTP_USER", "SMTP_PASS"].every(hasValue) && senderReady;
-  const provider = resendReady ? "Resend" : smtpReady ? "SMTP" : null;
+  const provider = sendGridReady
+    ? "SendGrid"
+    : resendReady
+      ? "Resend"
+      : smtpReady
+        ? "SMTP"
+        : null;
   const missing = [];
   if (!senderReady) missing.push("MAIL_FROM");
-  if (!resendReady && !smtpReady) {
+  if (!resendReady && !sendGridReady && !smtpReady) {
     if (!hasValue("RESEND_API_KEY")) missing.push("RESEND_API_KEY");
+    if (!hasValue("SENDGRID_API_KEY")) missing.push("SENDGRID_API_KEY");
     if (!["SMTP_HOST", "SMTP_USER", "SMTP_PASS"].every(hasValue)) {
       missing.push(
         ...["SMTP_HOST", "SMTP_USER", "SMTP_PASS"].filter(
@@ -75,6 +83,33 @@ async function deliver({
       );
     return;
   }
+  if (status.provider === "SendGrid") {
+    const from = parseSender(process.env.MAIL_FROM);
+    const content = [];
+    if (text) content.push({ type: "text/plain", value: text });
+    if (html) content.push({ type: "text/html", value: html });
+    const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.SENDGRID_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        personalizations: [{ to: [{ email: to }] }],
+        from,
+        ...(replyTo ? { reply_to: { email: replyTo } } : {}),
+        subject,
+        content,
+      }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({}));
+      const detail = result.errors?.[0]?.message || `HTTP ${response.status}`;
+      throw new Error(`SendGrid email delivery failed: ${detail}`);
+    }
+    return;
+  }
   const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: Number(process.env.SMTP_PORT || 587),
@@ -92,6 +127,19 @@ async function deliver({
     html,
     ...(replyTo ? { replyTo } : {}),
   });
+}
+
+function parseSender(value) {
+  const raw = String(value || "").trim();
+  const match = raw.match(/^\s*(?:"?([^"<>]*)"?\s*)?<([^<>]+)>\s*$/);
+  if (match) {
+    const name = match[1]?.trim();
+    return {
+      email: match[2].trim(),
+      ...(name ? { name } : {}),
+    };
+  }
+  return { email: raw };
 }
 
 export async function sendTestEmail({ to }) {
