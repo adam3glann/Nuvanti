@@ -3,6 +3,7 @@ import { createAdminModal } from '../components/modal.js';
 import { showAdminToast } from '../components/toast.js';
 import { escapeHtml } from '../components/utils.js';
 import { changeAdminPassword } from '../services/adminAuthService.js';
+import { releaseEmergencyLockdown } from '../services/maintenanceService.js';
 import { beginMfaSetup, disableMfa, enableMfa, getActiveSessions, getMfaStatus, revokeOtherSessions, revokeSession } from '../services/securityService.js';
 
 const session = initAdminShell({ page: 'security', title: 'Security' });
@@ -36,6 +37,7 @@ function render(mfa, sessions, sessionsError = null) {
       ${item.isCurrent ? '<span class="status-badge status-info">Current</span>' : `<button class="btn btn-outline btn-sm" data-revoke-session="${escapeHtml(item.id)}">Revoke</button>`}
     </div>`).join('');
   root.innerHTML = `
+    ${session.role === 'super_admin' ? `<div class="card card-pad" style="margin-bottom:1.25rem"><h2>Emergency store access</h2><p class="settings-row__desc">If a store lockdown is active, release it here after verifying the incident is resolved. This action requires your super-admin session and MFA.</p><button class="btn btn-outline btn-sm" id="releaseEmergencyLockdown">Release store lockdown</button></div>` : ''}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem" class="sec-grid">
       <div>
         <div class="card" style="margin-bottom:1.25rem">
@@ -54,6 +56,20 @@ function render(mfa, sessions, sessionsError = null) {
           : sessionRows || '<p class="settings-row__desc">No active sessions were found. Sign in again to create a tracked session.</p>'}</div>
       </div>
     </div>`;
+  root.querySelector('#releaseEmergencyLockdown')?.addEventListener('click', async (event) => {
+    if (!window.confirm('Restore store and admin access? Only do this after checking the security incident.')) return;
+    if (window.prompt('Type RELEASE STORE LOCKDOWN exactly to confirm:') !== 'RELEASE STORE LOCKDOWN') return;
+    const button = event.currentTarget;
+    button.disabled = true;
+    try {
+      const result = await releaseEmergencyLockdown();
+      showAdminToast(result.released ? 'Store lockdown released. Admin access is restored.' : 'No active store lockdown was found.', 'success');
+      if (result.released) window.location.replace('index.html');
+    } catch (error) {
+      showAdminToast(error.message || 'Could not release the store lockdown.', 'error');
+      button.disabled = false;
+    }
+  });
   root.querySelector('#changePwBtn').addEventListener('click', openChangePassword);
   root.querySelector('#mfaActionBtn').addEventListener('click', () => mfa.enabled ? openDisableMfa() : openEnableMfa());
   root.querySelector('#revokeOthersBtn').addEventListener('click', async () => {

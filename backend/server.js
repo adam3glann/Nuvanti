@@ -183,8 +183,17 @@ function verifyForwardedClientIp(req, res, next) {
     .update(`${ip}\n${timestamp}`)
     .digest();
   const received = Buffer.from(signature, "hex");
-  if (received.length === expected.length && timingSafeEqual(received, expected))
+  if (received.length === expected.length && timingSafeEqual(received, expected)) {
     req.trustedClientIp = ip;
+    // Express's rate limiters and admin lockout logic consume req.ip. Override
+    // it only after the Pages Function's HMAC has authenticated the address,
+    // so storefront users are keyed by their real address without trusting a
+    // caller-supplied X-Forwarded-For header.
+    Object.defineProperty(req, "ip", {
+      configurable: true,
+      value: ip,
+    });
+  }
   next();
 }
 if (process.env.NODE_ENV === "production") {
@@ -248,10 +257,8 @@ const productSearchLimiter = rateLimit({
   limit: 1800,
   standardHeaders: "draft-7",
   legacyHeaders: false,
-  // Accept a shopper IP only after HMAC verification. Unverified direct
-  // Railway requests share the immediate peer key instead of spoofing req.ip.
-  keyGenerator: (req) =>
-    `search:${req.trustedClientIp || req.socket?.remoteAddress || "unknown"}`,
+  // verifyForwardedClientIp replaces req.ip only after validating the HMAC;
+  // express-rate-limit then applies its standard IPv6 subnet normalization.
   skip: (req) => !isProductSearch(req),
   message: {
     error: "Search request limit reached. Please wait a few minutes and retry.",

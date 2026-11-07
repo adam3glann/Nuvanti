@@ -37,7 +37,7 @@ function initStoreMaintenance(adminSession) {
         await downloadStoreBackup();
         emergencyButton.textContent = 'Activating lockdown…';
         await activateEmergencyLockdown();
-        window.location.replace('login.html');
+        window.location.replace('security.html');
       } catch (error) {
         emergencyButton.disabled = false;
         emergencyButton.textContent = 'Download snapshot & lock down store';

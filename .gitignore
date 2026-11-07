@@ -1,5 +1,7 @@
 node_modules/
 backend/.npm-cache/
+work/npm-cache/
+cv-output/
 .env
 .env.*
 !.env.example

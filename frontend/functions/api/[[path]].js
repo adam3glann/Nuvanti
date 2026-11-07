@@ -130,13 +130,23 @@ export async function onRequest({ request, params, env, context }) {
     upstreamHeaders.delete("Cookie");
     upstreamHeaders.delete("Authorization");
   }
-  const upstreamRequest = isPublicCatalogRead
-    ? new Request(upstream, {
+  // Use the sanitized/enriched headers for private requests too. Passing the
+  // original Request here silently discarded the signed client-IP headers,
+  // making all storefront customers appear to come from the Pages egress IP
+  // for login and other IP-based limits. Rebuild from the request so method,
+  // body, and cookies are preserved while only the validated headers travel
+  // upstream.
+  const requestWithSafeHeaders = isPublicCatalogRead
+    ? new Request(request.url, {
         method: "GET",
         headers: upstreamHeaders,
         redirect: "manual",
       })
-    : new Request(upstream, request);
+    : new Request(request, {
+        headers: upstreamHeaders,
+        redirect: "manual",
+      });
+  const upstreamRequest = new Request(upstream, requestWithSafeHeaders);
   let response = await fetch(upstreamRequest, {
     cache: "no-store",
     redirect: "manual",

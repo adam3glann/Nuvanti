@@ -14,7 +14,9 @@ function fingerprintIp(ip, accountId) {
 }
 
 function requestIp(req) {
-  return String(req.ip || req.socket?.remoteAddress || "").trim();
+  return String(
+    req.trustedClientIp || req.ip || req.socket?.remoteAddress || "",
+  ).trim();
 }
 
 export async function adminIpBlockStatus(req, accountId = req.user?.sub) {

@@ -10,6 +10,16 @@ export async function isEmergencyLockdownActive() {
 export async function requireEmergencyLockdownInactive(req, res, next) {
   try {
     if (await isEmergencyLockdownActive()) {
+      // Keep a recovery path for an already-authenticated super administrator.
+      // The downstream API route still enforces session, role, and MFA checks;
+      // the protected Security page is the only admin document/assets exposed
+      // while locked down so the owner can reach that control.
+      const emergencyControl =
+        req.method === "POST" && req.path === "/maintenance/emergency";
+      const securityRecoveryPage =
+        req.method === "GET" &&
+        (req.path === "/security.html" || req.path.startsWith("/assets/"));
+      if (emergencyControl || securityRecoveryPage) return next();
       res.set("Cache-Control", "no-store");
       return res.status(503).json({
         error: "The store is temporarily locked down. Contact the store owner.",

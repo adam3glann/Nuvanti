@@ -49,6 +49,14 @@ export function activateEmergencyLockdown() {
   });
 }
 
+export function releaseEmergencyLockdown() {
+  return maintenanceRequest('emergency', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ confirmation: 'RELEASE STORE LOCKDOWN' }),
+  });
+}
+
 export async function restoreStoreBackup(file) {
   const form = new FormData();
   form.set('backupFile', file);

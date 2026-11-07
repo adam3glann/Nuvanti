@@ -93,6 +93,9 @@ const resetPassword = z.object({
 async function blockStaffLoginDuringLockdown(user, res) {
   if (!STAFF_ROLES.includes(user?.role) || !(await isEmergencyLockdownActive()))
     return false;
+  // The super administrator must be able to complete email + MFA verification
+  // and reach the narrowly exposed recovery control. All other staff remain blocked.
+  if (user.role === "super_admin") return false;
   clearSession(res);
   res.set("Cache-Control", "no-store").status(503).json({
     error: "Admin sign-in is temporarily disabled during a security lockdown.",
@@ -300,13 +303,7 @@ const emailCodeInput = z.object({
 router.post(
   "/login/email-code",
   asyncRoute(async (req, res) => {
-    if (await isEmergencyLockdownActive()) {
-      clearAdminEmailChallengeCookie(res);
-      return res.status(503).json({
-        error:
-          "Admin sign-in is temporarily disabled during a security lockdown.",
-      });
-    }
+    const lockdownActive = await isEmergencyLockdownActive();
     const challenge = readAdminEmailChallenge(req);
     if (await rejectBlockedAdminIp(req, res, challenge?.sub)) {
       clearAdminEmailChallengeCookie(res);
@@ -339,6 +336,18 @@ router.post(
       return res.status(401).json({
         error:
           "Your email code expired or was already used. Enter your password again.",
+      });
+    }
+
+    if (lockdownActive && user.role !== "super_admin") {
+      clearAdminEmailChallengeCookie(res);
+      await query(
+        "DELETE FROM admin_email_login_challenges WHERE id = $1",
+        [challenge.jti],
+      );
+      return res.status(503).json({
+        error:
+          "Admin sign-in is temporarily disabled during a security lockdown.",
       });
     }
 
@@ -442,13 +451,7 @@ router.post(
 router.post(
   "/login/mfa",
   asyncRoute(async (req, res) => {
-    if (await isEmergencyLockdownActive()) {
-      clearMfaChallengeCookie(res);
-      return res.status(503).json({
-        error:
-          "Admin sign-in is temporarily disabled during a security lockdown.",
-      });
-    }
+    const lockdownActive = await isEmergencyLockdownActive();
     const challenge = readMfaChallenge(req);
     if (await rejectBlockedAdminIp(req, res, challenge?.sub)) return;
     const { code } = mfaCodeInput.parse(req.body);
@@ -468,6 +471,13 @@ router.post(
       clearMfaChallengeCookie(res);
       return res.status(401).json({
         error: "Your sign-in challenge expired. Enter your password again.",
+      });
+    }
+    if (lockdownActive && user.role !== "super_admin") {
+      clearMfaChallengeCookie(res);
+      return res.status(503).json({
+        error:
+          "Admin sign-in is temporarily disabled during a security lockdown.",
       });
     }
 

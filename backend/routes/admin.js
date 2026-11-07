@@ -631,12 +631,31 @@ router.post(
     if (req.user?.role !== "super_admin") {
       return res
         .status(403)
-        .json({ error: "Only a super admin can activate emergency lockdown." });
+        .json({ error: "Only a super admin can manage emergency lockdown." });
     }
-    if (req.body?.confirmation !== "LOCK DOWN STORE") {
+    const confirmation = req.body?.confirmation;
+    if (confirmation === "RELEASE STORE LOCKDOWN") {
+      const { rows } = await query(
+        `UPDATE emergency_lockdown
+         SET is_active = FALSE, activated_at = NULL, activated_by = NULL
+         WHERE id = 1 AND is_active = TRUE
+         RETURNING id`,
+      );
+      await logAudit({
+        req,
+        action: "security.emergency_lockdown_released",
+        targetType: "store",
+        targetId: "1",
+      });
       return res
-        .status(400)
-        .json({ error: "Emergency confirmation is required." });
+        .set("Cache-Control", "no-store")
+        .json({ ok: true, released: rows.length > 0 });
+    }
+    if (confirmation !== "LOCK DOWN STORE") {
+      return res.status(400).json({
+        error:
+          "Type LOCK DOWN STORE to activate or RELEASE STORE LOCKDOWN to restore access.",
+      });
     }
 
     const result = await transaction(async (client) => {
@@ -647,25 +666,25 @@ router.post(
       const { rows: staff } = await client.query(
         `UPDATE users
       SET session_version = session_version + 1
-      WHERE role = ANY($1::text[]) AND is_active = true
+      WHERE role = ANY($1::text[]) AND role <> 'super_admin' AND is_active = true
       RETURNING id`,
         [STAFF_ROLES],
       );
       const { rowCount: revokedSessions } = await client.query(
         `UPDATE auth_sessions
       SET revoked_at = NOW()
-      WHERE user_id IN (SELECT id FROM users WHERE role = ANY($1::text[]))
+      WHERE user_id IN (SELECT id FROM users WHERE role = ANY($1::text[]) AND role <> 'super_admin')
         AND revoked_at IS NULL`,
         [STAFF_ROLES],
       );
       const { rowCount: clearedEmailChallenges } = await client.query(
         `DELETE FROM admin_email_login_challenges
-      WHERE user_id IN (SELECT id FROM users WHERE role = ANY($1::text[]))`,
+      WHERE user_id IN (SELECT id FROM users WHERE role = ANY($1::text[]) AND role <> 'super_admin')`,
         [STAFF_ROLES],
       );
       const { rowCount: clearedResetTokens } = await client.query(
         `DELETE FROM password_reset_tokens
-      WHERE user_id IN (SELECT id FROM users WHERE role = ANY($1::text[]))`,
+      WHERE user_id IN (SELECT id FROM users WHERE role = ANY($1::text[]) AND role <> 'super_admin')`,
         [STAFF_ROLES],
       );
       return {
