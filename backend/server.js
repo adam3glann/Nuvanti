@@ -152,6 +152,7 @@ function isPublicCatalogRead(req) {
     "/api/categories/",
     "/api/navigation",
     "/api/navigation/",
+    "/api/storefront/homepage-slides",
   ].includes(req.path);
 }
 function isProductSearch(req) {
@@ -335,7 +336,12 @@ const publicCatalogReadLimiter = rateLimit({
   },
 });
 app.use(
-  ["/api/products", "/api/categories", "/api/navigation"],
+  [
+    "/api/products",
+    "/api/categories",
+    "/api/navigation",
+    "/api/storefront/homepage-slides",
+  ],
   publicCatalogReadLimiter,
 );
 app.use("/api/products", productsRouter);

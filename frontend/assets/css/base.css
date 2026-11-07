@@ -50,6 +50,8 @@ h1, h2, h3, h4, p { margin: 0; }
    becomes the containing block for position:sticky and the header
    scrolls away with it after its own (small) height passes. */
 #site-header { display: contents; }
+#site-header-reserve { height: var(--header-h); }
+#site-header-reserve.is-mounted { margin-bottom: calc(-1 * var(--header-h)); }
 
 .skip-link {
   position: absolute; left: 1rem; top: -60px; z-index: 200;

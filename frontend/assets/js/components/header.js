@@ -61,6 +61,7 @@ export function renderHeader({ transparentOnHero = false, currentPage = '' } = {
       </div>
     </nav>
   `;
+  document.getElementById('site-header-reserve')?.classList.add('is-mounted');
 
   const header = document.getElementById('siteHeader');
   const mobileNav = document.getElementById('mobileNav');

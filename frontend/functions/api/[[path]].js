@@ -76,7 +76,8 @@ export async function onRequest({ request, params, env, context }) {
     (path === "products" ||
       /^products\/[^/]+$/.test(path) ||
       path === "categories" ||
-      path === "navigation");
+      path === "navigation" ||
+      path === "storefront/homepage-slides");
   const cacheKey = isPublicCatalogRead
     ? getPublicCatalogCacheKey(incoming, path, request.headers.get("Origin"))
     : null;
@@ -149,7 +150,8 @@ export async function onRequest({ request, params, env, context }) {
     !response.headers.has("set-cookie")
   ) {
     const headers = new Headers(response.headers);
-    headers.set("Cache-Control", "public, max-age=0, s-maxage=15");
+    const edgeTtl = path === "storefront/homepage-slides" ? 30 : 15;
+    headers.set("Cache-Control", `public, max-age=0, s-maxage=${edgeTtl}`);
     response = new Response(response.body, {
       status: response.status,
       statusText: response.statusText,

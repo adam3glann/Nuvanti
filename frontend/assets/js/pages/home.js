@@ -36,7 +36,6 @@ const HERO_SLIDES = [
   },
 ];
 
-loadHeroSlides();
 let hasLoadedHomeProducts = false;
 let hasLoadedHomeCategories = false;
 refreshHomeCatalog();
@@ -46,6 +45,21 @@ document.getElementById('naPrev')?.addEventListener('click', () => document.getE
 document.getElementById('naNext')?.addEventListener('click', () => document.getElementById('newArrivalsTrack')?.scrollBy({ left: 320, behavior: 'smooth' }));
 let lastHeroSlides = '';
 let hasLoadedRemoteSlides = false;
+const fallbackSlides = HERO_SLIDES.map((slide) => ({
+  imageUrl: slide.image,
+  mobileImageUrl: null,
+  eyebrow: slide.eyebrow,
+  title: slide.title.replace(/<[^>]*>/g, ''),
+  description: slide.desc,
+  ctaLabel: slide.cta.label,
+  ctaHref: slide.cta.href,
+  secondaryLabel: slide.secondary?.label || '',
+  secondaryHref: slide.secondary?.href || '',
+}));
+lastHeroSlides = JSON.stringify(fallbackSlides);
+renderHero(fallbackSlides);
+initHeroSlider();
+loadHeroSlides();
 startLiveRefresh(loadHeroSlides, 60000);
 startLiveRefresh(refreshHomeCatalog, 60000);
 
@@ -88,12 +102,7 @@ async function loadHeroSlides() {
     // Once the API has supplied the saved slides, keep showing those through
     // a temporary network failure instead of replacing them with demo content.
     if (hasLoadedRemoteSlides) return;
-    slides = HERO_SLIDES.map((slide) => ({
-      imageUrl: slide.image, mobileImageUrl: null, eyebrow: slide.eyebrow,
-      title: slide.title.replace(/<[^>]*>/g, ''), description: slide.desc,
-      ctaLabel: slide.cta.label, ctaHref: slide.cta.href,
-      secondaryLabel: slide.secondary?.label || '', secondaryHref: slide.secondary?.href || '',
-    }));
+    slides = fallbackSlides;
   }
   const signature = JSON.stringify(slides);
   if (signature === lastHeroSlides) return;
@@ -115,8 +124,8 @@ function renderHero(slides) {
     ${slides.map((s, i) => `
       <div class="hero-slide" data-active="${i === activeIndex}" data-index="${i}" data-duration="${Math.min(30, Math.max(3, Math.floor(Number(s.durationSeconds) || 5)))}" aria-hidden="${i !== activeIndex}" style="${slideTextStyle(s)}">
         <picture class="hero-slide__picture">
-          ${s.mobileImageUrl ? `<source media="(max-width: 899px)" srcset="${escapeHtml(revisionedImageUrl(s.mobileImageUrl, s.updatedAt))}" />` : ''}
-          <img class="hero-slide__img" src="${escapeHtml(revisionedImageUrl(s.imageUrl, s.updatedAt))}" alt="" ${i === 0 ? 'fetchpriority="high"' : 'loading="lazy"'} />
+          ${s.mobileImageUrl ? `<source media="(max-width: 899px)" srcset="${escapeHtml(responsiveSlideImageUrl(s.mobileImageUrl, s.updatedAt, 900))}" />` : ''}
+          <img class="hero-slide__img" src="${escapeHtml(responsiveSlideImageUrl(s.imageUrl, s.updatedAt, 1440))}" alt="" ${i === 0 ? 'fetchpriority="high"' : 'loading="lazy"'} />
         </picture>
         <div class="hero-slide__scrim"></div>
         <div class="hero-slide__content">
@@ -148,6 +157,24 @@ function revisionedImageUrl(imageUrl, updatedAt) {
     return /^https?:\/\//i.test(imageUrl) ? url.href : `${url.pathname}${url.search}${url.hash}`;
   } catch {
     return imageUrl;
+  }
+}
+
+function responsiveSlideImageUrl(imageUrl, updatedAt, width) {
+  const revisioned = revisionedImageUrl(imageUrl, updatedAt);
+  try {
+    const url = new URL(revisioned, location.href);
+    if (url.hostname !== 'res.cloudinary.com') return revisioned;
+    const uploadPath = '/image/upload/';
+    const uploadIndex = url.pathname.indexOf(uploadPath);
+    if (uploadIndex < 0) return revisioned;
+    const assetPath = url.pathname.slice(uploadIndex + uploadPath.length);
+    url.pathname = `${url.pathname.slice(0, uploadIndex)}${uploadPath}f_auto,q_auto,w_${width},c_limit/${assetPath}`;
+    return /^https?:\/\//i.test(revisioned)
+      ? url.href
+      : `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return revisioned;
   }
 }
 
