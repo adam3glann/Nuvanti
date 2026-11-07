@@ -36,6 +36,7 @@ const HERO_SLIDES = [
   },
 ];
 
+let heroSliderCleanup = () => {};
 let hasLoadedHomeProducts = false;
 let hasLoadedHomeCategories = false;
 refreshHomeCatalog();
@@ -214,7 +215,6 @@ function textGradientAttributes(slide, part) {
   return `data-text-gradient="${enabled}" style="${styles.join(';')}"`;
 }
 
-let heroSliderCleanup = () => {};
 function initHeroSlider() {
   heroSliderCleanup();
   const slider = document.getElementById('heroSlider');
