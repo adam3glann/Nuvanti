@@ -6,7 +6,7 @@ import { subscribeToNewsletter, unsubscribeFromNewsletter } from '../services/ne
 import { fetchHomepageSlides } from '../services/homepageService.js';
 import { startLiveRefresh } from '../services/liveRefresh.js';
 import {
-  fetchFeatured, fetchBestsellers, fetchNewArrivals, fetchCategories, fetchProducts,
+  fetchCategories, fetchProducts,
 } from '../services/productService.js';
 
 initShell({ transparentHeader: true, currentPage: 'index' });
@@ -37,21 +37,47 @@ const HERO_SLIDES = [
 ];
 
 loadHeroSlides();
-loadFeatured();
-loadCategories();
-loadNewArrivals();
-loadBestsellers();
+let hasLoadedHomeProducts = false;
+let hasLoadedHomeCategories = false;
+refreshHomeCatalog();
 initNewsletter();
 initInstagramGrid();
 document.getElementById('naPrev')?.addEventListener('click', () => document.getElementById('newArrivalsTrack')?.scrollBy({ left: -320, behavior: 'smooth' }));
 document.getElementById('naNext')?.addEventListener('click', () => document.getElementById('newArrivalsTrack')?.scrollBy({ left: 320, behavior: 'smooth' }));
 let lastHeroSlides = '';
 let hasLoadedRemoteSlides = false;
-startLiveRefresh(loadHeroSlides, 5000);
-startLiveRefresh(async () => {
-  const [products, categories] = await Promise.all([fetchProducts(), fetchCategories()]);
-  await Promise.all([loadFeatured(products), loadCategories(categories), loadNewArrivals(products), loadBestsellers(products)]);
-}, 15000);
+startLiveRefresh(loadHeroSlides, 60000);
+startLiveRefresh(refreshHomeCatalog, 60000);
+
+async function refreshHomeCatalog() {
+  const [productsResult, categoriesResult] = await Promise.allSettled([
+    fetchProducts(),
+    fetchCategories(),
+  ]);
+
+  if (productsResult.status === 'fulfilled') {
+    const products = productsResult.value;
+    await Promise.all([
+      loadFeatured(products),
+      loadNewArrivals(products),
+      loadBestsellers(products),
+    ]);
+    hasLoadedHomeProducts = true;
+  } else if (!hasLoadedHomeProducts) {
+    for (const id of ['featuredGrid', 'newArrivalsTrack', 'bestsellerGrid']) {
+      const element = document.getElementById(id);
+      if (element) element.innerHTML = serviceUnavailable();
+    }
+  }
+
+  if (categoriesResult.status === 'fulfilled') {
+    await loadCategories(categoriesResult.value);
+    hasLoadedHomeCategories = true;
+  } else if (!hasLoadedHomeCategories) {
+    const element = document.getElementById('categoryGrid');
+    if (element) element.innerHTML = serviceUnavailable();
+  }
+}
 
 async function loadHeroSlides() {
   let slides;
