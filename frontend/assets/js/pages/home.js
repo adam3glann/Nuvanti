@@ -1,4 +1,4 @@
-import { initShell, initScrollReveal } from '../main.js?v=store-theme-1';
+import { initShell, initScrollReveal } from '../main.js?v=announcement-strip-1';
 import { icon } from '../components/icons.js';
 import { productCardHTML, bindProductCardEvents } from '../components/productCard.js';
 import { refreshCartDrawer } from '../components/cartDrawer.js';

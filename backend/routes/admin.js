@@ -2607,6 +2607,12 @@ const settingsInput = z.object({
       );
     })
     .optional(),
+  announcementEnabled: z.boolean().optional(),
+  announcementText: z.string().trim().min(1).max(240).optional(),
+  announcementBackgroundColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  announcementTextColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  announcementPattern: z.enum(["solid", "stripes", "dots", "checker", "waves"]).optional(),
+  announcementTheme: z.enum(["midnight", "cream", "citrus", "rose", "custom"]).optional(),
   shippingLocations: z
     .array(
       z.object({
@@ -2635,7 +2641,7 @@ router.get(
   requirePermission("settings.view"),
   async (req, res) => {
     const { rows } = await query(
-      `SELECT store_name AS "storeName", support_email AS "supportEmail", currency, standard_shipping_cents AS "standardShippingCents", express_shipping_cents AS "expressShippingCents", free_shipping_threshold_cents AS "freeShippingThresholdCents", shipping_locations AS "shippingLocations", online_payment_enabled AS "onlinePaymentEnabled", instapay_enabled AS "instapayEnabled", instapay_recipient AS "instapayRecipient", instapay_whatsapp_phone AS "instapayWhatsappPhone" FROM store_settings WHERE id = 1`,
+      `SELECT store_name AS "storeName", support_email AS "supportEmail", currency, standard_shipping_cents AS "standardShippingCents", express_shipping_cents AS "expressShippingCents", free_shipping_threshold_cents AS "freeShippingThresholdCents", shipping_locations AS "shippingLocations", online_payment_enabled AS "onlinePaymentEnabled", instapay_enabled AS "instapayEnabled", instapay_recipient AS "instapayRecipient", instapay_whatsapp_phone AS "instapayWhatsappPhone", announcement_enabled AS "announcementEnabled", announcement_text AS "announcementText", announcement_background_color AS "announcementBackgroundColor", announcement_text_color AS "announcementTextColor", announcement_pattern AS "announcementPattern", announcement_theme AS "announcementTheme" FROM store_settings WHERE id = 1`,
     );
     res
       .set("Cache-Control", "no-store")
@@ -2685,9 +2691,15 @@ router.patch(
       instapay_recipient = coalesce($9, instapay_recipient),
       instapay_whatsapp_phone = coalesce($10, instapay_whatsapp_phone),
       shipping_locations = coalesce($11::jsonb, shipping_locations),
+      announcement_enabled = coalesce($12, announcement_enabled),
+      announcement_text = coalesce($13, announcement_text),
+      announcement_background_color = coalesce($14, announcement_background_color),
+      announcement_text_color = coalesce($15, announcement_text_color),
+      announcement_pattern = coalesce($16, announcement_pattern),
+      announcement_theme = coalesce($17, announcement_theme),
       updated_at = NOW()
     WHERE id = 1
-    RETURNING store_name AS "storeName", support_email AS "supportEmail", currency, standard_shipping_cents AS "standardShippingCents", express_shipping_cents AS "expressShippingCents", free_shipping_threshold_cents AS "freeShippingThresholdCents", shipping_locations AS "shippingLocations", online_payment_enabled AS "onlinePaymentEnabled", instapay_enabled AS "instapayEnabled", instapay_recipient AS "instapayRecipient", instapay_whatsapp_phone AS "instapayWhatsappPhone"`,
+    RETURNING store_name AS "storeName", support_email AS "supportEmail", currency, standard_shipping_cents AS "standardShippingCents", express_shipping_cents AS "expressShippingCents", free_shipping_threshold_cents AS "freeShippingThresholdCents", shipping_locations AS "shippingLocations", online_payment_enabled AS "onlinePaymentEnabled", instapay_enabled AS "instapayEnabled", instapay_recipient AS "instapayRecipient", instapay_whatsapp_phone AS "instapayWhatsappPhone", announcement_enabled AS "announcementEnabled", announcement_text AS "announcementText", announcement_background_color AS "announcementBackgroundColor", announcement_text_color AS "announcementTextColor", announcement_pattern AS "announcementPattern", announcement_theme AS "announcementTheme"`,
       [
         s.storeName ?? null,
         s.supportEmail ?? null,
@@ -2706,6 +2718,12 @@ router.patch(
         s.shippingLocations == null
           ? null
           : JSON.stringify(s.shippingLocations),
+        s.announcementEnabled ?? null,
+        s.announcementText ?? null,
+        s.announcementBackgroundColor?.toLowerCase() ?? null,
+        s.announcementTextColor?.toLowerCase() ?? null,
+        s.announcementPattern ?? null,
+        s.announcementTheme ?? null,
       ],
     );
     await logAudit({

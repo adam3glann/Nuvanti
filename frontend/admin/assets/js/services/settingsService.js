@@ -32,6 +32,14 @@ function fromApi(value) {
       instapayRecipient: value.instapayRecipient || '',
       instapayWhatsappPhone: value.instapayWhatsappPhone || '',
     },
+    announcement: {
+      enabled: value.announcementEnabled === true,
+      text: value.announcementText || 'Welcome to Nuvanti',
+      backgroundColor: /^#[0-9a-f]{6}$/i.test(value.announcementBackgroundColor || '') ? value.announcementBackgroundColor : '#17251e',
+      textColor: /^#[0-9a-f]{6}$/i.test(value.announcementTextColor || '') ? value.announcementTextColor : '#ffffff',
+      pattern: ['solid', 'stripes', 'dots', 'checker', 'waves'].includes(value.announcementPattern) ? value.announcementPattern : 'stripes',
+      theme: ['midnight', 'cream', 'citrus', 'rose', 'custom'].includes(value.announcementTheme) ? value.announcementTheme : 'midnight',
+    },
   };
 }
 
@@ -50,6 +58,8 @@ export async function sendAdminTestEmail() {
 export async function saveSettingsSection(section, data) {
   const payload = section === 'general'
     ? { storeName: data.storeName, supportEmail: data.contactEmail }
+    : section === 'announcement'
+      ? { announcementEnabled: data.enabled, announcementText: data.text, announcementBackgroundColor: data.backgroundColor, announcementTextColor: data.textColor, announcementPattern: data.pattern, announcementTheme: data.theme }
     : section === 'payments'
       ? { onlinePaymentEnabled: data.onlinePaymentEnabled, instapayEnabled: data.instapayEnabled, instapayRecipient: data.instapayRecipient, instapayWhatsappPhone: data.instapayWhatsappPhone }
       : section === 'shipping'

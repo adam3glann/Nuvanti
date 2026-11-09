@@ -3,6 +3,9 @@ import { API_ORIGIN } from '../config.js';
 const DEFAULTS = Object.freeze({
   storeName: 'Nuvanti', currency: 'EGP', standardShippingCents: 7500,
   expressShippingCents: 15000, freeShippingThresholdCents: 300000,
+  announcementEnabled: false, announcementText: 'Welcome to Nuvanti',
+  announcementBackgroundColor: '#17251e', announcementTextColor: '#ffffff',
+  announcementPattern: 'stripes', announcementTheme: 'midnight',
 });
 let settingsPromise;
 

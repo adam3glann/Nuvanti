@@ -12,8 +12,8 @@ if (session) { init(); startLiveRefresh(init, 20000, { pauseWhileEditing: true }
 let tab = 'general';
 let settings;
 let emailStatus;
-const TABS = ['general', 'shipping', 'payments', 'email'];
-const LABELS = { general: 'General', shipping: 'Shipping', payments: 'Payments', email: 'Email' };
+const TABS = ['general', 'announcement', 'shipping', 'payments', 'email'];
+const LABELS = { general: 'General', announcement: 'Announcement Strip', shipping: 'Shipping', payments: 'Payments', email: 'Email' };
 
 async function init() {
   if (!hasPermission(session.role, 'settings.view')) {
@@ -46,6 +46,22 @@ function render() {
       <div class="field"><label for="contactEmail">Customer Support Email</label><input id="contactEmail" type="email" value="${escapeHtml(settings.general.contactEmail)}" maxlength="254" ${disabled()} /></div>
       <p class="hint">Prices are displayed in ${escapeHtml(settings.general.currency)}. Change your customer-facing support details here.</p>
     `);
+  } else if (tab === 'announcement') {
+    const announcement = settings.announcement;
+    root.innerHTML = `<div class="card"><div class="card-pad">
+      <div class="settings-row"><div><p class="settings-row__label" id="announcementEnabledLabel">Show announcement strip</p><p class="settings-row__desc">A scrolling message shown above the store navigation.</p></div><label class="a-switch"><input type="checkbox" id="announcementEnabled" aria-labelledby="announcementEnabledLabel" ${announcement.enabled ? 'checked' : ''} ${disabled()}><span class="a-switch-track"></span></label></div>
+      <div class="field"><label for="announcementText">Strip message</label><input id="announcementText" maxlength="240" value="${escapeHtml(announcement.text)}" placeholder="Free shipping over EGP 3,000" ${disabled()}><p class="hint">Keep it short so customers can read it as it scrolls.</p></div>
+      <div class="field-row">
+        <div class="field"><label for="announcementTheme">Theme</label><select id="announcementTheme" ${disabled()}><option value="midnight" ${announcement.theme === 'midnight' ? 'selected' : ''}>Midnight</option><option value="cream" ${announcement.theme === 'cream' ? 'selected' : ''}>Soft Cream</option><option value="citrus" ${announcement.theme === 'citrus' ? 'selected' : ''}>Citrus</option><option value="rose" ${announcement.theme === 'rose' ? 'selected' : ''}>Rose</option><option value="custom" ${announcement.theme === 'custom' ? 'selected' : ''}>Custom</option></select><p class="hint">Choose a preset, then adjust its colors and pattern.</p></div>
+        <div class="field"><label for="announcementPattern">Pattern</label><select id="announcementPattern" ${disabled()}><option value="solid" ${announcement.pattern === 'solid' ? 'selected' : ''}>Solid</option><option value="stripes" ${announcement.pattern === 'stripes' ? 'selected' : ''}>Diagonal stripes</option><option value="dots" ${announcement.pattern === 'dots' ? 'selected' : ''}>Dots</option><option value="checker" ${announcement.pattern === 'checker' ? 'selected' : ''}>Checker</option><option value="waves" ${announcement.pattern === 'waves' ? 'selected' : ''}>Waves</option></select></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label for="announcementBackgroundColor">Strip color</label><div class="announcement-color-field"><input type="color" id="announcementBackgroundColor" value="${announcement.backgroundColor}" ${disabled()}><input type="text" data-color-text="announcementBackgroundColor" value="${announcement.backgroundColor}" maxlength="7" pattern="#[0-9a-fA-F]{6}" aria-label="Strip color hex value" ${disabled()}></div></div>
+        <div class="field"><label for="announcementTextColor">Text color</label><div class="announcement-color-field"><input type="color" id="announcementTextColor" value="${announcement.textColor}" ${disabled()}><input type="text" data-color-text="announcementTextColor" value="${announcement.textColor}" maxlength="7" pattern="#[0-9a-fA-F]{6}" aria-label="Text color hex value" ${disabled()}></div></div>
+      </div>
+      <div class="announcement-preview-wrap"><p class="settings-row__label">Preview</p><div id="announcementPreview" class="store-announcement" data-pattern="${announcement.pattern}" style="--announcement-bg:${announcement.backgroundColor};--announcement-fg:${announcement.textColor}"><div class="store-announcement__track"><span class="store-announcement__group"><span>${escapeHtml(announcement.text)}</span><span class="store-announcement__separator" aria-hidden="true">✦</span><span aria-hidden="true">${escapeHtml(announcement.text)}</span></span></div></div></div>
+      ${canEdit ? '<button class="btn btn-primary" id="saveSectionBtn">Save Changes</button>' : '<p class="hint">You have view-only access to store settings.</p>'}
+    </div></div>`;
   } else if (tab === 'shipping') {
     root.innerHTML = section(`
       <div class="field"><label for="freeShippingThreshold">Free Shipping Threshold (EGP)</label><input type="number" min="0" step="0.01" id="freeShippingThreshold" value="${settings.shipping.freeShippingThreshold}" ${disabled()} /></div>
@@ -114,6 +130,8 @@ document.getElementById('settingsRoot')?.addEventListener('click', async (event)
   const sectionName = tab;
   const data = sectionName === 'general'
     ? { storeName: value('storeName').trim(), contactEmail: value('contactEmail').trim() }
+    : sectionName === 'announcement'
+      ? { enabled: document.getElementById('announcementEnabled').checked, text: value('announcementText').trim(), backgroundColor: colorValue('announcementBackgroundColor'), textColor: colorValue('announcementTextColor'), pattern: value('announcementPattern'), theme: value('announcementTheme') }
     : sectionName === 'payments'
       ? { onlinePaymentEnabled: document.getElementById('onlinePaymentEnabled')?.checked === true, instapayEnabled: document.getElementById('instapayEnabled')?.checked === true, instapayRecipient: value('instapayRecipient').trim(), instapayWhatsappPhone: value('instapayWhatsappPhone').trim() }
       : {
@@ -137,6 +155,10 @@ document.getElementById('settingsRoot')?.addEventListener('click', async (event)
     showAdminToast('Enter a store name and a valid support email.', 'error');
     return;
   }
+  if (sectionName === 'announcement' && (!data.text || data.text.length > 240 || !/^#[0-9a-fA-F]{6}$/.test(data.backgroundColor) || !/^#[0-9a-fA-F]{6}$/.test(data.textColor))) {
+    showAdminToast('Enter a message and valid six-digit hex colors.', 'error');
+    return;
+  }
   if (sectionName === 'shipping' && [data.freeShippingThreshold, data.standardCost, data.expressCost].some((amount) => !Number.isFinite(amount) || amount < 0)) {
     showAdminToast('Shipping amounts must be zero or greater.', 'error');
     return;
@@ -158,8 +180,62 @@ document.getElementById('settingsRoot')?.addEventListener('click', async (event)
   }
 });
 
+const announcementThemes = {
+  midnight: { background: '#17251e', text: '#ffffff', pattern: 'stripes' },
+  cream: { background: '#f2eadb', text: '#27352b', pattern: 'dots' },
+  citrus: { background: '#e5bc45', text: '#263021', pattern: 'checker' },
+  rose: { background: '#9e5363', text: '#fff8f0', pattern: 'waves' },
+};
+
+document.getElementById('settingsPanel')?.addEventListener('change', (event) => {
+  if (event.target.id === 'announcementTheme' && announcementThemes[event.target.value]) {
+    const theme = announcementThemes[event.target.value];
+    setColor('announcementBackgroundColor', theme.background);
+    setColor('announcementTextColor', theme.text);
+    document.getElementById('announcementPattern').value = theme.pattern;
+  }
+  if (event.target.matches('[data-color-text]')) {
+    const colorInput = document.getElementById(event.target.dataset.colorText);
+    if (/^#[0-9a-fA-F]{6}$/.test(event.target.value)) colorInput.value = event.target.value;
+  }
+  if (event.target.id === 'announcementPattern' || event.target.matches('[data-color-text]')) {
+    const theme = document.getElementById('announcementTheme');
+    if (theme) theme.value = 'custom';
+  }
+  updateAnnouncementPreview();
+});
+document.getElementById('settingsPanel')?.addEventListener('input', (event) => {
+  if (event.target.matches('input[type="color"]')) {
+    const textInput = document.querySelector(`[data-color-text="${event.target.id}"]`);
+    if (textInput) textInput.value = event.target.value;
+  }
+  if (event.target.matches('[data-color-text]') && /^#[0-9a-fA-F]{6}$/.test(event.target.value)) {
+    document.getElementById(event.target.dataset.colorText).value = event.target.value;
+    const theme = document.getElementById('announcementTheme');
+    if (theme) theme.value = 'custom';
+  }
+  updateAnnouncementPreview();
+});
+
+function setColor(id, color) {
+  document.getElementById(id).value = color;
+  document.querySelector(`[data-color-text="${id}"]`).value = color;
+}
+function updateAnnouncementPreview() {
+  const preview = document.getElementById('announcementPreview');
+  if (!preview) return;
+  const background = value('announcementBackgroundColor');
+  const foreground = value('announcementTextColor');
+  if (/^#[0-9a-fA-F]{6}$/.test(background)) preview.style.setProperty('--announcement-bg', background);
+  if (/^#[0-9a-fA-F]{6}$/.test(foreground)) preview.style.setProperty('--announcement-fg', foreground);
+  preview.dataset.pattern = value('announcementPattern');
+  const message = value('announcementText').trim() || 'Your announcement preview';
+  preview.querySelectorAll('.store-announcement__group > span:not(.store-announcement__separator)').forEach((span) => { span.textContent = message; });
+}
+
 function disabled() { return canEdit ? '' : 'disabled'; }
 function value(id) { return document.getElementById(id)?.value ?? ''; }
+function colorValue(id) { return document.querySelector(`[data-color-text="${id}"]`)?.value ?? value(id); }
 function numberValue(id) { return Number(value(id)); }
 function slugifyLocation(name) {
   const base = name.normalize('NFKC').trim().toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '').slice(0, 48) || 'location';

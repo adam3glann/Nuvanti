@@ -68,7 +68,13 @@ router.get("/settings", async (req, res) => {
     shipping_locations AS "shippingLocations",
     instapay_enabled AS "instapayEnabled",
     CASE WHEN instapay_enabled THEN instapay_recipient ELSE '' END AS "instapayRecipient",
-    CASE WHEN instapay_enabled THEN instapay_whatsapp_phone ELSE '' END AS "instapayWhatsappPhone"
+    CASE WHEN instapay_enabled THEN instapay_whatsapp_phone ELSE '' END AS "instapayWhatsappPhone",
+    announcement_enabled AS "announcementEnabled",
+    announcement_text AS "announcementText",
+    announcement_background_color AS "announcementBackgroundColor",
+    announcement_text_color AS "announcementTextColor",
+    announcement_pattern AS "announcementPattern",
+    announcement_theme AS "announcementTheme"
     FROM store_settings WHERE id = 1`);
   res.set("Cache-Control", "no-store");
   res.json({

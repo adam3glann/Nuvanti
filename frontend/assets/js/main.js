@@ -10,6 +10,7 @@ import { configureFreeShippingThreshold } from './services/cartService.js';
 import { startStorePresence } from './services/presenceService.js';
 import { startLiveRefresh } from './services/liveRefresh.js';
 import { applyStoreTheme } from './services/storeThemeService.js';
+import { renderAnnouncementStrip } from './components/announcementStrip.js';
 
 export function initShell({ transparentHeader = false, currentPage = '' } = {}) {
   applyStoreTheme();
@@ -24,11 +25,13 @@ export function initShell({ transparentHeader = false, currentPage = '' } = {}) 
 
   loadStoreSettings().then((settings) => {
     configureFreeShippingThreshold(settings.freeShippingThresholdCents / 100);
+    renderAnnouncementStrip(settings);
     refreshCartDrawer();
   }).catch((error) => console.error('Store settings unavailable:', error));
   startLiveRefresh(async () => {
     const settings = await refreshStoreSettings();
     configureFreeShippingThreshold(settings.freeShippingThresholdCents / 100);
+    renderAnnouncementStrip(settings);
     refreshCartDrawer();
   }, 60000);
 

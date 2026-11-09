@@ -1,4 +1,4 @@
-import { initShell } from '../main.js?v=store-theme-1';
+import { initShell } from '../main.js?v=announcement-strip-1';
 import { formatPrice } from '../components/productCard.js';
 import { getSession, getCurrentUser, updateProfile, login, register, logout, requestPasswordReset, confirmPasswordReset, confirmEmailVerification, requestEmailVerification } from '../services/authService.js';
 import { fetchMyOrders } from '../services/orderService.js';

@@ -2,6 +2,72 @@
    NUVANTI — Components
    ========================================================= */
 
+/* ---------- Scrolling store announcement ---------- */
+.store-announcement {
+  position: relative;
+  z-index: 2;
+  overflow: hidden;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  color: var(--announcement-fg, #fff);
+  background-color: var(--announcement-bg, #17251e);
+  isolation: isolate;
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.store-announcement::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  content: "";
+  opacity: .16;
+  pointer-events: none;
+}
+.store-announcement[data-pattern="stripes"]::before {
+  background-image: repeating-linear-gradient(135deg, #000 0 2px, transparent 2px 12px);
+}
+.store-announcement[data-pattern="dots"]::before {
+  background-image: radial-gradient(#000 1.3px, transparent 1.5px);
+  background-size: 12px 12px;
+}
+.store-announcement[data-pattern="checker"]::before {
+  background-image: conic-gradient(#000 25%, transparent 0 50%, #000 0 75%, transparent 0);
+  background-size: 18px 18px;
+}
+.store-announcement[data-pattern="waves"]::before {
+  background-image: repeating-radial-gradient(ellipse at 0 100%, transparent 0 8px, #000 9px 10px, transparent 11px 18px);
+  background-size: 46px 38px;
+}
+.store-announcement__track {
+  display: flex;
+  width: max-content;
+  min-width: 100%;
+  animation: store-announcement-scroll 26s linear infinite;
+}
+.store-announcement__group {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-around;
+  min-width: 100vw;
+  gap: clamp(2rem, 6vw, 6rem);
+  padding: .65rem clamp(1.5rem, 4vw, 4rem);
+  white-space: nowrap;
+}
+.store-announcement__separator { font-size: .85em; opacity: .72; }
+.store-announcement:hover .store-announcement__track { animation-play-state: paused; }
+@keyframes store-announcement-scroll {
+  to { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .store-announcement__track { animation: none; }
+  .store-announcement__group[aria-hidden="true"] { display: none; }
+  .store-announcement__group { justify-content: center; width: 100vw; white-space: normal; text-align: center; }
+}
+
 /* ---------- Header ---------- */
 .site-header {
   position: sticky;
