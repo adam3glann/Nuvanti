@@ -57,9 +57,9 @@ const fallbackSlides = HERO_SLIDES.map((slide) => ({
   secondaryLabel: slide.secondary?.label || '',
   secondaryHref: slide.secondary?.href || '',
 }));
-lastHeroSlides = JSON.stringify(fallbackSlides);
-renderHero(fallbackSlides);
-initHeroSlider();
+// Wait for the saved storefront slides before painting a hero image. Rendering
+// the demo fallback first causes a visible image swap on every successful API
+// load, especially when the saved slide uses a custom photo.
 loadHeroSlides();
 startLiveRefresh(loadHeroSlides, 60000);
 startLiveRefresh(refreshHomeCatalog, 60000);

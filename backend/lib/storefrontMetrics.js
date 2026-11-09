@@ -1,4 +1,4 @@
-import { query } from './db.js';
+import { query } from "./db.js";
 
 let pendingPageViews = 0;
 let flushing = false;
@@ -14,7 +14,7 @@ export async function flushStorefrontPageViews() {
   pendingPageViews = 0;
   try {
     await query(
-      'UPDATE storefront_metrics SET total_views = total_views + $1, updated_at = NOW() WHERE id = 1',
+      "UPDATE storefront_metrics SET total_views = total_views + $1, updated_at = NOW() WHERE id = 1",
       [batch],
     );
   } catch (error) {
