@@ -19,22 +19,27 @@ function init() {
   document.getElementById('paymentFilter').addEventListener('change', (e) => { state.payment = e.target.value; state.page = 1; load(); });
   document.getElementById('sortSelect').addEventListener('change', (e) => { state.sort = e.target.value; state.page = 1; load(); });
   document.getElementById('perPageSelect').addEventListener('change', (e) => { state.perPage = e.target.value === 'all' ? 'all' : Number(e.target.value); state.page = 1; load(); });
-  load();
-  startLiveRefresh(() => load(false), 30000);
+  load().finally(() => startLiveRefresh(() => load(false, true), 30000));
 }
 
 let loadRequestId = 0;
-async function load(showLoading = true) {
+let activeLoadCount = 0;
+async function load(showLoading = true, background = false) {
+  if (background && activeLoadCount > 0) return;
   const requestId = ++loadRequestId;
   const tbody = document.getElementById('ordersBody');
   if (showLoading) tbody.innerHTML = `<tr><td colspan="7"><div class="a-skeleton" style="height:36px"></div></td></tr>`;
   let items, total;
+  activeLoadCount += 1;
   try {
     ({ items, total } = await fetchAdminOrders(state));
   } catch (error) {
     if (requestId !== loadRequestId) return;
-    tbody.innerHTML = `<tr><td colspan="7"><div class="admin-empty"><h3>Couldn't load orders</h3><p>${escapeHtml(error.message)}</p></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7"><div class="admin-empty"><h3>Couldn't load orders</h3><p>${escapeHtml(error.message)}</p><button class="btn btn-outline" id="retryOrders">Try Again</button></div></td></tr>`;
+    document.getElementById('retryOrders')?.addEventListener('click', () => load());
     return;
+  } finally {
+    activeLoadCount -= 1;
   }
   if (requestId !== loadRequestId) return;
 

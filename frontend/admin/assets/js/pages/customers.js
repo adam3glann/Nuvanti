@@ -1,7 +1,7 @@
 import { initAdminShell } from '../components/shell.js';
 import { formatPrice, formatDate, paginationHTML, escapeHtml } from '../components/utils.js';
 import { statusBadge } from '../components/statusBadge.js';
-import { fetchAdminCustomers } from '../services/customerService.js';
+import { fetchAdminCustomers } from '../services/customerService.js?v=orders-load-race-2';
 import { startLiveRefresh } from '../services/liveRefresh.js';
 
 const state = { query: '', status: '', page: 1, perPage: 'all', sort: 'recent' };
@@ -14,18 +14,21 @@ function init() {
   document.getElementById('statusFilter').addEventListener('change', (e) => { state.status = e.target.value; state.page = 1; load(); });
   document.getElementById('sortSelect').addEventListener('change', (e) => { state.sort = e.target.value; state.page = 1; load(); });
   document.getElementById('perPageSelect').addEventListener('change', (e) => { state.perPage = e.target.value === 'all' ? 'all' : Number(e.target.value); state.page = 1; load(); });
-  load();
-  startLiveRefresh(load, 30000);
+  load().finally(() => startLiveRefresh(() => load(true, true), 30000));
 }
 
 let loadRequestId = 0;
-async function load() {
+let activeLoadCount = 0;
+async function load(showLoading = true, background = false) {
+  if (background && activeLoadCount > 0) return;
   const requestId = ++loadRequestId;
   const body = document.getElementById('custBody');
-  if (!body.children.length) body.innerHTML = '<tr><td colspan="7"><div class="a-skeleton" style="height:36px"></div></td></tr>';
+  if (showLoading && !body.children.length) body.innerHTML = '<tr><td colspan="7"><div class="a-skeleton" style="height:36px"></div></td></tr>';
   let result;
+  activeLoadCount += 1;
   try { result = await fetchAdminCustomers(state); }
-  catch (error) { if (requestId !== loadRequestId) return; document.getElementById('custBody').innerHTML = `<tr><td colspan="7"><div class="admin-empty"><h3>Customers could not be loaded</h3><p>${escapeHtml(error.message)}</p><button class="btn btn-outline" id="retryCustomers">Try Again</button></div></td></tr>`; document.getElementById('retryCustomers')?.addEventListener('click', load); return; }
+  catch (error) { if (requestId !== loadRequestId) return; document.getElementById('custBody').innerHTML = `<tr><td colspan="7"><div class="admin-empty"><h3>Customers could not be loaded</h3><p>${escapeHtml(error.message)}</p><button class="btn btn-outline" id="retryCustomers">Try Again</button></div></td></tr>`; document.getElementById('retryCustomers')?.addEventListener('click', () => load()); return; }
+  finally { activeLoadCount -= 1; }
   if (requestId !== loadRequestId) return;
   const { items, total } = result;
   document.getElementById('custBody').innerHTML = items.length ? items.map((c) => `
