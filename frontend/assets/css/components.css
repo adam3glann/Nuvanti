@@ -4,8 +4,9 @@
 
 /* ---------- Scrolling store announcement ---------- */
 .store-announcement {
-  position: relative;
-  z-index: 2;
+  position: sticky;
+  top: 0;
+  z-index: 110;
   overflow: hidden;
   min-height: 38px;
   display: flex;
@@ -41,11 +42,28 @@
   background-image: repeating-radial-gradient(ellipse at 0 100%, transparent 0 8px, #000 9px 10px, transparent 11px 18px);
   background-size: 46px 38px;
 }
+.store-announcement[data-pattern="diagonal"]::before {
+  background-image: repeating-linear-gradient(45deg, #000 0 1px, transparent 1px 9px);
+}
+.store-announcement[data-pattern="grid"]::before {
+  background-image: linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+.store-announcement[data-pattern="bars"]::before {
+  background-image: repeating-linear-gradient(90deg, #000 0 10px, transparent 10px 22px);
+}
+.store-announcement[data-pattern="confetti"]::before {
+  background-image: radial-gradient(circle, #000 0 2px, transparent 2.5px), radial-gradient(circle, #000 0 1px, transparent 2px);
+  background-size: 21px 19px, 31px 27px;
+}
+.store-announcement[data-pattern="glow"]::before {
+  background-image: linear-gradient(110deg, transparent 20%, #fff 48%, transparent 76%);
+}
 .store-announcement__track {
   display: flex;
   width: max-content;
   min-width: 100%;
-  animation: store-announcement-scroll 26s linear infinite;
+  animation: store-announcement-scroll var(--announcement-speed, 26s) linear infinite;
 }
 .store-announcement__group {
   display: flex;
@@ -58,7 +76,6 @@
   white-space: nowrap;
 }
 .store-announcement__separator { font-size: .85em; opacity: .72; }
-.store-announcement:hover .store-announcement__track { animation-play-state: paused; }
 @keyframes store-announcement-scroll {
   to { transform: translateX(-50%); }
 }
@@ -68,10 +85,55 @@
   .store-announcement__group { justify-content: center; width: 100vw; white-space: normal; text-align: center; }
 }
 
+/* ---------- Timed guest sign-up offer ---------- */
+.signup-offer-overlay {
+  position: fixed;
+  z-index: 500;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background: rgba(15, 20, 17, .62);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+.signup-offer-dialog {
+  position: relative;
+  width: min(100%, 490px);
+  padding: clamp(2rem, 7vw, 3.4rem);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-paper);
+  color: var(--color-text);
+  box-shadow: 0 24px 90px rgba(0, 0, 0, .28);
+  text-align: center;
+  animation: signup-offer-enter 220ms ease-out both;
+}
+.signup-offer-close {
+  position: absolute;
+  top: .8rem;
+  right: .9rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--color-muted);
+  font-size: 1.7rem;
+}
+.signup-offer-close:hover { background: var(--color-surface); color: var(--color-text); }
+.signup-offer-eyebrow { margin-bottom: .75rem; color: var(--color-accent); font-size: .68rem; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+.signup-offer-title { margin: 0 auto .85rem; max-width: 18ch; font-family: var(--font-display); font-size: clamp(1.65rem, 5vw, 2.3rem); line-height: 1.12; }
+.signup-offer-message { max-width: 38ch; margin: 0 auto 1.5rem; color: var(--color-muted); }
+.signup-offer-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: .7rem; }
+.signup-offer-actions .btn { min-width: 145px; }
+@keyframes signup-offer-enter { from { opacity: 0; transform: translateY(12px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .signup-offer-dialog { animation: none; } }
+
 /* ---------- Header ---------- */
 .site-header {
   position: sticky;
-  top: 0;
+  top: var(--announcement-sticky-offset, 0px);
   z-index: 100;
   height: var(--header-h);
   padding-top: var(--space-3);

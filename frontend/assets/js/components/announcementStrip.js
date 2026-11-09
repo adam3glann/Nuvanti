@@ -1,4 +1,4 @@
-const PATTERNS = new Set(['solid', 'stripes', 'dots', 'checker', 'waves']);
+const PATTERNS = new Set(['solid', 'stripes', 'dots', 'checker', 'waves', 'diagonal', 'grid', 'bars', 'confetti', 'glow']);
 
 export function renderAnnouncementStrip(settings) {
   const header = document.getElementById('site-header');
@@ -6,6 +6,7 @@ export function renderAnnouncementStrip(settings) {
   let strip = document.getElementById('storeAnnouncement');
   if (!settings.announcementEnabled || !String(settings.announcementText || '').trim()) {
     strip?.remove();
+    document.documentElement.style.removeProperty('--announcement-sticky-offset');
     return;
   }
 
@@ -24,12 +25,17 @@ export function renderAnnouncementStrip(settings) {
     ? settings.announcementTextColor
     : '#ffffff';
   const pattern = PATTERNS.has(settings.announcementPattern) ? settings.announcementPattern : 'solid';
+  const speedSeconds = Number.isInteger(settings.announcementSpeedSeconds) && settings.announcementSpeedSeconds >= 6 && settings.announcementSpeedSeconds <= 60
+    ? settings.announcementSpeedSeconds
+    : 26;
   strip.dataset.pattern = pattern;
   strip.style.setProperty('--announcement-bg', background);
   strip.style.setProperty('--announcement-fg', foreground);
+  document.documentElement.style.setProperty('--announcement-sticky-offset', `${strip.offsetHeight || 38}px`);
 
   const track = document.createElement('div');
   track.className = 'store-announcement__track';
+  track.style.setProperty('--announcement-speed', `${speedSeconds}s`);
   for (let index = 0; index < 2; index += 1) {
     const group = document.createElement('span');
     group.className = 'store-announcement__group';

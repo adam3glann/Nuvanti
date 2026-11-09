@@ -5,7 +5,7 @@ const DEFAULTS = Object.freeze({
   expressShippingCents: 15000, freeShippingThresholdCents: 300000,
   announcementEnabled: false, announcementText: 'Welcome to Nuvanti',
   announcementBackgroundColor: '#17251e', announcementTextColor: '#ffffff',
-  announcementPattern: 'stripes', announcementTheme: 'midnight',
+  announcementPattern: 'stripes', announcementTheme: 'midnight', announcementSpeedSeconds: 26,
 });
 let settingsPromise;
 

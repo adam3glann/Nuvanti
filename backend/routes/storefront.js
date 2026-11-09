@@ -74,7 +74,12 @@ router.get("/settings", async (req, res) => {
     announcement_background_color AS "announcementBackgroundColor",
     announcement_text_color AS "announcementTextColor",
     announcement_pattern AS "announcementPattern",
-    announcement_theme AS "announcementTheme"
+    announcement_theme AS "announcementTheme",
+    announcement_speed_seconds AS "announcementSpeedSeconds",
+    signup_offer_enabled AS "signupOfferEnabled",
+    signup_offer_delay_seconds AS "signupOfferDelaySeconds",
+    signup_offer_title AS "signupOfferTitle",
+    signup_offer_text AS "signupOfferText"
     FROM store_settings WHERE id = 1`);
   res.set("Cache-Control", "no-store");
   res.json({

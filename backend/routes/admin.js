@@ -2611,8 +2611,13 @@ const settingsInput = z.object({
   announcementText: z.string().trim().min(1).max(240).optional(),
   announcementBackgroundColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   announcementTextColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
-  announcementPattern: z.enum(["solid", "stripes", "dots", "checker", "waves"]).optional(),
-  announcementTheme: z.enum(["midnight", "cream", "citrus", "rose", "custom"]).optional(),
+  announcementPattern: z.enum(["solid", "stripes", "dots", "checker", "waves", "diagonal", "grid", "bars", "confetti", "glow"]).optional(),
+  announcementTheme: z.enum(["midnight", "cream", "citrus", "rose", "ocean", "lavender", "forest", "mono", "custom"]).optional(),
+  announcementSpeedSeconds: z.coerce.number().int().min(6).max(60).optional(),
+  signupOfferEnabled: z.boolean().optional(),
+  signupOfferDelaySeconds: z.coerce.number().int().min(1).max(120).optional(),
+  signupOfferTitle: z.string().trim().min(1).max(120).optional(),
+  signupOfferText: z.string().trim().min(1).max(300).optional(),
   shippingLocations: z
     .array(
       z.object({
@@ -2641,7 +2646,7 @@ router.get(
   requirePermission("settings.view"),
   async (req, res) => {
     const { rows } = await query(
-      `SELECT store_name AS "storeName", support_email AS "supportEmail", currency, standard_shipping_cents AS "standardShippingCents", express_shipping_cents AS "expressShippingCents", free_shipping_threshold_cents AS "freeShippingThresholdCents", shipping_locations AS "shippingLocations", online_payment_enabled AS "onlinePaymentEnabled", instapay_enabled AS "instapayEnabled", instapay_recipient AS "instapayRecipient", instapay_whatsapp_phone AS "instapayWhatsappPhone", announcement_enabled AS "announcementEnabled", announcement_text AS "announcementText", announcement_background_color AS "announcementBackgroundColor", announcement_text_color AS "announcementTextColor", announcement_pattern AS "announcementPattern", announcement_theme AS "announcementTheme" FROM store_settings WHERE id = 1`,
+      `SELECT store_name AS "storeName", support_email AS "supportEmail", currency, standard_shipping_cents AS "standardShippingCents", express_shipping_cents AS "expressShippingCents", free_shipping_threshold_cents AS "freeShippingThresholdCents", shipping_locations AS "shippingLocations", online_payment_enabled AS "onlinePaymentEnabled", instapay_enabled AS "instapayEnabled", instapay_recipient AS "instapayRecipient", instapay_whatsapp_phone AS "instapayWhatsappPhone", announcement_enabled AS "announcementEnabled", announcement_text AS "announcementText", announcement_background_color AS "announcementBackgroundColor", announcement_text_color AS "announcementTextColor", announcement_pattern AS "announcementPattern", announcement_theme AS "announcementTheme", announcement_speed_seconds AS "announcementSpeedSeconds", signup_offer_enabled AS "signupOfferEnabled", signup_offer_delay_seconds AS "signupOfferDelaySeconds", signup_offer_title AS "signupOfferTitle", signup_offer_text AS "signupOfferText" FROM store_settings WHERE id = 1`,
     );
     res
       .set("Cache-Control", "no-store")
@@ -2697,9 +2702,14 @@ router.patch(
       announcement_text_color = coalesce($15, announcement_text_color),
       announcement_pattern = coalesce($16, announcement_pattern),
       announcement_theme = coalesce($17, announcement_theme),
+      announcement_speed_seconds = coalesce($18, announcement_speed_seconds),
+      signup_offer_enabled = coalesce($19, signup_offer_enabled),
+      signup_offer_delay_seconds = coalesce($20, signup_offer_delay_seconds),
+      signup_offer_title = coalesce($21, signup_offer_title),
+      signup_offer_text = coalesce($22, signup_offer_text),
       updated_at = NOW()
     WHERE id = 1
-    RETURNING store_name AS "storeName", support_email AS "supportEmail", currency, standard_shipping_cents AS "standardShippingCents", express_shipping_cents AS "expressShippingCents", free_shipping_threshold_cents AS "freeShippingThresholdCents", shipping_locations AS "shippingLocations", online_payment_enabled AS "onlinePaymentEnabled", instapay_enabled AS "instapayEnabled", instapay_recipient AS "instapayRecipient", instapay_whatsapp_phone AS "instapayWhatsappPhone", announcement_enabled AS "announcementEnabled", announcement_text AS "announcementText", announcement_background_color AS "announcementBackgroundColor", announcement_text_color AS "announcementTextColor", announcement_pattern AS "announcementPattern", announcement_theme AS "announcementTheme"`,
+    RETURNING store_name AS "storeName", support_email AS "supportEmail", currency, standard_shipping_cents AS "standardShippingCents", express_shipping_cents AS "expressShippingCents", free_shipping_threshold_cents AS "freeShippingThresholdCents", shipping_locations AS "shippingLocations", online_payment_enabled AS "onlinePaymentEnabled", instapay_enabled AS "instapayEnabled", instapay_recipient AS "instapayRecipient", instapay_whatsapp_phone AS "instapayWhatsappPhone", announcement_enabled AS "announcementEnabled", announcement_text AS "announcementText", announcement_background_color AS "announcementBackgroundColor", announcement_text_color AS "announcementTextColor", announcement_pattern AS "announcementPattern", announcement_theme AS "announcementTheme", announcement_speed_seconds AS "announcementSpeedSeconds", signup_offer_enabled AS "signupOfferEnabled", signup_offer_delay_seconds AS "signupOfferDelaySeconds", signup_offer_title AS "signupOfferTitle", signup_offer_text AS "signupOfferText"`,
       [
         s.storeName ?? null,
         s.supportEmail ?? null,
@@ -2724,6 +2734,11 @@ router.patch(
         s.announcementTextColor?.toLowerCase() ?? null,
         s.announcementPattern ?? null,
         s.announcementTheme ?? null,
+        s.announcementSpeedSeconds ?? null,
+        s.signupOfferEnabled ?? null,
+        s.signupOfferDelaySeconds ?? null,
+        s.signupOfferTitle ?? null,
+        s.signupOfferText ?? null,
       ],
     );
     await logAudit({

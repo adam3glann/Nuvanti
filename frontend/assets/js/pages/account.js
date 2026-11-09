@@ -1,4 +1,4 @@
-import { initShell } from '../main.js?v=announcement-strip-1';
+import { initShell } from '../main.js?v=promo-strip-popup-1';
 import { formatPrice } from '../components/productCard.js';
 import { getSession, getCurrentUser, updateProfile, login, register, logout, requestPasswordReset, confirmPasswordReset, confirmEmailVerification, requestEmailVerification } from '../services/authService.js';
 import { fetchMyOrders } from '../services/orderService.js';
@@ -11,7 +11,7 @@ initShell({ currentPage: 'account' });
 
 const root = document.getElementById('accountRoot');
 const params = new URLSearchParams(location.search);
-let authView = params.get('reset') ? 'reset' : 'login'; // login | register | forgot | reset
+let authView = params.get('reset') ? 'reset' : params.get('register') ? 'register' : 'login'; // login | register | forgot | reset
 
 render();
 

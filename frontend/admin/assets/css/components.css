@@ -396,5 +396,16 @@
 .announcement-preview-wrap .store-announcement[data-pattern="dots"]::before { background-image: radial-gradient(#000 1.3px, transparent 1.5px); background-size: 12px 12px; }
 .announcement-preview-wrap .store-announcement[data-pattern="checker"]::before { background-image: conic-gradient(#000 25%, transparent 0 50%, #000 0 75%, transparent 0); background-size: 18px 18px; }
 .announcement-preview-wrap .store-announcement[data-pattern="waves"]::before { background-image: repeating-radial-gradient(ellipse at 0 100%, transparent 0 8px, #000 9px 10px, transparent 11px 18px); background-size: 46px 38px; }
-.announcement-preview-wrap .store-announcement__track { width: 100%; animation: none; }
+.announcement-preview-wrap .store-announcement[data-pattern="diagonal"]::before { background-image: repeating-linear-gradient(45deg, #000 0 1px, transparent 1px 9px); }
+.announcement-preview-wrap .store-announcement[data-pattern="grid"]::before { background-image: linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px); background-size: 16px 16px; }
+.announcement-preview-wrap .store-announcement[data-pattern="bars"]::before { background-image: repeating-linear-gradient(90deg, #000 0 10px, transparent 10px 22px); }
+.announcement-preview-wrap .store-announcement[data-pattern="confetti"]::before { background-image: radial-gradient(circle, #000 0 2px, transparent 2.5px), radial-gradient(circle, #000 0 1px, transparent 2px); background-size: 21px 19px, 31px 27px; }
+.announcement-preview-wrap .store-announcement[data-pattern="glow"]::before { background-image: linear-gradient(110deg, transparent 20%, #fff 48%, transparent 76%); }
+.announcement-preview-wrap .store-announcement[data-pattern="diagonal"]::before { background-image: repeating-linear-gradient(45deg, #000 0 1px, transparent 1px 9px); }
+.announcement-preview-wrap .store-announcement[data-pattern="grid"]::before { background-image: linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px); background-size: 16px 16px; }
+.announcement-preview-wrap .store-announcement[data-pattern="bars"]::before { background-image: repeating-linear-gradient(90deg, #000 0 10px, transparent 10px 22px); }
+.announcement-preview-wrap .store-announcement[data-pattern="confetti"]::before { background-image: radial-gradient(circle, #000 0 2px, transparent 2.5px), radial-gradient(circle, #000 0 1px, transparent 2px); background-size: 21px 19px, 31px 27px; }
+.announcement-preview-wrap .store-announcement[data-pattern="glow"]::before { background-image: linear-gradient(110deg, transparent 20%, #fff 48%, transparent 76%); }
+.announcement-preview-wrap .store-announcement__track { width: max-content; min-width: 100%; animation: store-announcement-scroll var(--announcement-speed, 26s) linear infinite; }
 .announcement-preview-wrap .store-announcement__group { min-width: 100%; width: 100%; gap: .75rem; padding-inline: .75rem; }
+@keyframes store-announcement-scroll { to { transform: translateX(-50%); } }
