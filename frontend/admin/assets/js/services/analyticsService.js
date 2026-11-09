@@ -32,7 +32,8 @@ export async function fetchFinancialSummary() {
   return body;
 }
 export function summarize(series) {
-  const revenue = series.reduce((sum, day) => sum + day.revenue, 0);
+  const revenueCents = series.reduce((sum, day) => sum + Math.round(Number(day.revenue || 0) * 100), 0);
+  const revenue = revenueCents / 100;
   const orders = series.reduce((sum, day) => sum + day.orders, 0);
-  return { revenue, orders, aov: orders ? Math.round(revenue / orders) : 0 };
+  return { revenue, orders, aov: orders ? Math.round(revenueCents / orders) / 100 : 0 };
 }

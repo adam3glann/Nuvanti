@@ -1143,8 +1143,7 @@ router.get(
     );
     const { rows: counts } = await query(
       `SELECT count(*) FILTER (WHERE status IN ('pending', 'paid', 'processing', 'shipped', 'out_for_delivery'))::int AS "pendingOrders"
-    FROM orders WHERE created_at >= (((NOW() AT TIME ZONE 'Africa/Cairo')::date - ($1::int - 1))::timestamp AT TIME ZONE 'Africa/Cairo')`,
-      [days],
+    FROM orders`,
     );
     res.json({
       series: series.map((row) => ({
@@ -2424,23 +2423,40 @@ router.delete(
   },
 );
 
-// --- Customers (real users with role = 'customer') ---
+// --- Customers (registered and guest purchasers) ---
 router.get(
   "/customers",
   requirePermission("customers.view"),
   async (req, res) => {
     const { rows } =
-      await query(`SELECT u.id::text, u.name, u.email, u.is_active AS "isActive", u.created_at AS "createdAt",
+      await query(`WITH registered AS (
+  SELECT u.id::text, u.name, u.email, u.is_active AS "isActive", u.created_at AS "createdAt",
+    false AS "isGuest",
     coalesce(
       (SELECT nullif(btrim(o.shipping_address->>'phone'), '') FROM orders o WHERE o.user_id = u.id AND nullif(btrim(o.shipping_address->>'phone'), '') IS NOT NULL ORDER BY o.created_at DESC LIMIT 1),
       (SELECT nullif(btrim(a.phone), '') FROM addresses a WHERE a.user_id = u.id ORDER BY a.is_default DESC, a.created_at DESC LIMIT 1)
     ) AS phone,
     count(o.id) FILTER (WHERE o.status <> 'cancelled')::int AS "orderCount",
     max(o.created_at) FILTER (WHERE o.status <> 'cancelled') AS "lastOrder",
-    coalesce(sum(o.total_cents) FILTER (WHERE o.payment_status = 'paid' AND o.status <> 'cancelled'), 0)::bigint AS "totalSpentCents",
+    coalesce(sum(o.total_cents) FILTER (WHERE o.payment_status = 'paid' AND o.status <> 'cancelled' AND o.payment_status <> 'refunded'), 0)::bigint AS "totalSpentCents",
     count(*) OVER (PARTITION BY lower(btrim(u.email)))::int AS "matchingEmailAccounts"
     FROM users u LEFT JOIN orders o ON o.user_id = u.id WHERE u.role = 'customer'
-    GROUP BY u.id ORDER BY u.created_at DESC`);
+    GROUP BY u.id
+), guests AS (
+  SELECT ('guest:' || md5(lower(btrim(o.shipping_address->>'email')))) AS id,
+    coalesce((array_agg(nullif(btrim(o.shipping_address->>'name'), '') ORDER BY o.created_at DESC) FILTER (WHERE nullif(btrim(o.shipping_address->>'name'), '') IS NOT NULL))[1], 'Guest customer') AS name,
+    lower(btrim(o.shipping_address->>'email')) AS email, true AS "isActive",
+    min(o.created_at) AS "createdAt", true AS "isGuest",
+    (array_agg(nullif(btrim(o.shipping_address->>'phone'), '') ORDER BY o.created_at DESC) FILTER (WHERE nullif(btrim(o.shipping_address->>'phone'), '') IS NOT NULL))[1] AS phone,
+    count(*) FILTER (WHERE o.status <> 'cancelled')::int AS "orderCount",
+    max(o.created_at) FILTER (WHERE o.status <> 'cancelled') AS "lastOrder",
+    coalesce(sum(o.total_cents) FILTER (WHERE o.payment_status = 'paid' AND o.status <> 'cancelled'), 0)::bigint AS "totalSpentCents",
+    1::int AS "matchingEmailAccounts"
+  FROM orders o
+  WHERE o.user_id IS NULL AND nullif(btrim(o.shipping_address->>'email'), '') IS NOT NULL
+  GROUP BY lower(btrim(o.shipping_address->>'email'))
+)
+SELECT * FROM registered UNION ALL SELECT * FROM guests`);
     res.json(rows);
   },
 );

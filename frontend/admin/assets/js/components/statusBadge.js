@@ -9,7 +9,7 @@ const MAP = {
   // stock
   in: ['status-success', 'In Stock'], low: ['status-warning', 'Low Stock'], out: ['status-danger', 'Out of Stock'],
   // generic
-  active: ['status-success', 'Active'], disabled: ['status-neutral', 'Disabled'],
+  active: ['status-success', 'Active'], disabled: ['status-neutral', 'Disabled'], guest: ['status-info', 'Guest'],
   published: ['status-success', 'Published'], draft: ['status-neutral', 'Draft'],
   expired: ['status-danger', 'Expired'], scheduled: ['status-info', 'Scheduled'], inactive: ['status-neutral', 'Inactive'],
   connected: ['status-success', 'Connected'], enabled: ['status-success', 'Enabled'], not_connected: ['status-neutral', 'Not Connected'],

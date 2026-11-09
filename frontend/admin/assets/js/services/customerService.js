@@ -11,13 +11,13 @@ export async function fetchAdminCustomers({ query, status, page = 1, perPage = 1
   const rows = await request('/api/admin/customers');
   let items = rows.map((row) => ({
     ...row,
-    status: row.isActive ? 'active' : 'disabled',
+    status: row.isGuest ? 'guest' : (row.isActive ? 'active' : 'disabled'),
     totalSpent: Number(row.totalSpentCents || 0) / 100,
     lastOrder: row.lastOrder || null,
   }));
   if (query) {
     const q = query.toLowerCase();
-    items = items.filter((c) => c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q));
+    items = items.filter((c) => String(c.name || '').toLowerCase().includes(q) || String(c.email || '').toLowerCase().includes(q));
   }
   if (status) items = items.filter((c) => c.status === status);
   if (sort === 'spent-desc') items.sort((a, b) => b.totalSpent - a.totalSpent);

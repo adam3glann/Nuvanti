@@ -5,7 +5,7 @@ import { fetchAdminOrders } from '../services/orderService.js';
 import { startLiveRefresh } from '../services/liveRefresh.js';
 
 const params = new URLSearchParams(location.search);
-const state = { query: params.get('q') || '', status: params.get('status') || '', payment: '', page: 1, perPage: 10, sort: 'newest' };
+const state = { query: params.get('q') || '', status: params.get('status') || '', payment: '', page: 1, perPage: 50, sort: 'newest' };
 
 const session = initAdminShell({ page: 'orders', title: 'Orders' });
 if (session) init();
@@ -18,6 +18,7 @@ function init() {
   document.getElementById('statusFilter').addEventListener('change', (e) => { state.status = e.target.value; state.page = 1; load(); });
   document.getElementById('paymentFilter').addEventListener('change', (e) => { state.payment = e.target.value; state.page = 1; load(); });
   document.getElementById('sortSelect').addEventListener('change', (e) => { state.sort = e.target.value; state.page = 1; load(); });
+  document.getElementById('perPageSelect').addEventListener('change', (e) => { state.perPage = Number(e.target.value); state.page = 1; load(); });
   load();
   startLiveRefresh(() => load(false), 15000);
 }
