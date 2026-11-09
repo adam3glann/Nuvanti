@@ -70,14 +70,19 @@ router.post(
       const order = rows[0];
       if (!order || Number(order.totalCents) !== callbackAmount)
         return { invalid: true };
-      if (order.paymentStatus === "paid" || order.paymentStatus === "refunded")
+      const refunded = obj.is_refunded === true || obj.is_voided === true;
+      // Refund and void callbacks can arrive after the original payment was
+      // marked paid. Process those state changes before treating a paid order
+      // as a duplicate; otherwise the database can continue to report money
+      // as captured after Paymob has returned or voided it.
+      if (order.paymentStatus === "refunded")
+        return { duplicate: true };
+      if (order.paymentStatus === "paid" && !refunded)
         return { duplicate: true };
       const paid =
         obj.success === true &&
         obj.pending === false &&
-        obj.is_voided !== true &&
-        obj.is_refunded !== true;
-      const refunded = obj.is_refunded === true || obj.is_voided === true;
+        !refunded;
       if (paid) {
         if (order.status === "cancelled") {
           await client.query(

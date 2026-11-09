@@ -127,7 +127,8 @@ export function verifyPaymobCallback(obj, receivedHmac) {
   if (
     !secret ||
     !obj ||
-    !receivedHmac ||
+    typeof receivedHmac !== "string" ||
+    !/^[a-f0-9]{128}$/i.test(receivedHmac) ||
     transactionFields(obj).some(
       (value) => value === undefined || value === null,
     )
