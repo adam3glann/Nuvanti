@@ -1,11 +1,11 @@
 import { initAdminShell } from '../components/shell.js';
 import { formatPrice, formatDate, paginationHTML, escapeHtml } from '../components/utils.js';
 import { statusBadge } from '../components/statusBadge.js';
-import { fetchAdminOrders } from '../services/orderService.js';
+import { fetchAdminOrders } from '../services/orderService.js?v=orders-load-race-3';
 import { startLiveRefresh } from '../services/liveRefresh.js';
 
 const params = new URLSearchParams(location.search);
-const state = { query: params.get('q') || '', status: params.get('status') || '', payment: '', page: 1, perPage: 'all', sort: 'newest' };
+const state = { query: params.get('q') || '', status: params.get('status') || '', payment: '', page: 1, perPage: 50, sort: 'newest' };
 
 const session = initAdminShell({ page: 'orders', title: 'Orders' });
 if (session) init();
@@ -13,6 +13,9 @@ if (session) init();
 function init() {
   document.getElementById('searchInput').value = state.query;
   document.getElementById('statusFilter').value = state.status;
+  document.getElementById('paymentFilter').value = state.payment;
+  document.getElementById('sortSelect').value = state.sort;
+  document.getElementById('perPageSelect').value = String(state.perPage);
 
   document.getElementById('searchInput').addEventListener('input', debounce((e) => { state.query = e.target.value; state.page = 1; load(); }, 250));
   document.getElementById('statusFilter').addEventListener('change', (e) => { state.status = e.target.value; state.page = 1; load(); });
@@ -20,6 +23,7 @@ function init() {
   document.getElementById('sortSelect').addEventListener('change', (e) => { state.sort = e.target.value; state.page = 1; load(); });
   document.getElementById('perPageSelect').addEventListener('change', (e) => { state.perPage = e.target.value === 'all' ? 'all' : Number(e.target.value); state.page = 1; load(); });
   load().finally(() => startLiveRefresh(() => load(false, true), 30000));
+  window.addEventListener('pageshow', (event) => { if (event.persisted) load(); });
 }
 
 let loadRequestId = 0;

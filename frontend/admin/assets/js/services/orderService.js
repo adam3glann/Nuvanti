@@ -1,7 +1,17 @@
 import { API_ORIGIN as API } from '../config.js';
 
 async function requestOrders(path = '') {
-  const response = await fetch(`${API}/api/admin/orders${path}`, { credentials: 'include' });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
+  let response;
+  try {
+    response = await fetch(`${API}/api/admin/orders${path}`, { credentials: 'include', signal: controller.signal });
+  } catch (error) {
+    if (error.name === 'AbortError') throw new Error('Loading orders took too long. Please try again.');
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body.error || 'Unable to load orders.');
   return body;

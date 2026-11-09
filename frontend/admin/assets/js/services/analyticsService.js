@@ -4,16 +4,24 @@ const cache = new Map();
 
 async function load(range) {
   if (!cache.has(range)) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000);
     cache.set(range, fetch(`${API_ORIGIN}/api/admin/analytics?range=${encodeURIComponent(range)}`, {
       credentials: 'include',
       cache: 'no-store',
+      signal: controller.signal,
     }).then(async (response) => {
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || 'Unable to load analytics.');
       return body;
     }).catch((error) => {
+      if (error.name === 'AbortError') throw new Error('Loading analytics took too long. Please try again.');
+      throw error;
+    }).catch((error) => {
       cache.delete(range);
       throw error;
+    }).finally(() => {
+      clearTimeout(timeout);
     }));
   }
   return cache.get(range);

@@ -1,22 +1,35 @@
 import { initAdminShell } from '../components/shell.js';
 import { formatPrice, escapeHtml } from '../components/utils.js';
 import { lineChart, barChart } from '../components/charts.js';
-import { fetchRevenueSeries, fetchTopProducts, fetchTopCategories, fetchPendingOrders, summarize } from '../services/analyticsService.js';
-import { clearAnalyticsCache } from '../services/analyticsService.js';
+import { fetchRevenueSeries, fetchTopProducts, fetchTopCategories, fetchPendingOrders, summarize, clearAnalyticsCache } from '../services/analyticsService.js?v=analytics-first-load-1';
 import { startLiveRefresh } from '../services/liveRefresh.js';
 
 const session = initAdminShell({ page: 'analytics', title: 'Analytics' });
 if (session) init();
 
 let activeRender = 0;
+let activeRenderCount = 0;
 function init() {
-  document.getElementById('rangeSelect').addEventListener('change', (e) => render(e.target.value));
-  render('30d');
-  startLiveRefresh(() => { clearAnalyticsCache(); return render(document.getElementById('rangeSelect').value); }, 15000);
+  const rangeSelect = document.getElementById('rangeSelect');
+  const validRanges = new Set(['7d', '30d', '90d', '1y']);
+  if (!validRanges.has(rangeSelect.value)) rangeSelect.value = '30d';
+  rangeSelect.addEventListener('change', (e) => render(validRanges.has(e.target.value) ? e.target.value : '30d'));
+  render(rangeSelect.value).finally(() => {
+    startLiveRefresh(() => {
+      if (activeRenderCount) return;
+      clearAnalyticsCache();
+      return render(rangeSelect.value, true);
+    }, 30000);
+  });
 }
 
-async function render(range) {
+async function render(range, background = false) {
+  if (background && activeRenderCount) return;
   const requestId = ++activeRender;
+  activeRenderCount += 1;
+  if (!document.querySelector('#statGrid .stat-card')) {
+    document.getElementById('statGrid').innerHTML = '<div class="admin-empty" role="status">Loading analytics…</div>';
+  }
   try {
   const series = await fetchRevenueSeries(range);
   if (requestId !== activeRender) return;
@@ -50,5 +63,7 @@ async function render(range) {
     document.getElementById('ordersChart').innerHTML = '';
     document.getElementById('topProductsBody').innerHTML = '';
     document.getElementById('categoryChart').innerHTML = '';
+  } finally {
+    activeRenderCount -= 1;
   }
 }

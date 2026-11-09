@@ -8,7 +8,14 @@ async function request(path, options = {}) {
 }
 
 export async function fetchAdminCustomers({ query, status, page = 1, perPage = 10, sort = 'recent' } = {}) {
-  const rows = await request('/api/admin/customers');
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
+  let rows;
+  try { rows = await request('/api/admin/customers', { signal: controller.signal }); }
+  catch (error) {
+    if (error.name === 'AbortError') throw new Error('Loading customers took too long. Please try again.');
+    throw error;
+  } finally { clearTimeout(timeout); }
   let items = rows.map((row) => ({
     ...row,
     status: row.isGuest ? 'guest' : (row.isActive ? 'active' : 'disabled'),
