@@ -24,7 +24,7 @@ export async function fetchAdminCustomers({ query, status, page = 1, perPage = 1
   if (sort === 'orders-desc') items.sort((a, b) => b.orderCount - a.orderCount);
   if (sort === 'recent') items.sort((a, b) => new Date(b.lastOrder || b.createdAt) - new Date(a.lastOrder || a.createdAt));
   const total = items.length;
-  return { items: items.slice((page - 1) * perPage, page * perPage), total, page, perPage };
+  return { items: perPage === 'all' ? items : items.slice((page - 1) * perPage, page * perPage), total, page, perPage };
 }
 
 export async function fetchAdminCustomer(id) {

@@ -1234,7 +1234,8 @@ router.get(
     const paginated = ["page", "perPage", "search", "status", "payment", "sort"].some((key) => req.query[key] !== undefined);
     if (paginated) {
       const page = z.coerce.number().int().min(1).max(1000000).default(1).parse(req.query.page);
-      const perPage = z.coerce.number().int().min(1).max(100).default(10).parse(req.query.perPage);
+      const allRows = req.query.perPage === "all";
+      const perPage = allRows ? null : z.coerce.number().int().min(1).max(100).default(10).parse(req.query.perPage);
       const search = z.string().trim().max(100).default("").parse(req.query.search || "");
       const status = z.enum(["pending", "paid", "processing", "shipped", "out_for_delivery", "fulfilled", "cancelled"]).or(z.literal("")).default("").parse(req.query.status || "");
       const payment = z.enum(["pending", "paid", "failed", "refunded"]).or(z.literal("")).default("").parse(req.query.payment || "");
@@ -1242,13 +1243,16 @@ router.get(
       const escapedSearch = search.replace(/[\\%_]/g, (character) => `\\${character}`);
       const conditions = `($1 = '' OR o.id::text ILIKE '%' || $1 || '%' ESCAPE '\\' OR coalesce(u.name, o.shipping_address->>'name', '') ILIKE '%' || $1 || '%' ESCAPE '\\' OR coalesce(u.email, o.shipping_address->>'email', '') ILIKE '%' || $1 || '%' ESCAPE '\\') AND ($2 = '' OR o.status = $2) AND ($3 = '' OR coalesce(o.payment_status, CASE WHEN o.status IN ('paid','fulfilled') THEN 'paid' ELSE 'pending' END) = $3)`;
       const orderBy = { newest: "o.created_at DESC", oldest: "o.created_at ASC", "total-desc": "o.total_cents DESC", "total-asc": "o.total_cents ASC" }[sort];
+      const listSql = `SELECT o.id, o.status, o.payment_status AS "paymentStatus", o.payment_transaction_id AS "paymentTransactionId", o.total_cents AS "totalCents", o.subtotal_cents AS "subtotalCents", o.shipping_cents AS "shippingCents", o.delivery, o.payment_method AS "paymentMethod", o.created_at AS "createdAt", o.shipping_address AS "shippingAddress", coalesce(u.email, o.shipping_address->>'email') AS email, coalesce(u.name, o.shipping_address->>'name') AS name,
+          coalesce(json_agg(json_build_object('productId', i.product_id, 'name', i.product_name, 'price', i.unit_price_cents::numeric / 100, 'quantity', i.quantity, 'color', i.color, 'size', i.size, 'image', i.image_url)) FILTER (WHERE i.id IS NOT NULL), '[]') AS items
+          FROM orders o LEFT JOIN users u ON u.id = o.user_id LEFT JOIN order_items i ON i.order_id = o.id WHERE ${conditions} GROUP BY o.id, u.email, u.name ORDER BY ${orderBy}, o.id DESC`;
       const [{ rows: countRows }, { rows }] = await Promise.all([
         query(`SELECT count(*)::int AS total FROM orders o LEFT JOIN users u ON u.id = o.user_id WHERE ${conditions}`, [escapedSearch, status, payment]),
-        query(`SELECT o.id, o.status, o.payment_status AS "paymentStatus", o.payment_transaction_id AS "paymentTransactionId", o.total_cents AS "totalCents", o.subtotal_cents AS "subtotalCents", o.shipping_cents AS "shippingCents", o.delivery, o.payment_method AS "paymentMethod", o.created_at AS "createdAt", o.shipping_address AS "shippingAddress", coalesce(u.email, o.shipping_address->>'email') AS email, coalesce(u.name, o.shipping_address->>'name') AS name,
-          coalesce(json_agg(json_build_object('productId', i.product_id, 'name', i.product_name, 'price', i.unit_price_cents::numeric / 100, 'quantity', i.quantity, 'color', i.color, 'size', i.size, 'image', i.image_url)) FILTER (WHERE i.id IS NOT NULL), '[]') AS items
-          FROM orders o LEFT JOIN users u ON u.id = o.user_id LEFT JOIN order_items i ON i.order_id = o.id WHERE ${conditions} GROUP BY o.id, u.email, u.name ORDER BY ${orderBy}, o.id DESC LIMIT $4 OFFSET $5`, [escapedSearch, status, payment, perPage, (page - 1) * perPage]),
+        allRows
+          ? query(listSql, [escapedSearch, status, payment])
+          : query(`${listSql} LIMIT $4 OFFSET $5`, [escapedSearch, status, payment, perPage, (page - 1) * perPage]),
       ]);
-      return res.json({ items: rows.map(mapAdminOrder), total: countRows[0].total, page, perPage });
+      return res.json({ items: rows.map(mapAdminOrder), total: countRows[0].total, page, perPage: allRows ? countRows[0].total : perPage });
     }
     const limit =
       req.query.limit === undefined
