@@ -62,6 +62,8 @@ SENDGRID_API_KEY=your-sendgrid-mail-send-api-key
 MAIL_FROM="Nuvanti <your-verified-sender@gmail.com>"
 ```
 
+For Render, add `SENDGRID_API_KEY` as a secret environment variable alongside `MAIL_FROM` in the service settings, then redeploy. The Render blueprint declares this variable so it can be configured there. The app submits each transactional email directly to SendGrid or Resend when the corresponding API key is configured; SMTP relay queues can delay delivery. A provider's acceptance response means the message was handed off, while final inbox arrival also depends on provider processing and the recipient's mail service.
+
 Alternatively, Resend requires a verified domain. Gmail SMTP works only where the host permits outbound SMTP; enable two-step verification and create a Google **App Password**, never use the normal Gmail password. Keep API keys and app passwords private and never commit them:
 
 ```env
