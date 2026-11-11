@@ -1,6 +1,8 @@
 import { API_ORIGIN } from '../config.js';
 
 const cache = new Map();
+let financialSummary;
+let financialSummaryPromise;
 
 async function load(range) {
   if (!cache.has(range)) {
@@ -31,17 +33,41 @@ async function load(range) {
   return cache.get(range);
 }
 
-export function clearAnalyticsCache() { cache.clear(); }
+export function clearAnalyticsCache() {
+  cache.clear();
+  financialSummary = undefined;
+  financialSummaryPromise = undefined;
+}
 
 export async function fetchRevenueSeries(range = '30d') { return (await load(range)).series; }
 export async function fetchTopProducts(range = '30d') { return (await load(range)).topProducts; }
 export async function fetchTopCategories(range = '30d') { return (await load(range)).topCategories; }
 export async function fetchPendingOrders(range = '30d') { return (await load(range)).pendingOrders; }
-export async function fetchFinancialSummary() {
-  const response = await fetch(`${API_ORIGIN}/api/admin/financial-summary`, { credentials: 'include' });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.error || 'Unable to load financial summary.');
-  return body;
+export function fetchFinancialSummary() {
+  if (financialSummary) return Promise.resolve(financialSummary);
+  if (!financialSummaryPromise) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000);
+    financialSummaryPromise = fetch(`${API_ORIGIN}/api/admin/financial-summary`, {
+      credentials: 'include', cache: 'no-store', signal: controller.signal,
+    }).then(async (response) => {
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const error = new Error(body.error || 'Unable to load financial summary.');
+        error.status = response.status;
+        throw error;
+      }
+      financialSummary = body;
+      return body;
+    }).catch((error) => {
+      if (error.name === 'AbortError') throw new Error('Loading the financial overview took too long. Please try again.');
+      throw error;
+    }).catch((error) => {
+      financialSummaryPromise = undefined;
+      throw error;
+    }).finally(() => clearTimeout(timeout));
+  }
+  return financialSummaryPromise;
 }
 export function summarize(series) {
   const revenueCents = series.reduce((sum, day) => sum + Math.round(Number(day.revenue || 0) * 100), 0);

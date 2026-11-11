@@ -1,7 +1,7 @@
 import { initAdminShell } from '../components/shell.js';
 import { formatPrice, escapeHtml } from '../components/utils.js';
 import { lineChart, barChart } from '../components/charts.js';
-import { fetchRevenueSeries, fetchTopProducts, fetchTopCategories, fetchPendingOrders, summarize, clearAnalyticsCache } from '../services/analyticsService.js?v=analytics-first-load-1';
+import { fetchRevenueSeries, fetchTopProducts, fetchTopCategories, fetchPendingOrders, fetchFinancialSummary, summarize, clearAnalyticsCache } from '../services/analyticsService.js?v=owner-finance-overview-1';
 import { startLiveRefresh } from '../services/liveRefresh.js';
 
 const session = initAdminShell({ page: 'analytics', title: 'Analytics' });
@@ -31,10 +31,13 @@ async function render(range, background = false) {
   if (background && activeRenderCount) return;
   const requestId = ++activeRender;
   activeRenderCount += 1;
-  ['statGrid', 'revenueChart', 'ordersChart', 'topProductsBody', 'categoryChart'].forEach((id) => {
+  ['statGrid', 'financeGrid', 'revenueChart', 'ordersChart', 'topProductsBody', 'categoryChart'].forEach((id) => {
     document.getElementById(id)?.setAttribute('aria-busy', 'true');
   });
   try {
+  fetchFinancialSummary()
+    .then((finance) => { if (requestId === activeRender) renderFinancialOverview(finance); })
+    .catch((error) => { if (requestId === activeRender) renderFinancialUnavailable(error); });
   const series = await fetchRevenueSeries(range);
   if (requestId !== activeRender) return;
   const summary = summarize(series);
@@ -91,4 +94,42 @@ async function render(range, background = false) {
   } finally {
     activeRenderCount -= 1;
   }
+}
+
+function renderFinancialOverview(finance) {
+  const cards = [
+    ['Net sales to date', formatPrice(finance.revenue)],
+    ['Gross profit on costed sales', finance.grossProfit == null ? 'Incomplete cost data' : formatPrice(finance.grossProfit)],
+    ['Current stock cost (known)', formatPrice(finance.inventoryCostValue)],
+    ['Current stock sale value', formatPrice(finance.inventoryRetailValue)],
+    ['Expected profit on current stock', finance.expectedInventoryProfit == null ? 'Add missing costs' : formatPrice(finance.expectedInventoryProfit)],
+    ['Profit + stock investment (pre-expenses)', finance.combinedOwnerValue == null ? 'Incomplete cost data' : formatPrice(finance.combinedOwnerValue)],
+  ];
+  document.getElementById('financeGrid').innerHTML = cards.map(([label, value]) => `
+    <div class="stat-card"><p class="stat-card__label">${escapeHtml(label)}</p><p class="stat-card__value">${escapeHtml(value)}</p></div>
+  `).join('');
+  document.getElementById('financeGrid').setAttribute('aria-busy', 'false');
+
+  const notes = [];
+  if (Number(finance.uncostedStockUnits) > 0) {
+    notes.push(`${Number(finance.uncostedStockUnits)} stocked unit(s) across ${Number(finance.uncostedStockProducts)} product(s) need a cost price.`);
+  }
+  if (Number(finance.uncostedLines) > 0) {
+    notes.push(`${Number(finance.uncostedLines)} sold order line(s) have no saved cost price.`);
+  }
+  notes.unshift(`Current stock on hand: ${Number(finance.inventoryUnits).toLocaleString('en-US')} unit(s).`);
+  notes.push('Expected stock profit uses current selling prices. Combined value is gross profit on fully costed sales plus stock cost; it excludes rent, wages, fees, taxes, and withdrawals.');
+  document.getElementById('financeNote').textContent = notes.join(' ');
+}
+
+function renderFinancialUnavailable(error) {
+  document.getElementById('financeGrid').innerHTML = `
+    <div class="admin-empty" style="grid-column:1/-1"><h3>Financial overview unavailable</h3><p>${escapeHtml(error?.message || 'Please try again.')}</p><button class="btn btn-outline" id="retryFinance">Try Again</button></div>
+  `;
+  document.getElementById('financeGrid').setAttribute('aria-busy', 'false');
+  document.getElementById('financeNote').textContent = 'The sales and stock charts are still available; the owner finance totals could not be loaded.';
+  document.getElementById('retryFinance')?.addEventListener('click', () => {
+    clearAnalyticsCache();
+    fetchFinancialSummary().then(renderFinancialOverview).catch(renderFinancialUnavailable);
+  });
 }

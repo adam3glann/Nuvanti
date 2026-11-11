@@ -702,26 +702,14 @@
   box-shadow: 0 0 0 4px var(--color-accent-tint);
 }
 .product-card__quick {
-  position: absolute;
-  left: var(--space-3);
-  right: var(--space-3);
-  bottom: var(--space-3);
-  z-index: 3;
-  opacity: 0;
-  transform: translateY(8px);
-  transition:
-    opacity var(--dur-fast) var(--ease-editorial),
-    transform var(--dur-fast) var(--ease-editorial);
+  position: static;
   display: flex;
   gap: var(--space-2);
-}
-.product-card:hover .product-card__quick,
-.product-card:focus-within .product-card__quick {
-  opacity: 1;
-  transform: translateY(0);
+  margin-top: var(--space-3);
 }
 .product-card__quick .btn {
   flex: 1;
+  min-height: 42px;
   background: var(--color-surface-raised);
   color: var(--color-ink);
   box-shadow: 0 6px 16px var(--shadow-color);
@@ -2321,20 +2309,6 @@
    product.
    ========================================================= */
 @media (hover: none), (pointer: coarse) {
-  /* Keep quick add in the card's normal flow on touch screens. An overlay
-     pinned to the image can be covered by the finger while scrolling and
-     can remain stuck in its hover state after a tap. */
-  .product-card__quick {
-    position: static;
-    inset: auto;
-    z-index: auto;
-    opacity: 1;
-    transform: none;
-    margin-top: var(--space-3);
-  }
-  .product-card__quick .btn {
-    min-height: 42px;
-  }
   .product-card:hover .product-card__media {
     box-shadow: none;
     transform: none;

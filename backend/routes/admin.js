@@ -1182,7 +1182,7 @@ router.get(
     JOIN order_items i ON i.order_id = o.id
     WHERE (o.status = 'fulfilled' OR (o.payment_status = 'paid' AND o.status <> 'cancelled')) AND o.payment_status <> 'refunded'
     GROUP BY o.id
-  )
+  ), financial_totals AS (
   SELECT coalesce(sum(net_revenue_cents), 0)::bigint AS "revenueCents",
     coalesce(sum(net_revenue_cents) FILTER (WHERE line_count = costed_line_count), 0)::bigint AS "costedRevenueCents",
     coalesce(sum(cost_cents) FILTER (WHERE line_count = costed_line_count), 0)::bigint AS "costCents",
@@ -1196,7 +1196,36 @@ router.get(
       WHERE (o.status = 'fulfilled' OR (o.payment_status = 'paid' AND o.status <> 'cancelled')) AND o.payment_status <> 'refunded' AND i.unit_cost_cents IS NULL) AS "uncostedLines",
     coalesce((SELECT sum(i.quantity)::bigint FROM order_items i JOIN orders o ON o.id = i.order_id
       WHERE (o.status = 'fulfilled' OR (o.payment_status = 'paid' AND o.status <> 'cancelled')) AND o.payment_status <> 'refunded'), 0)::bigint AS "unitsSold"
-  FROM completed_orders`);
+  FROM completed_orders
+  ), stock_products AS (
+    SELECT p.id, p.price_cents,
+      CASE WHEN p.metadata->>'costCents' ~ '^[0-9]+$'
+        THEN (p.metadata->>'costCents')::bigint ELSE NULL END AS unit_cost_cents,
+      CASE
+        WHEN p.metadata->'inventoryByVariant' IS NOT NULL AND p.metadata->'inventoryByVariant' <> '{}'::jsonb
+          THEN p.metadata->'inventoryByVariant'
+        WHEN p.metadata->'inventory' IS NOT NULL AND p.metadata->'inventory' <> '{}'::jsonb
+          THEN p.metadata->'inventory'
+        ELSE jsonb_build_object('One Size', p.inventory)
+      END AS stock_by_variant
+    FROM products p
+  ), stock_totals AS (
+    SELECT p.id, p.price_cents, p.unit_cost_cents,
+      coalesce(sum(CASE WHEN kv.value #>> '{}' ~ '^-?[0-9]+$'
+        THEN greatest((kv.value #>> '{}')::bigint, 0) ELSE 0 END), 0)::bigint AS units
+    FROM stock_products p
+    CROSS JOIN LATERAL jsonb_each(p.stock_by_variant) kv
+    GROUP BY p.id, p.price_cents, p.unit_cost_cents
+  ), inventory_totals AS (
+    SELECT coalesce(sum(units), 0)::bigint AS "inventoryUnits",
+      coalesce(sum(units * price_cents), 0)::bigint AS "inventoryRetailCents",
+      coalesce(sum(units * unit_cost_cents) FILTER (WHERE unit_cost_cents IS NOT NULL), 0)::bigint AS "inventoryCostCents",
+      coalesce(sum(units) FILTER (WHERE unit_cost_cents IS NULL), 0)::bigint AS "uncostedStockUnits",
+      count(*) FILTER (WHERE units > 0 AND unit_cost_cents IS NULL)::int AS "uncostedStockProducts"
+    FROM stock_totals
+  )
+  SELECT financial_totals.*, inventory_totals.*
+  FROM financial_totals CROSS JOIN inventory_totals`);
     const row = rows[0];
     const costedRevenueCents = Number(row.costedRevenueCents);
     const grossProfitCents = costedRevenueCents - Number(row.costCents);
@@ -1206,7 +1235,9 @@ router.get(
       costOfGoods: Number(row.costCents) / 100,
       pendingOrderValue: Number(row.pendingOrderValueCents) / 100,
       pendingOrderCount: row.pendingOrderCount,
-      grossProfit: Number(row.costedOrders) ? grossProfitCents / 100 : null,
+      grossProfit: Number(row.costedOrders)
+        ? grossProfitCents / 100
+        : Number(row.completedOrders) === 0 ? 0 : null,
       grossMargin:
         costedRevenueCents > 0
           ? (grossProfitCents / costedRevenueCents) * 100
@@ -1215,6 +1246,19 @@ router.get(
       unitsSold: Number(row.unitsSold),
       costedOrders: row.costedOrders,
       uncostedLines: row.uncostedLines,
+      inventoryUnits: Number(row.inventoryUnits),
+      inventoryRetailValue: Number(row.inventoryRetailCents) / 100,
+      inventoryCostValue: Number(row.inventoryCostCents) / 100,
+      uncostedStockUnits: Number(row.uncostedStockUnits),
+      uncostedStockProducts: row.uncostedStockProducts,
+      expectedInventoryProfit: Number(row.uncostedStockUnits) === 0
+        ? (Number(row.inventoryRetailCents) - Number(row.inventoryCostCents)) / 100
+        : null,
+      combinedOwnerValue: Number(row.uncostedStockUnits) === 0
+          && Number(row.costedOrders) === Number(row.completedOrders)
+          && Number(row.uncostedLines) === 0
+        ? (grossProfitCents + Number(row.inventoryCostCents)) / 100
+        : null,
     });
   }),
 );
