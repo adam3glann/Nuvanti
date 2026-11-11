@@ -92,33 +92,49 @@ const checkout = z.object({
     )
     .min(1)
     .max(30),
-  shipping: z.object({
-    name: z.string().min(2).max(100),
-    email: z
-      .string()
-      .trim()
-      .email()
-      .max(254)
-      .transform((value) => value.toLowerCase())
-      .optional(),
-    phone: z.string().max(30).optional(),
-    address1: z.string().trim().min(3).max(150),
-    propertyType: z.enum(["office", "villa", "apartment"]),
-    buildingNumber: z.string().trim().min(1).max(30),
-    floor: z.string().trim().max(20).optional().default(""),
-    apartmentNumber: z.string().trim().max(30).optional().default(""),
-    city: z.string().trim().min(2).max(100),
-    locationId: z.string().min(1).max(60),
-    country: z.literal("Egypt"),
-    postalCode: z.string().trim().min(1).max(20),
-  }).superRefine((address, context) => {
-    if (["office", "apartment"].includes(address.propertyType) && !address.floor.trim()) {
-      context.addIssue({ code: z.ZodIssueCode.custom, path: ["floor"], message: "Enter the floor for this delivery address." });
-    }
-    if (["office", "apartment"].includes(address.propertyType) && !address.apartmentNumber.trim()) {
-      context.addIssue({ code: z.ZodIssueCode.custom, path: ["apartmentNumber"], message: "Enter the apartment or office number." });
-    }
-  }),
+  shipping: z
+    .object({
+      name: z.string().min(2).max(100),
+      email: z
+        .string()
+        .trim()
+        .email()
+        .max(254)
+        .transform((value) => value.toLowerCase())
+        .optional(),
+      phone: z.string().max(30).optional(),
+      address1: z.string().trim().min(3).max(150),
+      propertyType: z.enum(["office", "villa", "apartment"]),
+      buildingNumber: z.string().trim().min(1).max(30),
+      floor: z.string().trim().max(20).optional().default(""),
+      apartmentNumber: z.string().trim().max(30).optional().default(""),
+      city: z.string().trim().min(2).max(100),
+      locationId: z.string().min(1).max(60),
+      country: z.literal("Egypt"),
+      postalCode: z.string().trim().min(1).max(20),
+    })
+    .superRefine((address, context) => {
+      if (
+        ["office", "apartment"].includes(address.propertyType) &&
+        !address.floor.trim()
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["floor"],
+          message: "Enter the floor for this delivery address.",
+        });
+      }
+      if (
+        ["office", "apartment"].includes(address.propertyType) &&
+        !address.apartmentNumber.trim()
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["apartmentNumber"],
+          message: "Enter the apartment or office number.",
+        });
+      }
+    }),
   delivery: z.enum(["standard", "express"]),
   paymentMethod: z.enum(["cod", "paymob", "instapay"]).default("cod"),
   discountCode: z.string().max(40).optional(),
@@ -207,7 +223,10 @@ router.post(
     }
     const discountCents =
       discount.type === "percent"
-        ? Math.min(subtotalCents, Math.round(subtotalCents * (discount.value / 100)))
+        ? Math.min(
+            subtotalCents,
+            Math.round(subtotalCents * (discount.value / 100)),
+          )
         : Math.min(discount.value * 100, subtotalCents);
     res.json({
       code: discount.code,
@@ -447,7 +466,10 @@ router.post(
           }
           discountCents =
             discount.type === "percent"
-              ? Math.min(subtotal, Math.round(subtotal * (discount.value / 100)))
+              ? Math.min(
+                  subtotal,
+                  Math.round(subtotal * (discount.value / 100)),
+                )
               : Math.min(discount.value * 100, subtotal);
           appliedCode = discount.code;
           await client.query(
@@ -541,7 +563,8 @@ router.post(
             name: map.get(item.productId).name,
             priceCents: map.get(item.productId).price_cents,
             quantity: item.quantity,
-            color: item.color || map.get(item.productId).colors?.[0] || "Default",
+            color:
+              item.color || map.get(item.productId).colors?.[0] || "Default",
             size: item.size || "",
             image: selectedCatalogImage(map.get(item.productId), item.image),
           })),
@@ -600,12 +623,13 @@ router.post(
           );
         }
         return res.status(502).json({
-          code: registeredUser ? "ACCOUNT_CREATED_PAYMENT_FAILED" : "PAYMENT_SETUP_FAILED",
+          code: registeredUser
+            ? "ACCOUNT_CREATED_PAYMENT_FAILED"
+            : "PAYMENT_SETUP_FAILED",
           accountCreated: Boolean(registeredUser),
-          error:
-            registeredUser
-              ? "Online payment could not start, so the order was cancelled. Your account was created and we sent an email verification link. Verify your email, then sign in to place the order again."
-              : "Online payment could not start. Your order was not placed; please try again or choose Cash on Delivery.",
+          error: registeredUser
+            ? "Online payment could not start, so the order was cancelled. Your account was created and we sent an email verification link. Verify your email, then sign in to place the order again."
+            : "Online payment could not start. Your order was not placed; please try again or choose Cash on Delivery.",
         });
       }
     }
