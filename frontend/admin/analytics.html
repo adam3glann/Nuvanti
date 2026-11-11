@@ -47,15 +47,20 @@
             </select>
           </div>
 
-          <div class="stat-grid" id="statGrid"></div>
+          <div class="stat-grid" id="statGrid" aria-live="polite" aria-busy="true">
+            <div class="stat-card" aria-hidden="true"><div class="a-skeleton" style="height:12px;width:46%"></div><div class="a-skeleton" style="height:28px;width:72%;margin-top:.8rem"></div></div>
+            <div class="stat-card" aria-hidden="true"><div class="a-skeleton" style="height:12px;width:46%"></div><div class="a-skeleton" style="height:28px;width:58%;margin-top:.8rem"></div></div>
+            <div class="stat-card" aria-hidden="true"><div class="a-skeleton" style="height:12px;width:58%"></div><div class="a-skeleton" style="height:28px;width:68%;margin-top:.8rem"></div></div>
+            <div class="stat-card" aria-hidden="true"><div class="a-skeleton" style="height:12px;width:52%"></div><div class="a-skeleton" style="height:28px;width:42%;margin-top:.8rem"></div></div>
+          </div>
 
           <div class="card" style="margin-bottom: 1.25rem">
             <div class="card-head"><h2>Paid Product Sales</h2></div>
-            <div class="card-pad" id="revenueChart"></div>
+            <div class="card-pad" id="revenueChart" aria-hidden="true" aria-busy="true"><div class="a-skeleton" style="height:220px;width:100%"></div></div>
           </div>
           <div class="card" style="margin-bottom: 1.25rem">
             <div class="card-head"><h2>Orders</h2></div>
-            <div class="card-pad" id="ordersChart"></div>
+            <div class="card-pad" id="ordersChart" aria-hidden="true" aria-busy="true"><div class="a-skeleton" style="height:180px;width:100%"></div></div>
           </div>
 
           <div
@@ -73,7 +78,12 @@
                       <th>Net Product Sales</th>
                     </tr>
                   </thead>
-                  <tbody id="topProductsBody"></tbody>
+                  <tbody id="topProductsBody" aria-hidden="true" aria-busy="true">
+                    <tr><td colspan="3"><div class="a-skeleton" style="height:14px;width:92%"></div></td></tr>
+                    <tr><td colspan="3"><div class="a-skeleton" style="height:14px;width:82%"></div></td></tr>
+                    <tr><td colspan="3"><div class="a-skeleton" style="height:14px;width:88%"></div></td></tr>
+                    <tr><td colspan="3"><div class="a-skeleton" style="height:14px;width:72%"></div></td></tr>
+                  </tbody>
                 </table>
               </div>
             </div>
@@ -81,7 +91,7 @@
               <div class="card-head">
                 <h2>Net Product Sales by Category</h2>
               </div>
-              <div class="card-pad" id="categoryChart"></div>
+              <div class="card-pad" id="categoryChart" aria-hidden="true" aria-busy="true"><div class="a-skeleton" style="height:220px;width:100%"></div></div>
             </div>
           </div>
         </div>
@@ -94,6 +104,6 @@
         }
       }
     </style>
-    <script type="module" src="assets/js/pages/analytics.js?v=analytics-first-load-1"></script>
+    <script type="module" src="assets/js/pages/analytics.js?v=analytics-autoload-skeleton-2"></script>
   </body>
 </html>

@@ -13,7 +13,11 @@ async function requestOrders(path = '') {
     clearTimeout(timeout);
   }
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.error || 'Unable to load orders.');
+  if (!response.ok) {
+    const error = new Error(body.error || 'Unable to load orders.');
+    error.status = response.status;
+    throw error;
+  }
   return body;
 }
 
@@ -32,7 +36,32 @@ export async function fetchRecentAdminOrders(limit = 6) {
 
 export async function fetchAdminOrders({ query = '', status = '', payment = '', page = 1, perPage = 10, sort = 'newest' } = {}) {
   const params = new URLSearchParams({ search: query, status, payment, page: String(page), perPage: String(perPage), sort });
-  return requestOrders(`?${params}`);
+  const result = await requestOrders(`?${params}`);
+  if (!Array.isArray(result)) {
+    if (!Array.isArray(result?.items)) throw new Error('The orders service returned an invalid response. Please retry.');
+    return result;
+  }
+
+  // Keep the UI usable during a rolling deploy where the API instance may
+  // still serve the previous unpaginated response shape.
+  const needle = String(query).trim().toLowerCase();
+  let items = result.filter((order) => {
+    const matchesSearch = !needle || [order.id, order.customer?.name, order.customer?.email]
+      .some((value) => String(value || '').toLowerCase().includes(needle));
+    const matchesStatus = !status || order.status === status;
+    const matchesPayment = !payment || order.paymentStatus === payment;
+    return matchesSearch && matchesStatus && matchesPayment;
+  });
+  const sorters = {
+    newest: (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+    oldest: (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
+    'total-desc': (a, b) => b.total - a.total,
+    'total-asc': (a, b) => a.total - b.total,
+  };
+  items.sort(sorters[sort] || sorters.newest);
+  const total = items.length;
+  if (perPage !== 'all') items = items.slice((page - 1) * perPage, page * perPage);
+  return { items, total, page, perPage };
 }
 
 export async function fetchAdminOrder(id) {

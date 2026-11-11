@@ -1,7 +1,7 @@
 import { initAdminShell } from '../components/shell.js';
 import { formatPrice, formatDate, paginationHTML, escapeHtml } from '../components/utils.js';
 import { statusBadge } from '../components/statusBadge.js';
-import { fetchAdminOrders } from '../services/orderService.js?v=orders-load-race-3';
+import { fetchAdminOrders } from '../services/orderService.js?v=orders-autoload-skeleton-4';
 import { startLiveRefresh } from '../services/liveRefresh.js';
 
 const params = new URLSearchParams(location.search);
@@ -22,30 +22,44 @@ function init() {
   document.getElementById('paymentFilter').addEventListener('change', (e) => { state.payment = e.target.value; state.page = 1; load(); });
   document.getElementById('sortSelect').addEventListener('change', (e) => { state.sort = e.target.value; state.page = 1; load(); });
   document.getElementById('perPageSelect').addEventListener('change', (e) => { state.perPage = e.target.value === 'all' ? 'all' : Number(e.target.value); state.page = 1; load(); });
-  load().finally(() => startLiveRefresh(() => load(false, true), 30000));
+  requestAnimationFrame(() => {
+    load().finally(() => startLiveRefresh(() => load(false, true), 30000));
+  });
   window.addEventListener('pageshow', (event) => { if (event.persisted) load(); });
 }
 
 let loadRequestId = 0;
 let activeLoadCount = 0;
+let initialLoadComplete = false;
+let initialRetryCount = 0;
 async function load(showLoading = true, background = false) {
   if (background && activeLoadCount > 0) return;
   const requestId = ++loadRequestId;
   const tbody = document.getElementById('ordersBody');
-  if (showLoading) tbody.innerHTML = `<tr><td colspan="7"><div class="a-skeleton" style="height:36px"></div></td></tr>`;
+  tbody.setAttribute('aria-busy', 'true');
+  if (showLoading) tbody.innerHTML = tableSkeleton(7, 6);
   let items, total;
   activeLoadCount += 1;
   try {
     ({ items, total } = await fetchAdminOrders(state));
   } catch (error) {
     if (requestId !== loadRequestId) return;
+    const retryable = !error.status || error.status === 408 || error.status === 429 || error.status >= 500;
+    if (!initialLoadComplete && retryable && initialRetryCount < 2) {
+      const delay = 600 * (2 ** initialRetryCount++);
+      window.setTimeout(() => load(), delay);
+      return;
+    }
     tbody.innerHTML = `<tr><td colspan="7"><div class="admin-empty"><h3>Couldn't load orders</h3><p>${escapeHtml(error.message)}</p><button class="btn btn-outline" id="retryOrders">Try Again</button></div></td></tr>`;
+    tbody.setAttribute('aria-busy', 'false');
     document.getElementById('retryOrders')?.addEventListener('click', () => load());
     return;
   } finally {
     activeLoadCount -= 1;
   }
   if (requestId !== loadRequestId) return;
+  initialLoadComplete = true;
+  tbody.setAttribute('aria-busy', 'false');
 
   tbody.innerHTML = items.length ? items.map((o) => `
     <tr>
@@ -64,3 +78,9 @@ async function load(showLoading = true, background = false) {
 }
 
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
+
+function tableSkeleton(columns, rows) {
+  return Array.from({ length: rows }, () => `<tr data-skeleton="true" aria-hidden="true">${Array.from({ length: columns }, (_, index) =>
+    `<td><div class="a-skeleton" style="height:14px;width:${index === 1 ? '82%' : '62%'}"></div></td>`,
+  ).join('')}</tr>`).join('');
+}

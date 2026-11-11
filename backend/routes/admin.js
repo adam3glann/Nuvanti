@@ -1112,7 +1112,8 @@ router.get(
   asyncRoute(async (req, res) => {
     const days =
       { "7d": 7, "30d": 30, "90d": 90, "1y": 365 }[req.query.range] || 30;
-    const { rows: series } = await query(
+    const [seriesResult, productsResult, categoriesResult, countsResult] = await Promise.all([
+      query(
       `WITH days AS (
     SELECT generate_series((NOW() AT TIME ZONE 'Africa/Cairo')::date - ($1::int - 1), (NOW() AT TIME ZONE 'Africa/Cairo')::date, interval '1 day')::date AS day
   )
@@ -1124,27 +1125,32 @@ router.get(
     AND COALESCE(o.payment_updated_at, o.created_at) < ((days.day + interval '1 day')::timestamp AT TIME ZONE 'Africa/Cairo')
   GROUP BY days.day ORDER BY days.day`,
       [days],
-    );
-    const { rows: topProducts } = await query(
+      ),
+      query(
       `SELECT i.product_name AS name, sum(i.quantity)::int AS "unitsSold",
     coalesce(sum(i.unit_price_cents::numeric * i.quantity * GREATEST(o.subtotal_cents - COALESCE(o.discount_cents, 0), 0) / NULLIF(o.subtotal_cents, 0)), 0)::bigint AS "revenueCents"
     FROM orders o JOIN order_items i ON i.order_id = o.id
     WHERE (o.status = 'fulfilled' OR (o.payment_status = 'paid' AND o.status <> 'cancelled')) AND o.payment_status <> 'refunded' AND COALESCE(o.payment_updated_at, o.created_at) >= (((NOW() AT TIME ZONE 'Africa/Cairo')::date - ($1::int - 1))::timestamp AT TIME ZONE 'Africa/Cairo')
     GROUP BY i.product_id, i.product_name ORDER BY "revenueCents" DESC LIMIT 8`,
       [days],
-    );
-    const { rows: topCategories } = await query(
+      ),
+      query(
       `SELECT p.category AS name,
     coalesce(sum(i.unit_price_cents::numeric * i.quantity * GREATEST(o.subtotal_cents - COALESCE(o.discount_cents, 0), 0) / NULLIF(o.subtotal_cents, 0)), 0)::bigint AS "revenueCents"
     FROM orders o JOIN order_items i ON i.order_id = o.id JOIN products p ON p.id = i.product_id
     WHERE (o.status = 'fulfilled' OR (o.payment_status = 'paid' AND o.status <> 'cancelled')) AND o.payment_status <> 'refunded' AND COALESCE(o.payment_updated_at, o.created_at) >= (((NOW() AT TIME ZONE 'Africa/Cairo')::date - ($1::int - 1))::timestamp AT TIME ZONE 'Africa/Cairo')
     GROUP BY p.category ORDER BY "revenueCents" DESC LIMIT 8`,
       [days],
-    );
-    const { rows: counts } = await query(
+      ),
+      query(
       `SELECT count(*) FILTER (WHERE status IN ('pending', 'paid', 'processing', 'shipped', 'out_for_delivery'))::int AS "pendingOrders"
     FROM orders`,
-    );
+      ),
+    ]);
+    const { rows: series } = seriesResult;
+    const { rows: topProducts } = productsResult;
+    const { rows: topCategories } = categoriesResult;
+    const { rows: counts } = countsResult;
     res.json({
       series: series.map((row) => ({
         ...row,

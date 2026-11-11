@@ -12,7 +12,11 @@ async function load(range) {
       signal: controller.signal,
     }).then(async (response) => {
       const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error || 'Unable to load analytics.');
+      if (!response.ok) {
+        const error = new Error(body.error || 'Unable to load analytics.');
+        error.status = response.status;
+        throw error;
+      }
       return body;
     }).catch((error) => {
       if (error.name === 'AbortError') throw new Error('Loading analytics took too long. Please try again.');

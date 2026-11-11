@@ -3,7 +3,11 @@ import { API_ORIGIN as API } from '../config.js';
 async function request(path, options = {}) {
   const response = await fetch(`${API}${path}`, { credentials: 'include', ...options });
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.error || 'Unable to load customers.');
+  if (!response.ok) {
+    const error = new Error(body.error || 'Unable to load customers.');
+    error.status = response.status;
+    throw error;
+  }
   return body;
 }
 
@@ -20,12 +24,27 @@ export async function fetchAdminCustomers({ query, status, page = 1, perPage = 5
     if (error.name === 'AbortError') throw new Error('Loading customers took too long. Please try again.');
     throw error;
   } finally { clearTimeout(timeout); }
-  const items = (Array.isArray(result.items) ? result.items : []).map((row) => ({
+  const serverPaged = !Array.isArray(result) && Array.isArray(result.items);
+  let rows = serverPaged ? result.items : Array.isArray(result) ? result : [];
+  let items = rows.map((row) => ({
     ...row,
     status: row.isGuest ? 'guest' : (row.isActive ? 'active' : 'disabled'),
     totalSpent: Number(row.totalSpentCents || 0) / 100,
     lastOrder: row.lastOrder || null,
   }));
+  if (!serverPaged) {
+    const normalizedQuery = String(query || '').trim().toLowerCase();
+    if (normalizedQuery) items = items.filter((customer) =>
+      String(customer.name || '').toLowerCase().includes(normalizedQuery)
+      || String(customer.email || '').toLowerCase().includes(normalizedQuery));
+    if (status) items = items.filter((customer) => customer.status === status);
+    if (sort === 'spent-desc') items.sort((a, b) => b.totalSpent - a.totalSpent);
+    else if (sort === 'orders-desc') items.sort((a, b) => b.orderCount - a.orderCount);
+    else items.sort((a, b) => new Date(b.lastOrder || b.createdAt) - new Date(a.lastOrder || a.createdAt));
+    const total = items.length;
+    const pageItems = perPage === 'all' ? items : items.slice((page - 1) * perPage, page * perPage);
+    return { items: pageItems, total, page, perPage };
+  }
   return { items, total: Number(result.total) || 0, page: result.page, perPage: result.perPage };
 }
 
