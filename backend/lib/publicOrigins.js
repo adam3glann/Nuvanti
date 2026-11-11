@@ -3,7 +3,7 @@ const deploymentOrigin = process.env.RAILWAY_PUBLIC_DOMAIN
   ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
   : process.env.RENDER_EXTERNAL_URL ||
   (isProduction
-    ? "https://nuvanti-production.up.railway.app"
+    ? "https://nuvanti-admin.up.railway.app"
     : "http://localhost:4000");
 
 function originFrom(value, fallback) {

@@ -1,4 +1,4 @@
-const DEFAULT_ADMIN_ORIGIN = "https://nuvanti-production.up.railway.app";
+const DEFAULT_ADMIN_ORIGIN = "https://nuvanti-admin.up.railway.app";
 
 export async function onRequest({ request, env }) {
   if (!["GET", "HEAD"].includes(request.method)) {

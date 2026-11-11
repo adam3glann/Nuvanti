@@ -1,4 +1,4 @@
-const DEFAULT_API_ORIGIN = "https://nuvanti-production.up.railway.app";
+const DEFAULT_API_ORIGIN = "https://nuvanti-admin.up.railway.app";
 
 function getPublicCatalogCacheKey(requestUrl, path, origin) {
   const cacheUrl = new URL(requestUrl.origin);
