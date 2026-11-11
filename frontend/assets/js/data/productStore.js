@@ -20,12 +20,10 @@ import { products as seedProducts } from './products.js';
 const STORAGE_KEY = 'nuvanti:products:v1';
 
 function seed() {
-  // Match the shape admin screens expect (status/cost/sku) so a product
-  // created here looks the same whether it started as seed data or was
-  // added later through the admin.
+  // The storefront fallback only needs public catalog fields. Never put
+  // supplier cost or other private business data in a client-side catalog.
   return seedProducts.map((p) => ({
     status: 'active',
-    cost: Math.round(p.price * 0.42),
     ...p,
     sku: p.sku || `NV-${p.id.toUpperCase()}`,
   }));
@@ -36,7 +34,19 @@ function load() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) {
+        let removedPrivateCost = false;
+        const publicProducts = parsed.map((product) => {
+          if (!product || typeof product !== 'object' || Array.isArray(product)) return product;
+          if (!Object.prototype.hasOwnProperty.call(product, 'cost')) return product;
+          const publicProduct = { ...product };
+          delete publicProduct.cost;
+          removedPrivateCost = true;
+          return publicProduct;
+        });
+        if (removedPrivateCost) persistRaw(publicProducts);
+        return publicProducts;
+      }
     }
   } catch (e) {
     // corrupt or inaccessible storage — fall back to the seed catalog

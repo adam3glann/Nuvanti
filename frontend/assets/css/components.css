@@ -61,9 +61,11 @@
 }
 .store-announcement__track {
   display: flex;
+  flex: 0 0 auto;
   width: max-content;
   min-width: 100%;
   animation: store-announcement-scroll var(--announcement-speed, 26s) linear infinite;
+  will-change: transform;
 }
 .store-announcement__group {
   display: flex;
@@ -77,7 +79,7 @@
 }
 .store-announcement__separator { font-size: .85em; opacity: .72; }
 @keyframes store-announcement-scroll {
-  to { transform: translateX(-50%); }
+  to { transform: translate3d(-50%, 0, 0); }
 }
 @media (prefers-reduced-motion: reduce) {
   .store-announcement__track { animation: none; }

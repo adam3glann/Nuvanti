@@ -1269,7 +1269,8 @@ router.get(
     const { rows } = await query(
       `SELECT ${columns} FROM products ORDER BY updated_at DESC`,
     );
-    res.json(rows.map(toAdminProduct));
+    const canViewCosts = hasPermission(req.user.role, "analytics.view");
+    res.json(rows.map((row) => toAdminProduct(row, { includeCost: canViewCosts })));
   },
 );
 const PAYMENT_METHOD_LABELS = {
@@ -2011,7 +2012,9 @@ router.post(
           JSON.stringify(p.metadata),
         ],
       );
-      res.status(201).json(toAdminProduct(rows[0]));
+      res.status(201).json(toAdminProduct(rows[0], {
+        includeCost: hasPermission(req.user.role, "analytics.view"),
+      }));
     } catch (error) {
       if (error.code === "23505")
         return res
@@ -2032,7 +2035,9 @@ router.patch(
         [req.params.id],
       );
       if (!existing.rows[0]) return null;
-      const current = toAdminProduct(existing.rows[0]);
+      const current = toAdminProduct(existing.rows[0], {
+        includeCost: hasPermission(req.user.role, "analytics.view"),
+      });
       const merged = { ...current, ...patch }; // The public product includes both EGP and cents; drop the stale counterpart when either is explicitly changed.
       if (patch.priceCents !== undefined && patch.price === undefined)
         merged.price = undefined;
@@ -2081,7 +2086,9 @@ router.patch(
       return rows[0];
     });
     if (!updated) return res.status(404).json({ error: "Product not found." });
-    res.json(toAdminProduct(updated));
+    res.json(toAdminProduct(updated, {
+      includeCost: hasPermission(req.user.role, "analytics.view"),
+    }));
   },
 );
 router.get(

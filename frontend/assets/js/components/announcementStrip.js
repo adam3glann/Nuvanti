@@ -33,25 +33,32 @@ export function renderAnnouncementStrip(settings) {
   strip.style.setProperty('--announcement-fg', foreground);
   document.documentElement.style.setProperty('--announcement-sticky-offset', `${strip.offsetHeight || 38}px`);
 
-  const track = document.createElement('div');
-  track.className = 'store-announcement__track';
-  track.style.setProperty('--announcement-speed', `${speedSeconds}s`);
-  for (let index = 0; index < 2; index += 1) {
-    const group = document.createElement('span');
-    group.className = 'store-announcement__group';
-    if (index) group.setAttribute('aria-hidden', 'true');
-    for (let repeat = 0; repeat < 3; repeat += 1) {
-      const message = document.createElement('span');
-      message.textContent = String(settings.announcementText).slice(0, 240);
-      if (repeat) message.setAttribute('aria-hidden', 'true');
-      group.append(message);
-      const separator = document.createElement('span');
-      separator.className = 'store-announcement__separator';
-      separator.setAttribute('aria-hidden', 'true');
-      separator.textContent = '✦';
-      group.append(separator);
+  const text = String(settings.announcementText).slice(0, 240);
+  let track = strip.querySelector('.store-announcement__track');
+  if (!track || track.dataset.message !== text) {
+    track = document.createElement('div');
+    track.className = 'store-announcement__track';
+    track.dataset.message = text;
+    for (let index = 0; index < 2; index += 1) {
+      const group = document.createElement('span');
+      group.className = 'store-announcement__group';
+      if (index) group.setAttribute('aria-hidden', 'true');
+      for (let repeat = 0; repeat < 3; repeat += 1) {
+        const message = document.createElement('span');
+        message.textContent = text;
+        if (repeat) message.setAttribute('aria-hidden', 'true');
+        group.append(message);
+        const separator = document.createElement('span');
+        separator.className = 'store-announcement__separator';
+        separator.setAttribute('aria-hidden', 'true');
+        separator.textContent = '✦';
+        group.append(separator);
+      }
+      track.append(group);
     }
-    track.append(group);
+    strip.replaceChildren(track);
   }
-  strip.replaceChildren(track);
+  // Keep the current animation running during settings refreshes. Replacing the
+  // track here made the marquee jump back to its starting frame every refresh.
+  track.style.setProperty('--announcement-speed', `${speedSeconds}s`);
 }

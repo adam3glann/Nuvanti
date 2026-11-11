@@ -9,8 +9,26 @@ import { configureFreeShippingThreshold } from './services/cartService.js';
 import { startStorePresence } from './services/presenceService.js';
 import { startLiveRefresh } from './services/liveRefresh.js';
 import { applyStoreTheme } from './services/storeThemeService.js';
-import { renderAnnouncementStrip } from './components/announcementStrip.js?v=promo-strip-popup-1';
+import { renderAnnouncementStrip } from './components/announcementStrip.js?v=announcement-strip-loop-2';
 import { scheduleSignupOffer } from './components/signupOffer.js?v=promo-strip-popup-1';
+
+let currentStoreSettings = null;
+
+function applyStoreSettings(settings) {
+  const previous = currentStoreSettings;
+  currentStoreSettings = settings;
+  const shippingThresholdChanged = !previous || previous.freeShippingThresholdCents !== settings.freeShippingThresholdCents;
+  const signupOfferChanged = !previous
+    || previous.signupOfferEnabled !== settings.signupOfferEnabled
+    || previous.signupOfferDelaySeconds !== settings.signupOfferDelaySeconds
+    || previous.signupOfferTitle !== settings.signupOfferTitle
+    || previous.signupOfferText !== settings.signupOfferText;
+
+  if (shippingThresholdChanged) configureFreeShippingThreshold(settings.freeShippingThresholdCents / 100);
+  renderAnnouncementStrip(settings);
+  if (signupOfferChanged) scheduleSignupOffer(settings);
+  if (shippingThresholdChanged) refreshCartDrawer();
+}
 
 export function initShell({ transparentHeader = false, currentPage = '' } = {}) {
   applyStoreTheme();
@@ -23,18 +41,12 @@ export function initShell({ transparentHeader = false, currentPage = '' } = {}) 
   onWishlistChange(() => { refreshHeaderCounts(); });
 
   loadStoreSettings().then((settings) => {
-    configureFreeShippingThreshold(settings.freeShippingThresholdCents / 100);
-    renderAnnouncementStrip(settings);
-    scheduleSignupOffer(settings);
-    refreshCartDrawer();
+    applyStoreSettings(settings);
   }).catch((error) => console.error('Store settings unavailable:', error));
   startLiveRefresh(async () => {
     const settings = await refreshStoreSettings();
-    configureFreeShippingThreshold(settings.freeShippingThresholdCents / 100);
-    renderAnnouncementStrip(settings);
-    scheduleSignupOffer(settings);
-    refreshCartDrawer();
-  }, 60000);
+    applyStoreSettings(settings);
+  }, 10000);
 
   window.addEventListener('load', () => initScrollReveal());
   initScrollReveal();

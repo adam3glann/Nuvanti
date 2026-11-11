@@ -63,14 +63,16 @@ export function toPublicProduct(row) {
 }
 
 // Product costs are private business data; expose them only on admin catalog APIs.
-export function toAdminProduct(row) {
+export function toAdminProduct(row, { includeCost = false } = {}) {
   const product = toPublicProduct(row);
   const costCents = row.metadata?.costCents;
-  return {
+  const result = {
     ...product,
     ...productInventory(row),
-    cost: costCents == null ? null : Number(costCents) / 100,
   };
+  if (includeCost)
+    result.cost = costCents == null ? null : Number(costCents) / 100;
+  return result;
 }
 
 export function productPayload(input) {

@@ -1,4 +1,4 @@
-import { initShell } from '../main.js?v=promo-strip-popup-1';
+import { initShell } from '../main.js?v=announcement-strip-loop-2';
 import { formatPrice } from '../components/productCard.js';
 import { getCart, cartSubtotal, clearCart, syncCartWithProducts } from '../services/cartService.js';
 import { createOrder } from '../services/orderService.js';

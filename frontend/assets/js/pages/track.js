@@ -1,4 +1,4 @@
-import { initShell } from '../main.js?v=promo-strip-popup-1';
+import { initShell } from '../main.js?v=announcement-strip-loop-2';
 import { formatPrice, escapeHtml } from '../components/productCard.js';
 import { createWhatsAppUrl } from '../services/whatsapp.js';
 
