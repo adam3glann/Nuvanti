@@ -1,7 +1,7 @@
 import { initShell } from '../main.js?v=announcement-strip-loop-2';
 import { formatPrice } from '../components/productCard.js';
 import { getCart, cartSubtotal, clearCart, syncCartWithProducts } from '../services/cartService.js';
-import { createOrder } from '../services/orderService.js';
+import { createOrder } from '../services/orderService.js?v=delivery-address-details-2';
 import { getCurrentUser } from '../services/authService.js';
 import { showToast } from '../components/toast.js';
 import { refreshCartDrawer } from '../components/cartDrawer.js';
@@ -136,7 +136,7 @@ function render() {
       <h3 class="h3" style="margin-bottom:1.25rem">Customer Information</h3>
       <div class="field"><label for="fullName">Full Name</label><input type="text" id="fullName" value="${escapeAttr(savedAddress?.name || currentUser?.name || '')}" autocomplete="name" required /></div>
       <div class="field-row">
-        ${currentUser ? `<div class="field"><label>Order email</label><p class="text-muted">${escapeHtml(currentUser.email)}</p><p class="text-muted" style="font-size:var(--fs-micro)">Your confirmation and tracking link will be sent here.</p></div>` : `<div class="field"><label for="email">Email for receipt and tracking link <span lang="ar" dir="rtl">البريد الإلكتروني للإيصال ورابط التتبع</span></label><input type="email" id="email" autocomplete="email" maxlength="254" required /></div>`}
+        ${currentUser ? `<div class="field"><label>Order email</label><p class="text-muted">${escapeHtml(currentUser.email)}</p><p class="text-muted" style="font-size:var(--fs-micro)">Your confirmation and tracking link will be sent here.</p></div>` : `<div class="field"><label for="email">Email for receipt and tracking link <span lang="ar" dir="rtl">البريد الإلكتروني للإيصال ورابط التتبع</span></label><input type="email" id="email" autocomplete="email" maxlength="254" required /><p class="text-muted" style="font-size:var(--fs-micro)">We send your order confirmation and tracking link here, even if you check out as a guest.</p></div>`}
         <div class="field"><label for="phone">Phone</label><input type="tel" id="phone" value="${escapeAttr(savedAddress?.phone || '')}" autocomplete="tel" required /></div>
       </div>
       ${!currentUser ? `<div class="guest-account-choice">
@@ -151,7 +151,15 @@ function render() {
 
     <section class="checkout-section">
       <h3 class="h3" style="margin-bottom:1.25rem">Shipping Address</h3>
-      <div class="field"><label for="address">Street Address</label><input type="text" id="address" value="${escapeAttr(savedAddress?.address1 || '')}" autocomplete="street-address" required /></div>
+      <div class="field-row">
+        <div class="field"><label for="address">Street Name</label><input type="text" id="address" value="${escapeAttr(savedAddress?.address1 || '')}" autocomplete="street-address" maxlength="150" required /></div>
+        <div class="field"><label for="buildingNumber">Building Number</label><input type="text" id="buildingNumber" value="${escapeAttr(savedAddress?.buildingNumber || '')}" maxlength="30" required /></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label for="propertyType">Address Type</label><select id="propertyType" required><option value="apartment" ${savedAddress?.propertyType !== 'office' && savedAddress?.propertyType !== 'villa' ? 'selected' : ''}>Apartment</option><option value="office" ${savedAddress?.propertyType === 'office' ? 'selected' : ''}>Office</option><option value="villa" ${savedAddress?.propertyType === 'villa' ? 'selected' : ''}>Villa</option></select></div>
+        <div class="field"><label for="floor">Floor</label><input type="text" id="floor" value="${escapeAttr(savedAddress?.floor || '')}" maxlength="20" /></div>
+        <div class="field"><label for="apartmentNumber">Apartment / Office Number</label><input type="text" id="apartmentNumber" value="${escapeAttr(savedAddress?.apartmentNumber || '')}" maxlength="30" /></div>
+      </div>
       <div class="field"><label for="shippingLocation">Delivery location</label><select id="shippingLocation" required><option value="" disabled ${!storeSettings.shippingLocations?.some((location) => savedAddress?.city === location.name) ? 'selected' : ''}>Choose where we should deliver</option>${(storeSettings.shippingLocations || []).map((location) => `<option value="${escapeAttr(location.id)}" ${savedAddress?.city === location.name ? 'selected' : ''}>${escapeAttr(location.name)}</option>`).join('')}</select>${!(storeSettings.shippingLocations || []).length ? '<small class="hint">Delivery locations are not configured yet. Please contact the store.</small>' : ''}</div>
       <div class="field-row"><div class="field"><label for="postal">Postal Code</label><input type="text" id="postal" value="${escapeAttr(savedAddress?.postalCode || '')}" autocomplete="postal-code" /></div></div>
       <div class="field"><label for="country">Country</label>
@@ -200,6 +208,18 @@ function render() {
     renderLocationDeliveryPrices();
     renderSummary();
   });
+  const propertyType = document.getElementById('propertyType');
+  const floorInput = document.getElementById('floor');
+  const apartmentInput = document.getElementById('apartmentNumber');
+  const updateAddressRequirements = () => {
+    const unitRequired = propertyType.value === 'apartment' || propertyType.value === 'office';
+    floorInput.required = unitRequired;
+    apartmentInput.required = unitRequired;
+    floorInput.placeholder = unitRequired ? 'Required' : 'Optional';
+    apartmentInput.placeholder = propertyType.value === 'office' ? 'Office number' : unitRequired ? 'Required' : 'Optional';
+  };
+  propertyType.addEventListener('change', updateAddressRequirements);
+  updateAddressRequirements();
   shippingLocation = storeSettings.shippingLocations?.find((location) => location.id === document.getElementById('shippingLocation')?.value) || null;
   renderLocationDeliveryPrices();
   bindPaymentOptions();
@@ -333,7 +353,7 @@ async function onSubmit(e) {
   e.preventDefault();
   const form = e.target;
   const createAccount = document.getElementById('createGuestAccount')?.checked === true;
-  const requiredIds = ['fullName', 'phone', 'address', 'shippingLocation', 'country', ...(!currentUser ? ['email'] : []), ...(createAccount ? ['guestPassword', 'guestPasswordConfirm'] : [])];
+  const requiredIds = ['fullName', 'phone', 'address', 'buildingNumber', 'propertyType', 'shippingLocation', 'country', ...(document.getElementById('floor').required ? ['floor', 'apartmentNumber'] : []), ...(!currentUser ? ['email'] : []), ...(createAccount ? ['guestPassword', 'guestPasswordConfirm'] : [])];
   let valid = true;
   requiredIds.forEach((id) => {
     const input = document.getElementById(id);
@@ -354,6 +374,10 @@ async function onSubmit(e) {
   };
   const shipping = {
     address: document.getElementById('address').value,
+    propertyType: document.getElementById('propertyType').value,
+    buildingNumber: document.getElementById('buildingNumber').value.trim(),
+    floor: document.getElementById('floor').value.trim(),
+    apartmentNumber: document.getElementById('apartmentNumber').value.trim(),
     city: shippingLocation?.name || '',
     locationId: shippingLocation?.id || '',
     postal: document.getElementById('postal').value,

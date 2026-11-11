@@ -30,6 +30,20 @@ async function init() {
 }
 
 function render(order) {
+  const shippingAddress = order.shippingAddress || {};
+  const propertyTypeLabels = { apartment: 'Apartment', office: 'Office', villa: 'Villa' };
+  const addressDetails = [
+    ['Type', propertyTypeLabels[shippingAddress.propertyType] || '—'],
+    ['Street', shippingAddress.address1],
+    ['Building number', shippingAddress.buildingNumber],
+    ['Floor', shippingAddress.floor],
+    ['Apartment / office', shippingAddress.apartmentNumber],
+    ['Area', shippingAddress.city],
+    ['Country', shippingAddress.country],
+    ['Postal code', shippingAddress.postalCode],
+  ].filter(([, value]) => value).map(([label, value]) => `
+    <div class="order-address-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>
+  `).join('');
   document.title = `${order.id} — Nuvanti Admin`;
   document.getElementById('pageHeading').textContent = order.id;
 
@@ -70,7 +84,7 @@ function render(order) {
         <div class="card">
           <div class="card-head"><h2>Shipping</h2></div>
           <div class="card-pad" style="font-size:.85rem;display:flex;flex-direction:column;gap:.5rem">
-            <div style="display:flex;justify-content:space-between"><span style="color:var(--a-muted)">Address</span><span>${escapeHtml(order.shippingAddress.city)}, ${escapeHtml(order.shippingAddress.country)}</span></div>
+            ${addressDetails}
             <div style="display:flex;justify-content:space-between"><span style="color:var(--a-muted)">Method</span><span>${order.shippingAddress.method}</span></div>
             <div style="display:flex;justify-content:space-between"><span style="color:var(--a-muted)">Tracking</span><span class="mono">${order.trackingNumber || '—'}</span></div>
           </div>

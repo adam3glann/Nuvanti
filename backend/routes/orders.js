@@ -90,11 +90,22 @@ const checkout = z.object({
       .transform((value) => value.toLowerCase())
       .optional(),
     phone: z.string().max(30).optional(),
-    address1: z.string().min(3).max(150),
-    city: z.string().min(2).max(100),
+    address1: z.string().trim().min(3).max(150),
+    propertyType: z.enum(["office", "villa", "apartment"]),
+    buildingNumber: z.string().trim().min(1).max(30),
+    floor: z.string().trim().max(20).optional().default(""),
+    apartmentNumber: z.string().trim().max(30).optional().default(""),
+    city: z.string().trim().min(2).max(100),
     locationId: z.string().min(1).max(60),
     country: z.literal("Egypt"),
-    postalCode: z.string().min(1).max(20),
+    postalCode: z.string().trim().min(1).max(20),
+  }).superRefine((address, context) => {
+    if (["office", "apartment"].includes(address.propertyType) && !address.floor.trim()) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["floor"], message: "Enter the floor for this delivery address." });
+    }
+    if (["office", "apartment"].includes(address.propertyType) && !address.apartmentNumber.trim()) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["apartmentNumber"], message: "Enter the apartment or office number." });
+    }
   }),
   delivery: z.enum(["standard", "express"]),
   paymentMethod: z.enum(["cod", "paymob", "instapay"]).default("cod"),
