@@ -4,7 +4,7 @@ import { statusBadge } from '../components/statusBadge.js';
 import { fetchAdminCustomers } from '../services/customerService.js?v=orders-load-race-3';
 import { startLiveRefresh } from '../services/liveRefresh.js';
 
-const state = { query: '', status: '', page: 1, perPage: 'all', sort: 'recent' };
+const state = { query: '', status: '', page: 1, perPage: 50, sort: 'recent' };
 
 const session = initAdminShell({ page: 'customers', title: 'Customers' });
 if (session) init();
@@ -13,11 +13,11 @@ function init() {
   document.getElementById('searchInput').value = state.query;
   document.getElementById('statusFilter').value = state.status;
   document.getElementById('sortSelect').value = state.sort;
-  document.getElementById('perPageSelect').value = state.perPage;
+  document.getElementById('perPageSelect').value = String(state.perPage);
   document.getElementById('searchInput').addEventListener('input', debounce((e) => { state.query = e.target.value; state.page = 1; load(); }, 250));
   document.getElementById('statusFilter').addEventListener('change', (e) => { state.status = e.target.value; state.page = 1; load(); });
   document.getElementById('sortSelect').addEventListener('change', (e) => { state.sort = e.target.value; state.page = 1; load(); });
-  document.getElementById('perPageSelect').addEventListener('change', (e) => { state.perPage = e.target.value === 'all' ? 'all' : Number(e.target.value); state.page = 1; load(); });
+  document.getElementById('perPageSelect').addEventListener('change', (e) => { state.perPage = Number(e.target.value); state.page = 1; load(); });
   load().finally(() => startLiveRefresh(() => load(true, true), 30000));
   window.addEventListener('pageshow', (event) => { if (event.persisted) load(); });
 }
@@ -48,7 +48,7 @@ async function load(showLoading = true, background = false) {
     </tr>
   `).join('') : `<tr><td colspan="7"><div class="admin-empty"><h3>No customers found</h3></div></td></tr>`;
 
-  document.getElementById('paginationWrap').innerHTML = paginationHTML(state.page, state.perPage === 'all' ? Math.max(total, 1) : state.perPage, total);
+  document.getElementById('paginationWrap').innerHTML = paginationHTML(state.page, state.perPage, total);
   document.querySelectorAll('#paginationWrap [data-page]').forEach((btn) => btn.addEventListener('click', () => { state.page = Number(btn.dataset.page); load(); }));
 }
 

@@ -3,7 +3,6 @@ import { mainNav } from '../data/navigation.js';
 import { cartCount } from '../services/cartService.js';
 import { getWishlist } from '../services/wishlistService.js';
 import { openCartDrawer } from './cartDrawer.js';
-import { openSearchOverlay } from './searchOverlay.js';
 import { fetchMenuLinks } from '../services/productService.js';
 import { startLiveRefresh } from '../services/liveRefresh.js';
 import { getStoreTheme, toggleStoreTheme } from '../services/storeThemeService.js';
@@ -157,7 +156,10 @@ export function renderHeader({ transparentOnHero = false, currentPage = '' } = {
   startLiveRefresh(refreshMenuLinks, 60000);
 
   document.getElementById('openCart').addEventListener('click', () => openCartDrawer());
-  document.getElementById('openSearch').addEventListener('click', () => openSearchOverlay());
+  document.getElementById('openSearch').addEventListener('click', () => {
+    import('./searchOverlay.js').then(({ openSearchOverlay }) => openSearchOverlay())
+      .catch((error) => console.error('Search could not be opened:', error));
+  });
 
   const logoImg = document.getElementById('headerLogoImg');
   if (transparentOnHero) {

@@ -7,31 +7,26 @@ async function request(path, options = {}) {
   return body;
 }
 
-export async function fetchAdminCustomers({ query, status, page = 1, perPage = 10, sort = 'recent' } = {}) {
+export async function fetchAdminCustomers({ query, status, page = 1, perPage = 50, sort = 'recent' } = {}) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 20000);
-  let rows;
-  try { rows = await request('/api/admin/customers', { signal: controller.signal }); }
+  const params = new URLSearchParams({
+    search: query || '', status: status || '', page: String(page),
+    perPage: String(perPage), sort: sort || 'recent',
+  });
+  let result;
+  try { result = await request(`/api/admin/customers?${params}`, { signal: controller.signal }); }
   catch (error) {
     if (error.name === 'AbortError') throw new Error('Loading customers took too long. Please try again.');
     throw error;
   } finally { clearTimeout(timeout); }
-  let items = rows.map((row) => ({
+  const items = (Array.isArray(result.items) ? result.items : []).map((row) => ({
     ...row,
     status: row.isGuest ? 'guest' : (row.isActive ? 'active' : 'disabled'),
     totalSpent: Number(row.totalSpentCents || 0) / 100,
     lastOrder: row.lastOrder || null,
   }));
-  if (query) {
-    const q = query.toLowerCase();
-    items = items.filter((c) => String(c.name || '').toLowerCase().includes(q) || String(c.email || '').toLowerCase().includes(q));
-  }
-  if (status) items = items.filter((c) => c.status === status);
-  if (sort === 'spent-desc') items.sort((a, b) => b.totalSpent - a.totalSpent);
-  if (sort === 'orders-desc') items.sort((a, b) => b.orderCount - a.orderCount);
-  if (sort === 'recent') items.sort((a, b) => new Date(b.lastOrder || b.createdAt) - new Date(a.lastOrder || a.createdAt));
-  const total = items.length;
-  return { items: perPage === 'all' ? items : items.slice((page - 1) * perPage, page * perPage), total, page, perPage };
+  return { items, total: Number(result.total) || 0, page: result.page, perPage: result.perPage };
 }
 
 export async function fetchAdminCustomer(id) {

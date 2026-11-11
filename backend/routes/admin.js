@@ -2432,6 +2432,12 @@ router.get(
   "/customers",
   requirePermission("customers.view"),
   async (req, res) => {
+    const page = z.coerce.number().int().min(1).max(1000000).default(1).parse(req.query.page);
+    const perPage = z.coerce.number().int().min(1).max(100).default(50).parse(req.query.perPage);
+    const search = z.string().trim().max(100).default("").parse(req.query.search || "");
+    const status = z.enum(["active", "disabled", "guest"]).or(z.literal("")).default("").parse(req.query.status || "");
+    const sort = z.enum(["recent", "spent-desc", "orders-desc"]).default("recent").parse(req.query.sort || "recent");
+    const escapedSearch = search.replace(/[\\%_]/g, (character) => `\\${character}`);
     const { rows } =
       await query(`WITH registered_orders AS (
   SELECT user_id, count(*) FILTER (WHERE status <> 'cancelled')::int AS "orderCount",
@@ -2470,9 +2476,20 @@ router.get(
   FROM orders o
   WHERE o.user_id IS NULL AND nullif(btrim(o.shipping_address->>'email'), '') IS NOT NULL
   GROUP BY lower(btrim(o.shipping_address->>'email'))
+), customers AS (
+  SELECT * FROM registered UNION ALL SELECT * FROM guests
 )
-SELECT * FROM registered UNION ALL SELECT * FROM guests`);
-    res.json(rows);
+SELECT customers.*, count(*) OVER()::int AS "totalCount"
+FROM customers
+WHERE ($1 = '' OR name ILIKE '%' || $1 || '%' ESCAPE E'\\\\' OR email ILIKE '%' || $1 || '%' ESCAPE E'\\\\')
+  AND ($2 = '' OR CASE WHEN "isGuest" THEN 'guest' WHEN "isActive" THEN 'active' ELSE 'disabled' END = $2)
+ORDER BY
+  CASE WHEN $3 = 'recent' THEN coalesce("lastOrder", "createdAt") END DESC NULLS LAST,
+  CASE WHEN $3 = 'spent-desc' THEN "totalSpentCents" END DESC,
+  CASE WHEN $3 = 'orders-desc' THEN "orderCount" END DESC,
+  id
+LIMIT $4 OFFSET $5`, [escapedSearch, status, sort, perPage, (page - 1) * perPage]);
+    res.json({ items: rows, total: rows[0]?.totalCount || 0, page, perPage });
   },
 );
 router.get(
