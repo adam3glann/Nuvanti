@@ -75,14 +75,10 @@ router.post(
       // marked paid. Process those state changes before treating a paid order
       // as a duplicate; otherwise the database can continue to report money
       // as captured after Paymob has returned or voided it.
-      if (order.paymentStatus === "refunded")
-        return { duplicate: true };
+      if (order.paymentStatus === "refunded") return { duplicate: true };
       if (order.paymentStatus === "paid" && !refunded)
         return { duplicate: true };
-      const paid =
-        obj.success === true &&
-        obj.pending === false &&
-        !refunded;
+      const paid = obj.success === true && obj.pending === false && !refunded;
       if (paid) {
         if (order.status === "cancelled") {
           await client.query(
