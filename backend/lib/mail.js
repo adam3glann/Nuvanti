@@ -81,6 +81,7 @@ async function deliver({
       throw new Error(
         `Resend email delivery failed (${response.status}): ${result.message || "provider rejected the message"}`,
       );
+    console.info("Email accepted by Resend", { messageId: result.id || null });
     return;
   }
   if (status.provider === "SendGrid") {
@@ -108,6 +109,9 @@ async function deliver({
       const detail = result.errors?.[0]?.message || `HTTP ${response.status}`;
       throw new Error(`SendGrid email delivery failed: ${detail}`);
     }
+    console.info("Email accepted by SendGrid", {
+      messageId: response.headers.get("x-message-id"),
+    });
     return;
   }
   const transporter = nodemailer.createTransport({
@@ -119,13 +123,16 @@ async function deliver({
     greetingTimeout: 10_000,
     socketTimeout: 20_000,
   });
-  await transporter.sendMail({
+  const result = await transporter.sendMail({
     from: process.env.MAIL_FROM,
     to,
     subject,
     text,
     html,
     ...(replyTo ? { replyTo } : {}),
+  });
+  console.info("Email accepted by SMTP server", {
+    messageId: result.messageId || null,
   });
 }
 
