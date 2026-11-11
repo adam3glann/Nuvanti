@@ -1,24 +1,29 @@
-import { icon } from './icons.js';
-import { productCardHTML, bindProductCardEvents } from './productCard.js';
-import { searchProducts } from '../services/productService.js';
-import { refreshCartDrawer } from './cartDrawer.js';
+import { icon } from "./icons.js";
+import { productCardHTML, bindProductCardEvents } from "./productCard.js";
+import { searchProducts } from "../services/productService.js";
+import { refreshCartDrawer } from "./cartDrawer.js";
 
 let mounted = false;
 let latestSearchId = 0;
-const RECENT_KEY = 'nuvanti_recent_searches_v1';
-const POPULAR = ['Knitted Embroidered Polo', 'Embroidered Tank Top', 'Nuv Sweatpants', 'Men Tank Top'];
+const RECENT_KEY = "nuvanti_recent_searches_v1";
+const POPULAR = [
+  "Knitted Embroidered Polo",
+  "Embroidered Tank Top",
+  "Nuv Sweatpants",
+  "Men Tank Top",
+];
 
 export function mountSearchOverlay() {
   if (mounted) return;
   mounted = true;
 
-  const wrap = document.createElement('div');
+  const wrap = document.createElement("div");
   wrap.innerHTML = `
     <div class="search-overlay" id="searchOverlay" data-open="false" role="dialog" aria-modal="true" aria-label="Search">
       <div class="search-overlay__bar container">
-        <span>${icon('search')}</span>
+        <span>${icon("search")}</span>
         <input type="text" id="searchInput" class="search-overlay__input" placeholder="Search products…" autocomplete="off" />
-        <button class="icon-btn" id="closeSearch" aria-label="Close search">${icon('close')}</button>
+        <button class="icon-btn" id="closeSearch" aria-label="Close search">${icon("close")}</button>
       </div>
       <div class="search-overlay__body container">
         <div id="searchDefault">
@@ -26,7 +31,7 @@ export function mountSearchOverlay() {
           <div class="search-chip-group" id="recentChips"></div>
           <p class="label" style="margin-top:2rem">Popular Searches</p>
           <div class="search-chip-group" id="popularChips">
-            ${POPULAR.map((p) => `<button class="search-chip" data-term="${escapeHtml(p)}">${escapeHtml(p)}</button>`).join('')}
+            ${POPULAR.map((p) => `<button class="search-chip" data-term="${escapeHtml(p)}">${escapeHtml(p)}</button>`).join("")}
           </div>
         </div>
         <div class="search-results" id="searchResults" hidden></div>
@@ -35,22 +40,29 @@ export function mountSearchOverlay() {
   `;
   document.body.appendChild(wrap);
 
-  const overlay = document.getElementById('searchOverlay');
-  const input = document.getElementById('searchInput');
-  const resultsWrap = document.getElementById('searchResults');
-  const defaultWrap = document.getElementById('searchDefault');
+  const overlay = document.getElementById("searchOverlay");
+  const input = document.getElementById("searchInput");
+  const resultsWrap = document.getElementById("searchResults");
+  const defaultWrap = document.getElementById("searchDefault");
 
-  document.getElementById('closeSearch').addEventListener('click', closeSearchOverlay);
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSearchOverlay(); });
+  document
+    .getElementById("closeSearch")
+    .addEventListener("click", closeSearchOverlay);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeSearchOverlay();
+  });
 
   let debounceTimer;
-  input.addEventListener('input', () => {
+  input.addEventListener("input", () => {
     clearTimeout(debounceTimer);
     const searchId = ++latestSearchId;
-    debounceTimer = setTimeout(() => runSearch(input.value.trim(), searchId), 200);
+    debounceTimer = setTimeout(
+      () => runSearch(input.value.trim(), searchId),
+      200,
+    );
   });
-  input.addEventListener('keydown', (event) => {
-    if (event.key !== 'Enter') return;
+  input.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
     event.preventDefault();
     clearTimeout(debounceTimer);
     const term = input.value.trim();
@@ -60,15 +72,15 @@ export function mountSearchOverlay() {
     runSearch(term, ++latestSearchId);
   });
 
-  wrap.addEventListener('click', (e) => {
-    const chip = e.target.closest('[data-term]');
+  wrap.addEventListener("click", (e) => {
+    const chip = e.target.closest("[data-term]");
     if (chip) {
       input.value = chip.dataset.term;
       runSearch(chip.dataset.term, ++latestSearchId);
     }
   });
 
-  resultsWrap.addEventListener('click', (event) => {
+  resultsWrap.addEventListener("click", (event) => {
     if (!event.target.closest('a[href*="product.html"]')) return;
     const term = input.value.trim();
     if (!term) return;
@@ -76,7 +88,10 @@ export function mountSearchOverlay() {
     renderRecentChips();
   });
 
-  bindProductCardEvents(resultsWrap, { products: [], onCartChange: refreshCartDrawer });
+  bindProductCardEvents(resultsWrap, {
+    products: [],
+    onCartChange: refreshCartDrawer,
+  });
 
   async function runSearch(term, searchId) {
     if (!term) {
@@ -100,7 +115,10 @@ export function mountSearchOverlay() {
     if (searchId !== latestSearchId) return;
 
     // Refresh the single delegated listener's live quick-add lookup.
-    bindProductCardEvents(resultsWrap, { products: results, onCartChange: refreshCartDrawer });
+    bindProductCardEvents(resultsWrap, {
+      products: results,
+      onCartChange: refreshCartDrawer,
+    });
 
     if (results.length === 0) {
       resultsWrap.innerHTML = `
@@ -112,8 +130,8 @@ export function mountSearchOverlay() {
       return;
     }
     resultsWrap.innerHTML = `
-      <p class="label" style="margin-bottom:1.5rem">${results.length} Result${results.length > 1 ? 's' : ''}</p>
-      <div class="product-grid">${results.map(productCardHTML).join('')}</div>
+      <p class="label" style="margin-bottom:1.5rem">${results.length} Result${results.length > 1 ? "s" : ""}</p>
+      <div class="product-grid">${results.map(productCardHTML).join("")}</div>
     `;
   }
 
@@ -121,37 +139,54 @@ export function mountSearchOverlay() {
 }
 
 function saveRecent(term) {
-  let recent = getRecent().filter((t) => t.toLowerCase() !== term.toLowerCase());
+  let recent = getRecent().filter(
+    (t) => t.toLowerCase() !== term.toLowerCase(),
+  );
   recent.unshift(term);
   recent = recent.slice(0, 5);
   localStorage.setItem(RECENT_KEY, JSON.stringify(recent));
 }
 function getRecent() {
-  try { return JSON.parse(localStorage.getItem(RECENT_KEY)) || []; } catch { return []; }
+  try {
+    return JSON.parse(localStorage.getItem(RECENT_KEY)) || [];
+  } catch {
+    return [];
+  }
 }
 function renderRecentChips() {
-  const el = document.getElementById('recentChips');
+  const el = document.getElementById("recentChips");
   if (!el) return;
   const recent = getRecent();
   el.innerHTML = recent.length
-    ? recent.map((t) => `<button class="search-chip" data-term="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join('')
+    ? recent
+        .map(
+          (t) =>
+            `<button class="search-chip" data-term="${escapeHtml(t)}">${escapeHtml(t)}</button>`,
+        )
+        .join("")
     : `<span class="text-muted" style="font-size:.875rem">No recent searches yet.</span>`;
 }
 
 function escapeHtml(value) {
-  return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+  return String(value ?? "").replace(
+    /[&<>"']/g,
+    (char) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
+        char
+      ],
+  );
 }
 
 export function openSearchOverlay() {
   mountSearchOverlay();
-  document.getElementById('searchOverlay').dataset.open = 'true';
-  document.body.style.overflow = 'hidden';
-  setTimeout(() => document.getElementById('searchInput')?.focus(), 350);
+  document.getElementById("searchOverlay").dataset.open = "true";
+  document.body.style.overflow = "hidden";
+  setTimeout(() => document.getElementById("searchInput")?.focus(), 350);
 }
 export function closeSearchOverlay() {
-  const overlay = document.getElementById('searchOverlay');
+  const overlay = document.getElementById("searchOverlay");
   if (!overlay) return;
-  overlay.dataset.open = 'false';
+  overlay.dataset.open = "false";
   latestSearchId += 1;
-  document.body.style.overflow = '';
+  document.body.style.overflow = "";
 }

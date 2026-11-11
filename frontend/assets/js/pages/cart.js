@@ -1,58 +1,108 @@
-import { initShell } from '../main.js?v=announcement-strip-loop-2';
-import { icon } from '../components/icons.js';
-import { formatPrice, escapeHtml } from '../components/productCard.js';
-import { refreshCartDrawer } from '../components/cartDrawer.js';
-import { getCart, updateQuantity, removeFromCart, cartSubtotal, configureFreeShippingThreshold, syncCartWithProducts, canIncreaseQuantity, variantStock } from '../services/cartService.js';
-import { loadStoreSettings, refreshStoreSettings } from '../services/storeSettingsService.js';
-import { startLiveRefresh } from '../services/liveRefresh.js';
-import { fetchProductBySlug } from '../services/productService.js';
-import { checkDiscount, getSavedDiscountCode, saveDiscountCode, clearDiscountCode } from '../services/discountService.js';
+import { initShell } from "../main.js?v=announcement-strip-loop-2";
+import { icon } from "../components/icons.js";
+import { formatPrice, escapeHtml } from "../components/productCard.js";
+import { refreshCartDrawer } from "../components/cartDrawer.js";
+import {
+  getCart,
+  updateQuantity,
+  removeFromCart,
+  cartSubtotal,
+  configureFreeShippingThreshold,
+  syncCartWithProducts,
+  canIncreaseQuantity,
+  variantStock,
+} from "../services/cartService.js";
+import {
+  loadStoreSettings,
+  refreshStoreSettings,
+} from "../services/storeSettingsService.js";
+import { startLiveRefresh } from "../services/liveRefresh.js";
+import { fetchProductBySlug } from "../services/productService.js";
+import {
+  checkDiscount,
+  getSavedDiscountCode,
+  saveDiscountCode,
+  clearDiscountCode,
+} from "../services/discountService.js";
 
-initShell({ currentPage: 'shop' });
+initShell({ currentPage: "shop" });
 
 // { code, discountCents } once a real code has been validated against the
 // backend, otherwise null.
 let discountInfo = null;
 let listenerBound = false;
 let storeSettings = null;
-let catalogNotice = '';
+let catalogNotice = "";
 try {
-  catalogNotice = sessionStorage.getItem('nuvanti_cart_notice') || '';
-  sessionStorage.removeItem('nuvanti_cart_notice');
-} catch { /* A browser may block storage; the cart can still load normally. */ }
+  catalogNotice = sessionStorage.getItem("nuvanti_cart_notice") || "";
+  sessionStorage.removeItem("nuvanti_cart_notice");
+} catch {
+  /* A browser may block storage; the cart can still load normally. */
+}
 
 initializeCart();
 
 async function initializeCart() {
   try {
     const initialLines = getCart();
-    const currentProducts = await Promise.all([...new Set(initialLines.map((line) => line.slug))].map(fetchProductBySlug));
+    const currentProducts = await Promise.all(
+      [...new Set(initialLines.map((line) => line.slug))].map(
+        fetchProductBySlug,
+      ),
+    );
     const changes = syncCartWithProducts(currentProducts);
-    if (!catalogNotice && changes.removed.length) catalogNotice = 'Some bag items are no longer available and were removed. Please review your bag.';
-    else if (!catalogNotice && changes.adjusted.length) catalogNotice = 'Your bag quantities were adjusted to match current stock.';
-    else if (!catalogNotice && changes.priceChanged) catalogNotice = 'Prices were updated to the current catalog.';
+    if (!catalogNotice && changes.removed.length)
+      catalogNotice =
+        "Some bag items are no longer available and were removed. Please review your bag.";
+    else if (!catalogNotice && changes.adjusted.length)
+      catalogNotice =
+        "Your bag quantities were adjusted to match current stock.";
+    else if (!catalogNotice && changes.priceChanged)
+      catalogNotice = "Prices were updated to the current catalog.";
     storeSettings = await loadStoreSettings();
-    configureFreeShippingThreshold(storeSettings.freeShippingThresholdCents / 100);
+    configureFreeShippingThreshold(
+      storeSettings.freeShippingThresholdCents / 100,
+    );
     await restoreSavedDiscount();
     render();
-    startLiveRefresh(async () => {
-      const latestProducts = await Promise.all([...new Set(getCart().map((line) => line.slug))].map(fetchProductBySlug));
-      const changes = syncCartWithProducts(latestProducts);
-      if (changes.removed.length || changes.adjusted.length || changes.priceChanged) {
-        catalogNotice = 'Your bag was updated to match the latest products, prices, and available stock.';
-      }
-      render();
-    }, 15000, { pauseWhileEditing: true });
-    startLiveRefresh(async () => {
-      const latest = await refreshStoreSettings();
-      if (JSON.stringify(latest) === JSON.stringify(storeSettings)) return;
-      storeSettings = latest;
-      configureFreeShippingThreshold(storeSettings.freeShippingThresholdCents / 100);
-      render();
-    }, 30000, { pauseWhileEditing: true });
+    startLiveRefresh(
+      async () => {
+        const latestProducts = await Promise.all(
+          [...new Set(getCart().map((line) => line.slug))].map(
+            fetchProductBySlug,
+          ),
+        );
+        const changes = syncCartWithProducts(latestProducts);
+        if (
+          changes.removed.length ||
+          changes.adjusted.length ||
+          changes.priceChanged
+        ) {
+          catalogNotice =
+            "Your bag was updated to match the latest products, prices, and available stock.";
+        }
+        render();
+      },
+      15000,
+      { pauseWhileEditing: true },
+    );
+    startLiveRefresh(
+      async () => {
+        const latest = await refreshStoreSettings();
+        if (JSON.stringify(latest) === JSON.stringify(storeSettings)) return;
+        storeSettings = latest;
+        configureFreeShippingThreshold(
+          storeSettings.freeShippingThresholdCents / 100,
+        );
+        render();
+      },
+      30000,
+      { pauseWhileEditing: true },
+    );
   } catch {
-    document.getElementById('cartList').innerHTML = '<div class="state-block"><h3>Bag pricing is temporarily unavailable</h3><p>Your items are saved. Please try again shortly before checkout.</p></div>';
-    document.getElementById('cartSummary').innerHTML = '';
+    document.getElementById("cartList").innerHTML =
+      '<div class="state-block"><h3>Bag pricing is temporarily unavailable</h3><p>Your items are saved. Please try again shortly before checkout.</p></div>';
+    document.getElementById("cartSummary").innerHTML = "";
   }
 }
 
@@ -74,22 +124,24 @@ async function restoreSavedDiscount() {
 
 function render() {
   const lines = getCart();
-  const listEl = document.getElementById('cartList');
-  const summaryEl = document.getElementById('cartSummary');
+  const listEl = document.getElementById("cartList");
+  const summaryEl = document.getElementById("cartSummary");
 
   if (lines.length === 0) {
-    document.getElementById('cartRoot').innerHTML = `
+    document.getElementById("cartRoot").innerHTML = `
       <div class="state-block">
-        ${icon('bag')}
+        ${icon("bag")}
         <h3 style="margin-top:1rem">Your bag is empty</h3>
-        ${catalogNotice ? `<p role="status">${escapeHtml(catalogNotice)}</p>` : ''}
+        ${catalogNotice ? `<p role="status">${escapeHtml(catalogNotice)}</p>` : ""}
         <p>Looks like you haven't added anything yet.</p>
         <a href="shop.html" class="btn btn-primary">Continue Shopping</a>
       </div>`;
     return;
   }
 
-  listEl.innerHTML = lines.map((l) => `
+  listEl.innerHTML = lines
+    .map(
+      (l) => `
     <div class="cart-page-line" data-line="${escapeHtml(l.lineId)}">
       <img src="${escapeHtml(l.image)}" alt="${escapeHtml(l.name)}" loading="lazy" />
       <div>
@@ -97,52 +149,61 @@ function render() {
           <div>
             <p style="font-weight:600">${escapeHtml(l.name)}</p>
             <p class="text-muted" style="font-size:var(--fs-small);margin-top:.25rem">${escapeHtml(l.color)} · Size ${escapeHtml(l.size)}</p>
-            ${variantStock(l.productId, l.size, l.color) === null ? '' : `<p class="text-muted" style="font-size:var(--fs-micro);margin-top:.2rem">${variantStock(l.productId, l.size, l.color)} available in this color and size</p>`}
+            ${variantStock(l.productId, l.size, l.color) === null ? "" : `<p class="text-muted" style="font-size:var(--fs-micro);margin-top:.2rem">${variantStock(l.productId, l.size, l.color)} available in this color and size</p>`}
           </div>
           <p style="font-weight:600">${formatPrice(l.price * l.quantity)}</p>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:1rem">
           <div class="qty-stepper">
-            <button data-dec="${escapeHtml(l.lineId)}" aria-label="Decrease quantity">${icon('minus')}</button>
+            <button data-dec="${escapeHtml(l.lineId)}" aria-label="Decrease quantity">${icon("minus")}</button>
             <span>${Number(l.quantity)}</span>
-            <button data-inc="${escapeHtml(l.lineId)}" aria-label="Increase quantity" ${canIncreaseQuantity(l.lineId) ? '' : 'disabled'}>${icon('plus')}</button>
+            <button data-inc="${escapeHtml(l.lineId)}" aria-label="Increase quantity" ${canIncreaseQuantity(l.lineId) ? "" : "disabled"}>${icon("plus")}</button>
           </div>
-          <button class="icon-btn" data-remove="${escapeHtml(l.lineId)}" aria-label="Remove item">${icon('trash')}</button>
+          <button class="icon-btn" data-remove="${escapeHtml(l.lineId)}" aria-label="Remove item">${icon("trash")}</button>
         </div>
       </div>
     </div>
-  `).join('');
+  `,
+    )
+    .join("");
 
   const subtotal = cartSubtotal();
-  const shipping = subtotal >= storeSettings.freeShippingThresholdCents / 100 ? 0 : (subtotal > 0 ? storeSettings.standardShippingCents / 100 : 0);
+  const shipping =
+    subtotal >= storeSettings.freeShippingThresholdCents / 100
+      ? 0
+      : subtotal > 0
+        ? storeSettings.standardShippingCents / 100
+        : 0;
   const discount = discountInfo ? discountInfo.discountCents / 100 : 0;
   const total = Math.max(0, subtotal - discount) + shipping;
 
   summaryEl.innerHTML = `
-    ${catalogNotice ? `<p class="state-note" role="status">${escapeHtml(catalogNotice)}</p>` : ''}
+    ${catalogNotice ? `<p class="state-note" role="status">${escapeHtml(catalogNotice)}</p>` : ""}
     <h3 class="h3" style="margin-bottom:1.5rem">Order Summary</h3>
     <div class="promo-row">
       <label class="visually-hidden" for="promoInput">Discount code</label>
-      <input type="text" id="promoInput" placeholder="Discount code" value="${discountInfo ? discountInfo.code : ''}" ${discountInfo ? 'disabled' : ''} />
-      <button class="btn btn-outline btn-sm" id="applyPromo" ${discountInfo ? 'disabled' : ''}>Apply</button>
+      <input type="text" id="promoInput" placeholder="Discount code" value="${discountInfo ? discountInfo.code : ""}" ${discountInfo ? "disabled" : ""} />
+      <button class="btn btn-outline btn-sm" id="applyPromo" ${discountInfo ? "disabled" : ""}>Apply</button>
     </div>
-    ${discountInfo ? `<button type="button" class="btn btn-text" id="removePromo" style="display:block;margin:-.5rem 0 1rem;padding:0;font-size:var(--fs-micro)">Remove code</button>` : ''}
+    ${discountInfo ? `<button type="button" class="btn btn-text" id="removePromo" style="display:block;margin:-.5rem 0 1rem;padding:0;font-size:var(--fs-micro)">Remove code</button>` : ""}
     <div id="promoMsg" style="font-size:var(--fs-micro);margin-bottom:1rem;color:var(--color-error)"></div>
     <div class="summary-row"><span>Subtotal</span><span>${formatPrice(subtotal)}</span></div>
-    ${discountInfo ? `<div class="summary-row"><span>Discount (${discountInfo.code})</span><span>-${formatPrice(discount)}</span></div>` : ''}
-    <div class="summary-row"><span>Estimated Shipping</span><span>${shipping === 0 ? 'Free' : formatPrice(shipping)}</span></div>
+    ${discountInfo ? `<div class="summary-row"><span>Discount (${discountInfo.code})</span><span>-${formatPrice(discount)}</span></div>` : ""}
+    <div class="summary-row"><span>Estimated Shipping</span><span>${shipping === 0 ? "Free" : formatPrice(shipping)}</span></div>
     <div class="summary-row summary-row--total"><span>Estimated Total</span><span>${formatPrice(total)}</span></div>
     <a href="checkout.html" class="btn btn-primary btn-block" style="margin-top:1.5rem">Proceed to Checkout</a>
     <a href="shop.html" class="btn btn-text" style="display:block;text-align:center;margin-top:1rem">Continue Shopping</a>
   `;
 
-  document.getElementById('applyPromo').addEventListener('click', async () => {
-    const input = document.getElementById('promoInput');
-    const btn = document.getElementById('applyPromo');
-    const msg = document.getElementById('promoMsg');
+  document.getElementById("applyPromo").addEventListener("click", async () => {
+    const input = document.getElementById("promoInput");
+    const btn = document.getElementById("applyPromo");
+    const msg = document.getElementById("promoMsg");
     const val = input.value.trim().toUpperCase();
     if (!val) return;
-    btn.disabled = true; btn.textContent = 'Checking…'; msg.textContent = '';
+    btn.disabled = true;
+    btn.textContent = "Checking…";
+    msg.textContent = "";
     try {
       const result = await checkDiscount(val, cartSubtotal());
       discountInfo = { code: result.code, discountCents: result.discountCents };
@@ -151,27 +212,29 @@ function render() {
     } catch (error) {
       discountInfo = null;
       msg.textContent = error.message;
-      btn.disabled = false; btn.textContent = 'Apply';
+      btn.disabled = false;
+      btn.textContent = "Apply";
     }
   });
 
-  const removeBtn = document.getElementById('removePromo');
-  if (removeBtn) removeBtn.addEventListener('click', () => {
-    discountInfo = null;
-    clearDiscountCode();
-    render();
-  });
+  const removeBtn = document.getElementById("removePromo");
+  if (removeBtn)
+    removeBtn.addEventListener("click", () => {
+      discountInfo = null;
+      clearDiscountCode();
+      render();
+    });
 
   if (!listenerBound) {
-    listEl.addEventListener('click', onLineClick);
+    listEl.addEventListener("click", onLineClick);
     listenerBound = true;
   }
 }
 
 async function onLineClick(e) {
-  const dec = e.target.closest('[data-dec]');
-  const inc = e.target.closest('[data-inc]');
-  const rem = e.target.closest('[data-remove]');
+  const dec = e.target.closest("[data-dec]");
+  const inc = e.target.closest("[data-inc]");
+  const rem = e.target.closest("[data-remove]");
   const lines = getCart();
   if (dec) {
     const line = lines.find((l) => l.lineId === dec.dataset.dec);

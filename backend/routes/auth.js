@@ -341,10 +341,9 @@ router.post(
 
     if (lockdownActive && user.role !== "super_admin") {
       clearAdminEmailChallengeCookie(res);
-      await query(
-        "DELETE FROM admin_email_login_challenges WHERE id = $1",
-        [challenge.jti],
-      );
+      await query("DELETE FROM admin_email_login_challenges WHERE id = $1", [
+        challenge.jti,
+      ]);
       return res.status(503).json({
         error:
           "Admin sign-in is temporarily disabled during a security lockdown.",
@@ -607,7 +606,9 @@ router.post(
         sendPasswordReset({
           to: user.email,
           resetUrl: `${baseUrl}/${resetPage}?reset=${token}`,
-        }).catch((error) => console.error("Password reset email failed:", error));
+        }).catch((error) =>
+          console.error("Password reset email failed:", error),
+        );
       } catch (error) {
         console.error("Password reset email could not be queued:", error);
       }

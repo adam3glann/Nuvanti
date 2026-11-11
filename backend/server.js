@@ -34,7 +34,10 @@ import { query } from "./lib/db.js";
 import { emailDeliveryStatus } from "./lib/mail.js";
 import { hasPermission } from "./lib/permissions.js";
 import { expireAbandonedOrders } from "./lib/orderLifecycle.js";
-import { cleanupStorefrontPresence, flushStorefrontPageViews } from "./lib/storefrontMetrics.js";
+import {
+  cleanupStorefrontPresence,
+  flushStorefrontPageViews,
+} from "./lib/storefrontMetrics.js";
 
 const app = express();
 const STAFF_ROLES = ["staff", "manager", "admin", "super_admin"];
@@ -156,9 +159,11 @@ function isPublicCatalogRead(req) {
   ].includes(req.path);
 }
 function isProductSearch(req) {
-  return req.method === "GET" &&
+  return (
+    req.method === "GET" &&
     ["/api/products", "/api/products/"].includes(req.path) &&
-    req.query.search !== undefined;
+    req.query.search !== undefined
+  );
 }
 function verifyForwardedClientIp(req, res, next) {
   req.trustedClientIp = null;
@@ -183,7 +188,10 @@ function verifyForwardedClientIp(req, res, next) {
     .update(`${ip}\n${timestamp}`)
     .digest();
   const received = Buffer.from(signature, "hex");
-  if (received.length === expected.length && timingSafeEqual(received, expected)) {
+  if (
+    received.length === expected.length &&
+    timingSafeEqual(received, expected)
+  ) {
     req.trustedClientIp = ip;
     // Express's rate limiters and admin lockout logic consume req.ip. Override
     // it only after the Pages Function's HMAC has authenticated the address,
@@ -480,12 +488,24 @@ adminApp.use((err, req, res, next) =>
 if (trustProxy) adminApp.set("trust proxy", trustProxy);
 
 await query("SELECT 1");
-const presenceCleanupTimer = setInterval(() => cleanupStorefrontPresence()
-  .catch((error) => console.error('Unable to clean up expired storefront presence:', error)), 60 * 1000);
+const presenceCleanupTimer = setInterval(
+  () =>
+    cleanupStorefrontPresence().catch((error) =>
+      console.error("Unable to clean up expired storefront presence:", error),
+    ),
+  60 * 1000,
+);
 presenceCleanupTimer.unref();
-cleanupStorefrontPresence().catch((error) => console.error('Unable to clean up expired storefront presence:', error));
-const pageViewFlushTimer = setInterval(() => flushStorefrontPageViews()
-  .catch((error) => console.error('Unable to flush storefront page views:', error)), 5 * 1000);
+cleanupStorefrontPresence().catch((error) =>
+  console.error("Unable to clean up expired storefront presence:", error),
+);
+const pageViewFlushTimer = setInterval(
+  () =>
+    flushStorefrontPageViews().catch((error) =>
+      console.error("Unable to flush storefront page views:", error),
+    ),
+  5 * 1000,
+);
 pageViewFlushTimer.unref();
 if (isProduction) {
   const sweepExpiredOrders = () =>

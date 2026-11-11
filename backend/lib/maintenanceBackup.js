@@ -157,9 +157,15 @@ export async function restoreStoreBackup(client, backup) {
     const { rows } = await client.query(
       `INSERT INTO users (email, name, password_hash, role, is_active, email_verified_at, created_at)
        VALUES ($1,$2,$3,'customer',$4,$5,$6) RETURNING id`,
-      [row.email, row.name,
-        hashesByEmail.get(String(row.email || "").toLowerCase()) || generatedPasswordHash,
-        row.isActive !== false, row.emailVerifiedAt || null, row.createdAt],
+      [
+        row.email,
+        row.name,
+        hashesByEmail.get(String(row.email || "").toLowerCase()) ||
+          generatedPasswordHash,
+        row.isActive !== false,
+        row.emailVerifiedAt || null,
+        row.createdAt,
+      ],
     );
     restoredCustomerIds.set(String(row.id), String(rows[0].id));
   }
@@ -436,7 +442,9 @@ export async function restoreStoreBackup(client, backup) {
     backup.orders,
     (row) => [
       row.id,
-      row.userId == null ? null : restoredCustomerIds.get(String(row.userId)) || null,
+      row.userId == null
+        ? null
+        : restoredCustomerIds.get(String(row.userId)) || null,
       row.status,
       row.subtotalCents,
       row.shippingCents,
@@ -535,10 +543,9 @@ export async function restoreStoreBackup(client, backup) {
 
   const subscribers = backup.newsletterSubscribers.map((row) => ({
     ...row,
-    restoreUnsubscribeHash: row.unsubscribeTokenHash || crypto
-      .createHash("sha256")
-      .update(crypto.randomBytes(32))
-      .digest("hex"),
+    restoreUnsubscribeHash:
+      row.unsubscribeTokenHash ||
+      crypto.createHash("sha256").update(crypto.randomBytes(32)).digest("hex"),
   }));
   await insertRows(
     client,

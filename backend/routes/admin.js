@@ -88,14 +88,36 @@ const productFields = z.object({
   category: z.string().min(1).max(80),
   collection: z.string().max(80).nullable().optional(),
   images: z.array(productImage).max(12).optional(),
-  colors: z.array(z.string().max(40).refine((value) => !value.includes("::"), "Color names cannot contain ::.")).max(20).optional(),
+  colors: z
+    .array(
+      z
+        .string()
+        .max(40)
+        .refine(
+          (value) => !value.includes("::"),
+          "Color names cannot contain ::.",
+        ),
+    )
+    .max(20)
+    .optional(),
   colorImages: z
     .record(z.string().max(40), z.array(productImage).max(12))
     .optional(),
   colorSwatches: z
     .record(z.string().max(40), z.string().regex(/^#[0-9a-fA-F]{6}$/))
     .optional(),
-  sizes: z.array(z.string().max(20).refine((value) => !value.includes("::"), "Size names cannot contain ::.")).max(20).optional(),
+  sizes: z
+    .array(
+      z
+        .string()
+        .max(20)
+        .refine(
+          (value) => !value.includes("::"),
+          "Size names cannot contain ::.",
+        ),
+    )
+    .max(20)
+    .optional(),
   inventory: z
     .union([
       z.coerce.number().int().min(0),
@@ -1112,9 +1134,10 @@ router.get(
   asyncRoute(async (req, res) => {
     const days =
       { "7d": 7, "30d": 30, "90d": 90, "1y": 365 }[req.query.range] || 30;
-    const [seriesResult, productsResult, categoriesResult, countsResult] = await Promise.all([
-      query(
-      `WITH days AS (
+    const [seriesResult, productsResult, categoriesResult, countsResult] =
+      await Promise.all([
+        query(
+          `WITH days AS (
     SELECT generate_series((NOW() AT TIME ZONE 'Africa/Cairo')::date - ($1::int - 1), (NOW() AT TIME ZONE 'Africa/Cairo')::date, interval '1 day')::date AS day
   )
   SELECT to_char(days.day, 'YYYY-MM-DD') AS date,
@@ -1124,29 +1147,29 @@ router.get(
   FROM days LEFT JOIN orders o ON COALESCE(o.payment_updated_at, o.created_at) >= (days.day::timestamp AT TIME ZONE 'Africa/Cairo')
     AND COALESCE(o.payment_updated_at, o.created_at) < ((days.day + interval '1 day')::timestamp AT TIME ZONE 'Africa/Cairo')
   GROUP BY days.day ORDER BY days.day`,
-      [days],
-      ),
-      query(
-      `SELECT i.product_name AS name, sum(i.quantity)::int AS "unitsSold",
+          [days],
+        ),
+        query(
+          `SELECT i.product_name AS name, sum(i.quantity)::int AS "unitsSold",
     coalesce(sum(i.unit_price_cents::numeric * i.quantity * GREATEST(o.subtotal_cents - COALESCE(o.discount_cents, 0), 0) / NULLIF(o.subtotal_cents, 0)), 0)::bigint AS "revenueCents"
     FROM orders o JOIN order_items i ON i.order_id = o.id
     WHERE (o.status = 'fulfilled' OR (o.payment_status = 'paid' AND o.status <> 'cancelled')) AND o.payment_status <> 'refunded' AND COALESCE(o.payment_updated_at, o.created_at) >= (((NOW() AT TIME ZONE 'Africa/Cairo')::date - ($1::int - 1))::timestamp AT TIME ZONE 'Africa/Cairo')
     GROUP BY i.product_id, i.product_name ORDER BY "revenueCents" DESC LIMIT 8`,
-      [days],
-      ),
-      query(
-      `SELECT p.category AS name,
+          [days],
+        ),
+        query(
+          `SELECT p.category AS name,
     coalesce(sum(i.unit_price_cents::numeric * i.quantity * GREATEST(o.subtotal_cents - COALESCE(o.discount_cents, 0), 0) / NULLIF(o.subtotal_cents, 0)), 0)::bigint AS "revenueCents"
     FROM orders o JOIN order_items i ON i.order_id = o.id JOIN products p ON p.id = i.product_id
     WHERE (o.status = 'fulfilled' OR (o.payment_status = 'paid' AND o.status <> 'cancelled')) AND o.payment_status <> 'refunded' AND COALESCE(o.payment_updated_at, o.created_at) >= (((NOW() AT TIME ZONE 'Africa/Cairo')::date - ($1::int - 1))::timestamp AT TIME ZONE 'Africa/Cairo')
     GROUP BY p.category ORDER BY "revenueCents" DESC LIMIT 8`,
-      [days],
-      ),
-      query(
-      `SELECT count(*) FILTER (WHERE status IN ('pending', 'paid', 'processing', 'shipped', 'out_for_delivery'))::int AS "pendingOrders"
+          [days],
+        ),
+        query(
+          `SELECT count(*) FILTER (WHERE status IN ('pending', 'paid', 'processing', 'shipped', 'out_for_delivery'))::int AS "pendingOrders"
     FROM orders`,
-      ),
-    ]);
+        ),
+      ]);
     const { rows: series } = seriesResult;
     const { rows: topProducts } = productsResult;
     const { rows: topCategories } = categoriesResult;
@@ -1237,7 +1260,9 @@ router.get(
       pendingOrderCount: row.pendingOrderCount,
       grossProfit: Number(row.costedOrders)
         ? grossProfitCents / 100
-        : Number(row.completedOrders) === 0 ? 0 : null,
+        : Number(row.completedOrders) === 0
+          ? 0
+          : null,
       grossMargin:
         costedRevenueCents > 0
           ? (grossProfitCents / costedRevenueCents) * 100
@@ -1251,14 +1276,18 @@ router.get(
       inventoryCostValue: Number(row.inventoryCostCents) / 100,
       uncostedStockUnits: Number(row.uncostedStockUnits),
       uncostedStockProducts: row.uncostedStockProducts,
-      expectedInventoryProfit: Number(row.uncostedStockUnits) === 0
-        ? (Number(row.inventoryRetailCents) - Number(row.inventoryCostCents)) / 100
-        : null,
-      combinedOwnerValue: Number(row.uncostedStockUnits) === 0
-          && Number(row.costedOrders) === Number(row.completedOrders)
-          && Number(row.uncostedLines) === 0
-        ? (grossProfitCents + Number(row.inventoryCostCents)) / 100
-        : null,
+      expectedInventoryProfit:
+        Number(row.uncostedStockUnits) === 0
+          ? (Number(row.inventoryRetailCents) -
+              Number(row.inventoryCostCents)) /
+            100
+          : null,
+      combinedOwnerValue:
+        Number(row.uncostedStockUnits) === 0 &&
+        Number(row.costedOrders) === Number(row.completedOrders) &&
+        Number(row.uncostedLines) === 0
+          ? (grossProfitCents + Number(row.inventoryCostCents)) / 100
+          : null,
     });
   }),
 );
@@ -1270,7 +1299,9 @@ router.get(
       `SELECT ${columns} FROM products ORDER BY updated_at DESC`,
     );
     const canViewCosts = hasPermission(req.user.role, "analytics.view");
-    res.json(rows.map((row) => toAdminProduct(row, { includeCost: canViewCosts })));
+    res.json(
+      rows.map((row) => toAdminProduct(row, { includeCost: canViewCosts })),
+    );
   },
 );
 const PAYMENT_METHOD_LABELS = {
@@ -1282,28 +1313,95 @@ router.get(
   "/orders",
   requirePermission("orders.view"),
   asyncRoute(async (req, res) => {
-    const paginated = ["page", "perPage", "search", "status", "payment", "sort"].some((key) => req.query[key] !== undefined);
+    const paginated = [
+      "page",
+      "perPage",
+      "search",
+      "status",
+      "payment",
+      "sort",
+    ].some((key) => req.query[key] !== undefined);
     if (paginated) {
-      const page = z.coerce.number().int().min(1).max(1000000).default(1).parse(req.query.page);
+      const page = z.coerce
+        .number()
+        .int()
+        .min(1)
+        .max(1000000)
+        .default(1)
+        .parse(req.query.page);
       const allRows = req.query.perPage === "all";
-      const perPage = allRows ? null : z.coerce.number().int().min(1).max(100).default(10).parse(req.query.perPage);
-      const search = z.string().trim().max(100).default("").parse(req.query.search || "");
-      const status = z.enum(["pending", "paid", "processing", "shipped", "out_for_delivery", "fulfilled", "cancelled"]).or(z.literal("")).default("").parse(req.query.status || "");
-      const payment = z.enum(["pending", "paid", "failed", "refunded"]).or(z.literal("")).default("").parse(req.query.payment || "");
-      const sort = z.enum(["newest", "oldest", "total-desc", "total-asc"]).default("newest").parse(req.query.sort || "newest");
-      const escapedSearch = search.replace(/[\\%_]/g, (character) => `\\${character}`);
+      const perPage = allRows
+        ? null
+        : z.coerce
+            .number()
+            .int()
+            .min(1)
+            .max(100)
+            .default(10)
+            .parse(req.query.perPage);
+      const search = z
+        .string()
+        .trim()
+        .max(100)
+        .default("")
+        .parse(req.query.search || "");
+      const status = z
+        .enum([
+          "pending",
+          "paid",
+          "processing",
+          "shipped",
+          "out_for_delivery",
+          "fulfilled",
+          "cancelled",
+        ])
+        .or(z.literal(""))
+        .default("")
+        .parse(req.query.status || "");
+      const payment = z
+        .enum(["pending", "paid", "failed", "refunded"])
+        .or(z.literal(""))
+        .default("")
+        .parse(req.query.payment || "");
+      const sort = z
+        .enum(["newest", "oldest", "total-desc", "total-asc"])
+        .default("newest")
+        .parse(req.query.sort || "newest");
+      const escapedSearch = search.replace(
+        /[\\%_]/g,
+        (character) => `\\${character}`,
+      );
       const conditions = `($1 = '' OR o.id::text ILIKE '%' || $1 || '%' ESCAPE '\\' OR coalesce(u.name, o.shipping_address->>'name', '') ILIKE '%' || $1 || '%' ESCAPE '\\' OR coalesce(u.email, o.shipping_address->>'email', '') ILIKE '%' || $1 || '%' ESCAPE '\\') AND ($2 = '' OR o.status = $2) AND ($3 = '' OR coalesce(o.payment_status, CASE WHEN o.status IN ('paid','fulfilled') THEN 'paid' ELSE 'pending' END) = $3)`;
-      const orderBy = { newest: "o.created_at DESC", oldest: "o.created_at ASC", "total-desc": "o.total_cents DESC", "total-asc": "o.total_cents ASC" }[sort];
+      const orderBy = {
+        newest: "o.created_at DESC",
+        oldest: "o.created_at ASC",
+        "total-desc": "o.total_cents DESC",
+        "total-asc": "o.total_cents ASC",
+      }[sort];
       const listSql = `SELECT o.id, o.status, o.payment_status AS "paymentStatus", o.payment_transaction_id AS "paymentTransactionId", o.total_cents AS "totalCents", o.subtotal_cents AS "subtotalCents", o.shipping_cents AS "shippingCents", o.delivery, o.payment_method AS "paymentMethod", o.created_at AS "createdAt", o.shipping_address AS "shippingAddress", coalesce(u.email, o.shipping_address->>'email') AS email, coalesce(u.name, o.shipping_address->>'name') AS name,
           coalesce(json_agg(json_build_object('productId', i.product_id, 'name', i.product_name, 'price', i.unit_price_cents::numeric / 100, 'quantity', i.quantity, 'color', i.color, 'size', i.size, 'image', i.image_url)) FILTER (WHERE i.id IS NOT NULL), '[]') AS items
           FROM orders o LEFT JOIN users u ON u.id = o.user_id LEFT JOIN order_items i ON i.order_id = o.id WHERE ${conditions} GROUP BY o.id, u.email, u.name ORDER BY ${orderBy}, o.id DESC`;
       const [{ rows: countRows }, { rows }] = await Promise.all([
-        query(`SELECT count(*)::int AS total FROM orders o LEFT JOIN users u ON u.id = o.user_id WHERE ${conditions}`, [escapedSearch, status, payment]),
+        query(
+          `SELECT count(*)::int AS total FROM orders o LEFT JOIN users u ON u.id = o.user_id WHERE ${conditions}`,
+          [escapedSearch, status, payment],
+        ),
         allRows
           ? query(listSql, [escapedSearch, status, payment])
-          : query(`${listSql} LIMIT $4 OFFSET $5`, [escapedSearch, status, payment, perPage, (page - 1) * perPage]),
+          : query(`${listSql} LIMIT $4 OFFSET $5`, [
+              escapedSearch,
+              status,
+              payment,
+              perPage,
+              (page - 1) * perPage,
+            ]),
       ]);
-      return res.json({ items: rows.map(mapAdminOrder), total: countRows[0].total, page, perPage: allRows ? countRows[0].total : perPage });
+      return res.json({
+        items: rows.map(mapAdminOrder),
+        total: countRows[0].total,
+        page,
+        perPage: allRows ? countRows[0].total : perPage,
+      });
     }
     const limit =
       req.query.limit === undefined
@@ -1320,45 +1418,50 @@ router.get(
 );
 function mapAdminOrder(row) {
   return {
-        id: `NV-${row.id}`,
-        dbId: String(row.id),
-        status: row.status,
-        paymentStatus:
-          row.paymentStatus ||
-          (["paid", "fulfilled"].includes(row.status) ? "paid" : "pending"),
-        total: Number(row.totalCents) / 100,
-        totalCents: Number(row.totalCents),
-        subtotal: Number(row.subtotalCents) / 100,
-        shipping: Number(row.shippingCents) / 100,
-        delivery: row.delivery,
-        paymentMethod:
-          PAYMENT_METHOD_LABELS[row.paymentMethod] || row.paymentMethod,
-        paymentMethodCode: row.paymentMethod,
-        createdAt: row.createdAt,
-        customer: {
-          name: row.name,
-          email: row.email,
-          phone: row.shippingAddress?.phone || "—",
-        },
-        shippingAddress: {
-          ...row.shippingAddress,
-          method: row.delivery === "express" ? "Express" : "Standard",
-        },
-        trackingNumber: null,
-        transactionRef: row.paymentTransactionId || null,
-        items: row.items,
-        notes: [],
+    id: `NV-${row.id}`,
+    dbId: String(row.id),
+    status: row.status,
+    paymentStatus:
+      row.paymentStatus ||
+      (["paid", "fulfilled"].includes(row.status) ? "paid" : "pending"),
+    total: Number(row.totalCents) / 100,
+    totalCents: Number(row.totalCents),
+    subtotal: Number(row.subtotalCents) / 100,
+    shipping: Number(row.shippingCents) / 100,
+    delivery: row.delivery,
+    paymentMethod:
+      PAYMENT_METHOD_LABELS[row.paymentMethod] || row.paymentMethod,
+    paymentMethodCode: row.paymentMethod,
+    createdAt: row.createdAt,
+    customer: {
+      name: row.name,
+      email: row.email,
+      phone: row.shippingAddress?.phone || "—",
+    },
+    shippingAddress: {
+      ...row.shippingAddress,
+      method: row.delivery === "express" ? "Express" : "Standard",
+    },
+    trackingNumber: null,
+    transactionRef: row.paymentTransactionId || null,
+    items: row.items,
+    notes: [],
   };
 }
 router.get(
   "/orders/:id",
   requirePermission("orders.view"),
   asyncRoute(async (req, res) => {
-    const id = z.coerce.number().int().positive().parse(String(req.params.id).replace(/^NV-/i, ""));
+    const id = z.coerce
+      .number()
+      .int()
+      .positive()
+      .parse(String(req.params.id).replace(/^NV-/i, ""));
     const { rows } = await query(
       `SELECT o.id, o.status, o.payment_status AS "paymentStatus", o.payment_transaction_id AS "paymentTransactionId", o.total_cents AS "totalCents", o.subtotal_cents AS "subtotalCents", o.shipping_cents AS "shippingCents", o.delivery, o.payment_method AS "paymentMethod", o.created_at AS "createdAt", o.shipping_address AS "shippingAddress", coalesce(u.email, o.shipping_address->>'email') AS email, coalesce(u.name, o.shipping_address->>'name') AS name,
         coalesce(json_agg(json_build_object('productId', i.product_id, 'name', i.product_name, 'price', i.unit_price_cents::numeric / 100, 'quantity', i.quantity, 'color', i.color, 'size', i.size, 'image', i.image_url)) FILTER (WHERE i.id IS NOT NULL), '[]') AS items
-        FROM orders o LEFT JOIN users u ON u.id = o.user_id LEFT JOIN order_items i ON i.order_id = o.id WHERE o.id = $1 GROUP BY o.id, u.email, u.name`, [id],
+        FROM orders o LEFT JOIN users u ON u.id = o.user_id LEFT JOIN order_items i ON i.order_id = o.id WHERE o.id = $1 GROUP BY o.id, u.email, u.name`,
+      [id],
     );
     if (!rows[0]) return res.status(404).json({ error: "Order not found." });
     res.json(mapAdminOrder(rows[0]));
@@ -1406,8 +1509,7 @@ router.patch(
         ].includes(status)
       ) {
         return {
-          conflict:
-            "Confirm the online payment before advancing this order.",
+          conflict: "Confirm the online payment before advancing this order.",
         };
       }
       if (order.status === "cancelled") {
@@ -1543,7 +1645,9 @@ router.patch(
         orderId: result.id,
         status: "paid",
         trackingUrl,
-      }).catch((error) => console.error("InstaPay confirmation email failed:", error));
+      }).catch((error) =>
+        console.error("InstaPay confirmation email failed:", error),
+      );
     }
   },
 );
@@ -1738,17 +1842,27 @@ router.delete(
   requirePermission("products.delete"),
   async (req, res) => {
     const result = await transaction(async (client) => {
-      const { rows } = await client.query("SELECT slug FROM categories WHERE id = $1 FOR UPDATE", [req.params.id]);
+      const { rows } = await client.query(
+        "SELECT slug FROM categories WHERE id = $1 FOR UPDATE",
+        [req.params.id],
+      );
       if (!rows[0]) return { missing: true };
-      const { rows: assigned } = await client.query("SELECT count(*)::int AS count FROM products WHERE category = $1", [rows[0].slug]);
+      const { rows: assigned } = await client.query(
+        "SELECT count(*)::int AS count FROM products WHERE category = $1",
+        [rows[0].slug],
+      );
       if (assigned[0].count) return { assigned: assigned[0].count };
-      await client.query("DELETE FROM categories WHERE id = $1", [req.params.id]);
+      await client.query("DELETE FROM categories WHERE id = $1", [
+        req.params.id,
+      ]);
       return { deleted: true };
     });
     if (result.missing)
       return res.status(404).json({ error: "Category not found." });
     if (result.assigned)
-      return res.status(409).json({ error: `This category is assigned to ${result.assigned} product(s). Reassign those products before deleting it.` });
+      return res.status(409).json({
+        error: `This category is assigned to ${result.assigned} product(s). Reassign those products before deleting it.`,
+      });
     await logAudit({
       req,
       action: "category.deleted",
@@ -1936,17 +2050,27 @@ router.delete(
   requirePermission("products.delete"),
   async (req, res) => {
     const result = await transaction(async (client) => {
-      const { rows } = await client.query("SELECT slug FROM collections WHERE id = $1 FOR UPDATE", [req.params.id]);
+      const { rows } = await client.query(
+        "SELECT slug FROM collections WHERE id = $1 FOR UPDATE",
+        [req.params.id],
+      );
       if (!rows[0]) return { missing: true };
-      const { rows: assigned } = await client.query("SELECT count(*)::int AS count FROM products WHERE collection = $1", [rows[0].slug]);
+      const { rows: assigned } = await client.query(
+        "SELECT count(*)::int AS count FROM products WHERE collection = $1",
+        [rows[0].slug],
+      );
       if (assigned[0].count) return { assigned: assigned[0].count };
-      await client.query("DELETE FROM collections WHERE id = $1", [req.params.id]);
+      await client.query("DELETE FROM collections WHERE id = $1", [
+        req.params.id,
+      ]);
       return { deleted: true };
     });
     if (result.missing)
       return res.status(404).json({ error: "Collection not found." });
     if (result.assigned)
-      return res.status(409).json({ error: `This collection is assigned to ${result.assigned} product(s). Remove those assignments before deleting it.` });
+      return res.status(409).json({
+        error: `This collection is assigned to ${result.assigned} product(s). Remove those assignments before deleting it.`,
+      });
     await logAudit({
       req,
       action: "collection.deleted",
@@ -2012,9 +2136,11 @@ router.post(
           JSON.stringify(p.metadata),
         ],
       );
-      res.status(201).json(toAdminProduct(rows[0], {
-        includeCost: hasPermission(req.user.role, "analytics.view"),
-      }));
+      res.status(201).json(
+        toAdminProduct(rows[0], {
+          includeCost: hasPermission(req.user.role, "analytics.view"),
+        }),
+      );
     } catch (error) {
       if (error.code === "23505")
         return res
@@ -2052,43 +2178,57 @@ router.patch(
       const oldVariantStock = current.inventoryByVariant || {};
       const colors = p.colors.length ? p.colors : ["Default"];
       const sizes = p.sizes.length ? p.sizes : ["One Size"];
-      const inventoryByVariant = Object.fromEntries(colors.flatMap((color) =>
-        sizes.map((size) => [`${color}::${size}`, Math.max(0, Number(oldVariantStock[`${color}::${size}`]) || 0)]),
-      ));
-      const inventory = Object.fromEntries(sizes.map((size) => [size,
-        Object.entries(inventoryByVariant).filter(([key]) => key.endsWith(`::${size}`))
-          .reduce((sum, [, amount]) => sum + amount, 0),
-      ]));
-      const totalInventory = Object.values(inventory).reduce((sum, amount) => sum + amount, 0);
+      const inventoryByVariant = Object.fromEntries(
+        colors.flatMap((color) =>
+          sizes.map((size) => [
+            `${color}::${size}`,
+            Math.max(0, Number(oldVariantStock[`${color}::${size}`]) || 0),
+          ]),
+        ),
+      );
+      const inventory = Object.fromEntries(
+        sizes.map((size) => [
+          size,
+          Object.entries(inventoryByVariant)
+            .filter(([key]) => key.endsWith(`::${size}`))
+            .reduce((sum, [, amount]) => sum + amount, 0),
+        ]),
+      );
+      const totalInventory = Object.values(inventory).reduce(
+        (sum, amount) => sum + amount,
+        0,
+      );
       const { rows } = await client.query(
-      `UPDATE products SET slug=$1,name=$2,description=$3,price_cents=$4,category=$5,collection=$6,images=$7::jsonb,colors=$8::jsonb,sizes=$9::jsonb,is_active=$10,inventory=$11,
+        `UPDATE products SET slug=$1,name=$2,description=$3,price_cents=$4,category=$5,collection=$6,images=$7::jsonb,colors=$8::jsonb,sizes=$9::jsonb,is_active=$10,inventory=$11,
        metadata = (COALESCE(metadata, '{}'::jsonb) - 'inventory' - 'inventoryByVariant') || $12::jsonb || jsonb_build_object(
          'inventory', $13::jsonb, 'inventoryByVariant', $14::jsonb
        ), updated_at=NOW() WHERE id=$15 RETURNING ${columns}`,
-      [
-        p.slug,
-        p.name,
-        p.description,
-        p.priceCents,
-        p.category,
-        p.collection,
-        JSON.stringify(p.images),
-        JSON.stringify(p.colors),
-        JSON.stringify(p.sizes),
-        p.isActive,
-        totalInventory,
-        JSON.stringify(p.metadata),
-        JSON.stringify(inventory),
-        JSON.stringify(inventoryByVariant),
-        req.params.id,
-      ],
+        [
+          p.slug,
+          p.name,
+          p.description,
+          p.priceCents,
+          p.category,
+          p.collection,
+          JSON.stringify(p.images),
+          JSON.stringify(p.colors),
+          JSON.stringify(p.sizes),
+          p.isActive,
+          totalInventory,
+          JSON.stringify(p.metadata),
+          JSON.stringify(inventory),
+          JSON.stringify(inventoryByVariant),
+          req.params.id,
+        ],
       );
       return rows[0];
     });
     if (!updated) return res.status(404).json({ error: "Product not found." });
-    res.json(toAdminProduct(updated, {
-      includeCost: hasPermission(req.user.role, "analytics.view"),
-    }));
+    res.json(
+      toAdminProduct(updated, {
+        includeCost: hasPermission(req.user.role, "analytics.view"),
+      }),
+    );
   },
 );
 router.get(
@@ -2113,7 +2253,11 @@ router.post(
           .min(-100000)
           .max(100000)
           .refine((value) => value !== 0),
-        color: z.string().max(60).refine((value) => !value.includes("::"), "Color cannot contain ::").optional(),
+        color: z
+          .string()
+          .max(60)
+          .refine((value) => !value.includes("::"), "Color cannot contain ::")
+          .optional(),
         reason: z.string().trim().min(2).max(240),
       })
       .parse(req.body);
@@ -2207,10 +2351,15 @@ router.delete(
   async (req, res) => {
     let result;
     try {
-      result = await query("DELETE FROM products WHERE id = $1", [req.params.id]);
+      result = await query("DELETE FROM products WHERE id = $1", [
+        req.params.id,
+      ]);
     } catch (error) {
       if (error.code === "23503")
-        return res.status(409).json({ error: "This product appears in order history and cannot be deleted. Unpublish it to remove it from the storefront." });
+        return res.status(409).json({
+          error:
+            "This product appears in order history and cannot be deleted. Unpublish it to remove it from the storefront.",
+        });
       throw error;
     }
     if (!result.rowCount)
@@ -2489,14 +2638,41 @@ router.get(
   "/customers",
   requirePermission("customers.view"),
   async (req, res) => {
-    const page = z.coerce.number().int().min(1).max(1000000).default(1).parse(req.query.page);
-    const perPage = z.coerce.number().int().min(1).max(100).default(50).parse(req.query.perPage);
-    const search = z.string().trim().max(100).default("").parse(req.query.search || "");
-    const status = z.enum(["active", "disabled", "guest"]).or(z.literal("")).default("").parse(req.query.status || "");
-    const sort = z.enum(["recent", "spent-desc", "orders-desc"]).default("recent").parse(req.query.sort || "recent");
-    const escapedSearch = search.replace(/[\\%_]/g, (character) => `\\${character}`);
-    const { rows } =
-      await query(`WITH registered_orders AS (
+    const page = z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(1000000)
+      .default(1)
+      .parse(req.query.page);
+    const perPage = z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .default(50)
+      .parse(req.query.perPage);
+    const search = z
+      .string()
+      .trim()
+      .max(100)
+      .default("")
+      .parse(req.query.search || "");
+    const status = z
+      .enum(["active", "disabled", "guest"])
+      .or(z.literal(""))
+      .default("")
+      .parse(req.query.status || "");
+    const sort = z
+      .enum(["recent", "spent-desc", "orders-desc"])
+      .default("recent")
+      .parse(req.query.sort || "recent");
+    const escapedSearch = search.replace(
+      /[\\%_]/g,
+      (character) => `\\${character}`,
+    );
+    const { rows } = await query(
+      `WITH registered_orders AS (
   SELECT user_id, count(*) FILTER (WHERE status <> 'cancelled')::int AS "orderCount",
     max(created_at) FILTER (WHERE status <> 'cancelled') AS "lastOrder",
     coalesce(sum(total_cents) FILTER (WHERE payment_status = 'paid' AND status <> 'cancelled' AND payment_status <> 'refunded'), 0)::bigint AS "totalSpentCents"
@@ -2545,7 +2721,9 @@ ORDER BY
   CASE WHEN $3 = 'spent-desc' THEN "totalSpentCents" END DESC,
   CASE WHEN $3 = 'orders-desc' THEN "orderCount" END DESC,
   id
-LIMIT $4 OFFSET $5`, [escapedSearch, status, sort, perPage, (page - 1) * perPage]);
+LIMIT $4 OFFSET $5`,
+      [escapedSearch, status, sort, perPage, (page - 1) * perPage],
+    );
     res.json({ items: rows, total: rows[0]?.totalCount || 0, page, perPage });
   },
 );
@@ -2601,27 +2779,29 @@ router.patch(
 );
 
 // --- Discounts ---
-const discountInput = z.object({
-  code: z
-    .string()
-    .min(2)
-    .max(40)
-    .transform((v) => v.toUpperCase().trim())
-    .pipe(z.string().regex(/^[A-Z0-9][A-Z0-9_-]{1,39}$/)),
-  type: z.enum(["percent", "fixed"]),
-  value: z.coerce.number().int().positive(),
-  minSubtotal: z.coerce.number().min(0).default(0),
-  usageLimit: z.coerce.number().int().positive().optional(),
-  expiresAt: z.string().datetime().optional().or(z.literal("")),
-}).superRefine((discount, context) => {
-  if (discount.type === "percent" && discount.value > 100) {
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["value"],
-      message: "Percentage discounts cannot be greater than 100.",
-    });
-  }
-});
+const discountInput = z
+  .object({
+    code: z
+      .string()
+      .min(2)
+      .max(40)
+      .transform((v) => v.toUpperCase().trim())
+      .pipe(z.string().regex(/^[A-Z0-9][A-Z0-9_-]{1,39}$/)),
+    type: z.enum(["percent", "fixed"]),
+    value: z.coerce.number().int().positive(),
+    minSubtotal: z.coerce.number().min(0).default(0),
+    usageLimit: z.coerce.number().int().positive().optional(),
+    expiresAt: z.string().datetime().optional().or(z.literal("")),
+  })
+  .superRefine((discount, context) => {
+    if (discount.type === "percent" && discount.value > 100) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["value"],
+        message: "Percentage discounts cannot be greater than 100.",
+      });
+    }
+  });
 router.get(
   "/discounts",
   requirePermission("discounts.manage"),
@@ -2723,10 +2903,41 @@ const settingsInput = z.object({
     .optional(),
   announcementEnabled: z.boolean().optional(),
   announcementText: z.string().trim().min(1).max(240).optional(),
-  announcementBackgroundColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
-  announcementTextColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
-  announcementPattern: z.enum(["solid", "stripes", "dots", "checker", "waves", "diagonal", "grid", "bars", "confetti", "glow"]).optional(),
-  announcementTheme: z.enum(["midnight", "cream", "citrus", "rose", "ocean", "lavender", "forest", "mono", "custom"]).optional(),
+  announcementBackgroundColor: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/)
+    .optional(),
+  announcementTextColor: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/)
+    .optional(),
+  announcementPattern: z
+    .enum([
+      "solid",
+      "stripes",
+      "dots",
+      "checker",
+      "waves",
+      "diagonal",
+      "grid",
+      "bars",
+      "confetti",
+      "glow",
+    ])
+    .optional(),
+  announcementTheme: z
+    .enum([
+      "midnight",
+      "cream",
+      "citrus",
+      "rose",
+      "ocean",
+      "lavender",
+      "forest",
+      "mono",
+      "custom",
+    ])
+    .optional(),
   announcementSpeedSeconds: z.coerce.number().int().min(6).max(60).optional(),
   signupOfferEnabled: z.boolean().optional(),
   signupOfferDelaySeconds: z.coerce.number().int().min(1).max(120).optional(),
@@ -2745,11 +2956,12 @@ const settingsInput = z.object({
     .superRefine((locations, context) => {
       const ids = new Set();
       for (const [index, location] of locations.entries()) {
-        if (ids.has(location.id)) context.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: [index, "id"],
-          message: "Delivery location IDs must be unique.",
-        });
+        if (ids.has(location.id))
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [index, "id"],
+            message: "Delivery location IDs must be unique.",
+          });
         ids.add(location.id);
       }
     })

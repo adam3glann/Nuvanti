@@ -29,7 +29,11 @@ export async function adminIpBlockStatus(req, accountId = req.user?.sub) {
   return rows[0]?.blockedUntil || null;
 }
 
-export async function rejectBlockedAdminIp(req, res, accountId = req.user?.sub) {
+export async function rejectBlockedAdminIp(
+  req,
+  res,
+  accountId = req.user?.sub,
+) {
   const blockedUntil = await adminIpBlockStatus(req, accountId);
   if (!blockedUntil) return false;
   const seconds = Math.max(
@@ -50,7 +54,8 @@ export async function recordAdminEmailCodeFailure(req, accountId) {
       failedAttempts: IP_FAILURE_LIMIT,
       blockedUntil: new Date(Date.now() + 24 * 60 * 60 * 1000),
     };
-  if (!accountId) throw new Error("Admin account is required to record a code failure.");
+  if (!accountId)
+    throw new Error("Admin account is required to record a code failure.");
   const ipHash = fingerprintIp(ip, accountId);
   const { rows } = await query(
     `
@@ -78,7 +83,10 @@ export async function recordAdminEmailCodeFailure(req, accountId) {
   return rows[0];
 }
 
-export async function clearAdminEmailCodeFailures(req, accountId = req.user?.sub) {
+export async function clearAdminEmailCodeFailures(
+  req,
+  accountId = req.user?.sub,
+) {
   const ip = requestIp(req);
   if (ip && accountId)
     await query("DELETE FROM admin_login_ip_blocks WHERE ip_hash = $1", [

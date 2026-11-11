@@ -72,10 +72,17 @@ export async function query(text, params) {
   } finally {
     const durationMs = performance.now() - startedAt;
     const threshold = Number(process.env.SLOW_QUERY_LOG_MS || 750);
-    if (Number.isFinite(threshold) && threshold > 0 && durationMs >= threshold) {
+    if (
+      Number.isFinite(threshold) &&
+      threshold > 0 &&
+      durationMs >= threshold
+    ) {
       // Log duration and operation only. Avoid query text and bind values,
       // which can contain private customer data.
-      const operation = /^\s*(SELECT|INSERT|UPDATE|DELETE|WITH)\b/i.exec(text)?.[1]?.toUpperCase() || "QUERY";
+      const operation =
+        /^\s*(SELECT|INSERT|UPDATE|DELETE|WITH)\b/i
+          .exec(text)?.[1]
+          ?.toUpperCase() || "QUERY";
       console.warn("Slow database query", {
         operation,
         durationMs: Math.round(durationMs),

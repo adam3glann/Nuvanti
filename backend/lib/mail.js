@@ -380,12 +380,18 @@ export async function sendOrderConfirmation({
   const address = [
     shippingAddress?.name || name,
     shippingAddress?.phone,
-    [shippingAddress?.address1, shippingAddress?.buildingNumber && `Building ${shippingAddress.buildingNumber}`]
+    [
+      shippingAddress?.address1,
+      shippingAddress?.buildingNumber &&
+        `Building ${shippingAddress.buildingNumber}`,
+    ]
       .filter(Boolean)
       .join(" "),
-    shippingAddress?.propertyType && `${shippingAddress.propertyType[0].toUpperCase()}${shippingAddress.propertyType.slice(1)}`,
+    shippingAddress?.propertyType &&
+      `${shippingAddress.propertyType[0].toUpperCase()}${shippingAddress.propertyType.slice(1)}`,
     shippingAddress?.floor && `Floor ${shippingAddress.floor}`,
-    shippingAddress?.apartmentNumber && `Unit ${shippingAddress.apartmentNumber}`,
+    shippingAddress?.apartmentNumber &&
+      `Unit ${shippingAddress.apartmentNumber}`,
     shippingAddress?.city,
     shippingAddress?.country,
     shippingAddress?.postalCode,

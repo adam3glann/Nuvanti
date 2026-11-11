@@ -15,15 +15,15 @@
 // also keeps any other open tab (e.g. the storefront open next to the
 // admin) in sync without a page reload.
 
-import { products as seedProducts } from './products.js';
+import { products as seedProducts } from "./products.js";
 
-const STORAGE_KEY = 'nuvanti:products:v1';
+const STORAGE_KEY = "nuvanti:products:v1";
 
 function seed() {
   // The storefront fallback only needs public catalog fields. Never put
   // supplier cost or other private business data in a client-side catalog.
   return seedProducts.map((p) => ({
-    status: 'active',
+    status: "active",
     ...p,
     sku: p.sku || `NV-${p.id.toUpperCase()}`,
   }));
@@ -37,8 +37,10 @@ function load() {
       if (Array.isArray(parsed)) {
         let removedPrivateCost = false;
         const publicProducts = parsed.map((product) => {
-          if (!product || typeof product !== 'object' || Array.isArray(product)) return product;
-          if (!Object.prototype.hasOwnProperty.call(product, 'cost')) return product;
+          if (!product || typeof product !== "object" || Array.isArray(product))
+            return product;
+          if (!Object.prototype.hasOwnProperty.call(product, "cost"))
+            return product;
           const publicProduct = { ...product };
           delete publicProduct.cost;
           removedPrivateCost = true;
@@ -70,21 +72,35 @@ const listeners = new Set();
 
 function persist() {
   persistRaw(store);
-  listeners.forEach((fn) => { try { fn(store); } catch (e) { /* listener error shouldn't break others */ } });
+  listeners.forEach((fn) => {
+    try {
+      fn(store);
+    } catch (e) {
+      /* listener error shouldn't break others */
+    }
+  });
 }
 
 // Keep other open tabs in sync (e.g. admin editing in one tab while the
 // storefront sits open in another).
-if (typeof window !== 'undefined') {
-  window.addEventListener('storage', (e) => {
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", (e) => {
     if (e.key === STORAGE_KEY && e.newValue) {
       try {
         const parsed = JSON.parse(e.newValue);
         if (Array.isArray(parsed)) {
           store = parsed;
-          listeners.forEach((fn) => { try { fn(store); } catch (err) { /* ignore */ } });
+          listeners.forEach((fn) => {
+            try {
+              fn(store);
+            } catch (err) {
+              /* ignore */
+            }
+          });
         }
-      } catch (err) { /* ignore malformed write from another tab */ }
+      } catch (err) {
+        /* ignore malformed write from another tab */
+      }
     }
   });
 }
@@ -98,7 +114,7 @@ export function getAllProducts() {
 export function getPublishedProducts() {
   // Products created before `status` existed have no field at all —
   // treat those as published so nothing already live disappears.
-  return store.filter((p) => !p.status || p.status === 'active');
+  return store.filter((p) => !p.status || p.status === "active");
 }
 
 export function getProductById(id) {
@@ -112,8 +128,15 @@ export function getProductBySlug(slug) {
 export function addProduct(data) {
   const id = data.id || `p-${Date.now()}`;
   const product = {
-    status: 'draft', featured: false, bestseller: false, newArrival: false,
-    colors: [], sizes: [], images: [], inventory: {}, badges: [],
+    status: "draft",
+    featured: false,
+    bestseller: false,
+    newArrival: false,
+    colors: [],
+    sizes: [],
+    images: [],
+    inventory: {},
+    badges: [],
     ...data,
     id,
     sku: data.sku || `NV-${id.toUpperCase()}`,

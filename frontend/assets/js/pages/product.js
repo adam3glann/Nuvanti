@@ -18,11 +18,7 @@ import {
   fetchRelated,
 } from "../services/productService.js";
 
-import {
-  colorHex,
-  stockFor,
-  isInStock,
-} from "../data/products.js";
+import { colorHex, stockFor, isInStock } from "../data/products.js";
 
 import { addToCart, variantStockRemaining } from "../services/cartService.js";
 
@@ -49,7 +45,7 @@ let selectedSize = null;
 let selectedQuantity = 1;
 
 let galleryIndex = 0;
-let galleryMode = 'all';
+let galleryMode = "all";
 let lightboxIndex = 0;
 
 /* =========================================================
@@ -64,11 +60,15 @@ async function init() {
     return;
   }
 
-  try { product = await fetchProductBySlug(slug); }
-  catch {
+  try {
+    product = await fetchProductBySlug(slug);
+  } catch {
     const root = document.getElementById("productRoot");
-    root.innerHTML = '<div class="state-block"><h3>Product details are temporarily unavailable</h3><p>Please try again in a moment.</p><button class="btn btn-outline" id="retryProduct">Try Again</button></div>';
-    root.querySelector('#retryProduct')?.addEventListener('click', () => location.reload());
+    root.innerHTML =
+      '<div class="state-block"><h3>Product details are temporarily unavailable</h3><p>Please try again in a moment.</p><button class="btn btn-outline" id="retryProduct">Try Again</button></div>';
+    root
+      .querySelector("#retryProduct")
+      ?.addEventListener("click", () => location.reload());
     return;
   }
 
@@ -78,10 +78,10 @@ async function init() {
   }
 
   selectedColor = product.colors?.[0] || null;
-  selectedSize = product.sizes?.length ? null : 'One Size';
+  selectedSize = product.sizes?.length ? null : "One Size";
   selectedQuantity = 1;
   galleryIndex = 0;
-  galleryMode = 'all';
+  galleryMode = "all";
 
   document.title = `${product.name} — Nuvanti`;
 
@@ -105,8 +105,10 @@ async function refreshProduct() {
   const latest = await fetchProductBySlug(slug);
   if (!latest || JSON.stringify(latest) === JSON.stringify(product)) return;
   product = latest;
-  if (!product.colors?.includes(selectedColor)) selectedColor = product.colors?.[0] || null;
-  if (product.sizes?.length && !product.sizes.includes(selectedSize)) selectedSize = null;
+  if (!product.colors?.includes(selectedColor))
+    selectedColor = product.colors?.[0] || null;
+  if (product.sizes?.length && !product.sizes.includes(selectedSize))
+    selectedSize = null;
   renderGallery();
   renderInfo();
 }
@@ -185,7 +187,8 @@ function renderGallery() {
 
   // Rebuilding the gallery after a thumbnail selection should not reset the
   // horizontal strip to the beginning after the customer has scrolled it.
-  const thumbsScrollLeft = gallery.querySelector(".gallery__thumbs")?.scrollLeft ?? 0;
+  const thumbsScrollLeft =
+    gallery.querySelector(".gallery__thumbs")?.scrollLeft ?? 0;
 
   const images = currentProductImages();
   const allImages = allProductImageEntries();
@@ -301,15 +304,21 @@ function renderGallery() {
     button.addEventListener("click", () => {
       const src = button.dataset.src;
       let colors = [];
-      try { colors = JSON.parse(button.dataset.colors || '[]').filter((color) => typeof color === 'string'); } catch {}
+      try {
+        colors = JSON.parse(button.dataset.colors || "[]").filter(
+          (color) => typeof color === "string",
+        );
+      } catch {}
       if (colors.length) {
-        selectedColor = colors.includes(selectedColor) ? selectedColor : colors[0];
-        galleryMode = 'color';
+        selectedColor = colors.includes(selectedColor)
+          ? selectedColor
+          : colors[0];
+        galleryMode = "color";
         renderInfo();
         const colorImages = currentProductImages();
         galleryIndex = Math.max(0, colorImages.indexOf(src));
       } else {
-        galleryMode = 'all';
+        galleryMode = "all";
         const globalImages = currentProductImages();
         galleryIndex = Math.max(0, globalImages.indexOf(src));
       }
@@ -329,29 +338,51 @@ function renderGallery() {
   let touchStart = null;
   let suppressGalleryClick = false;
   if (images.length > 1) {
-    main.addEventListener("touchstart", (event) => {
-      const touch = event.changedTouches[0];
-      touchStart = touch ? { x: touch.clientX, y: touch.clientY } : null;
-    }, { passive: true });
-    main.addEventListener("touchend", (event) => {
-      if (!touchStart) return;
-      const touch = event.changedTouches[0];
-      const dx = touch.clientX - touchStart.x;
-      const dy = touch.clientY - touchStart.y;
-      touchStart = null;
-      if (Math.abs(dx) < 45 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
-      event.preventDefault();
-      suppressGalleryClick = true;
-      setGalleryImage(galleryIndex + (dx < 0 ? 1 : -1));
-      window.setTimeout(() => { suppressGalleryClick = false; }, 700);
-    }, { passive: false });
-    main.addEventListener("touchcancel", () => { touchStart = null; }, { passive: true });
+    main.addEventListener(
+      "touchstart",
+      (event) => {
+        const touch = event.changedTouches[0];
+        touchStart = touch ? { x: touch.clientX, y: touch.clientY } : null;
+      },
+      { passive: true },
+    );
+    main.addEventListener(
+      "touchend",
+      (event) => {
+        if (!touchStart) return;
+        const touch = event.changedTouches[0];
+        const dx = touch.clientX - touchStart.x;
+        const dy = touch.clientY - touchStart.y;
+        touchStart = null;
+        if (Math.abs(dx) < 45 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
+        event.preventDefault();
+        suppressGalleryClick = true;
+        setGalleryImage(galleryIndex + (dx < 0 ? 1 : -1));
+        window.setTimeout(() => {
+          suppressGalleryClick = false;
+        }, 700);
+      },
+      { passive: false },
+    );
+    main.addEventListener(
+      "touchcancel",
+      () => {
+        touchStart = null;
+      },
+      { passive: true },
+    );
   }
   main.tabIndex = 0;
   main.setAttribute("role", "button");
-  main.setAttribute("aria-label", `Open ${product.name} image ${galleryIndex + 1}`);
+  main.setAttribute(
+    "aria-label",
+    `Open ${product.name} image ${galleryIndex + 1}`,
+  );
   main.addEventListener("click", () => {
-    if (suppressGalleryClick) { suppressGalleryClick = false; return; }
+    if (suppressGalleryClick) {
+      suppressGalleryClick = false;
+      return;
+    }
     openLightbox(galleryIndex);
   });
   main.addEventListener("keydown", (event) => {
@@ -379,9 +410,10 @@ function renderGallery() {
 }
 
 function currentProductImages() {
-  if (galleryMode === 'color' && selectedColor) {
+  if (galleryMode === "color" && selectedColor) {
     const selectedImages = product?.colorImages?.[selectedColor];
-    if (Array.isArray(selectedImages) && selectedImages.some(Boolean)) return [...new Set(selectedImages.filter(Boolean))];
+    if (Array.isArray(selectedImages) && selectedImages.some(Boolean))
+      return [...new Set(selectedImages.filter(Boolean))];
   }
   return allProductImageEntries().map((entry) => entry.src);
 }
@@ -544,7 +576,9 @@ function openLightbox(startIndex = 0) {
        CLOSE
        ------------------------------------------------------- */
 
-    box.querySelector(".lightbox__close").addEventListener("click", closeLightbox);
+    box
+      .querySelector(".lightbox__close")
+      .addEventListener("click", closeLightbox);
 
     box.addEventListener("click", (event) => {
       if (event.target === box) {
@@ -604,7 +638,9 @@ function openLightbox(startIndex = 0) {
     box.addEventListener(
       "touchstart",
       (event) => {
-        touchStartedOnImage = event.target.id === "lightboxImg" && !event.target.classList.contains("is-zoomed");
+        touchStartedOnImage =
+          event.target.id === "lightboxImg" &&
+          !event.target.classList.contains("is-zoomed");
         touchStartX = event.changedTouches[0].screenX;
       },
       { passive: true },
@@ -622,7 +658,9 @@ function openLightbox(startIndex = 0) {
         }
 
         box.dataset.dragged = "true";
-        window.setTimeout(() => { box.dataset.dragged = "false"; }, 700);
+        window.setTimeout(() => {
+          box.dataset.dragged = "false";
+        }, 700);
         if (difference < 0) {
           navigateLightbox(1);
         } else {
@@ -634,7 +672,12 @@ function openLightbox(startIndex = 0) {
 
     let pointerStartX = null;
     box.addEventListener("pointerdown", (event) => {
-      if (event.pointerType !== "mouse" || event.target.id !== "lightboxImg" || event.target.classList.contains("is-zoomed")) return;
+      if (
+        event.pointerType !== "mouse" ||
+        event.target.id !== "lightboxImg" ||
+        event.target.classList.contains("is-zoomed")
+      )
+        return;
       pointerStartX = event.clientX;
     });
     box.addEventListener("pointerup", (event) => {
@@ -643,7 +686,9 @@ function openLightbox(startIndex = 0) {
       pointerStartX = null;
       if (Math.abs(difference) < 55) return;
       box.dataset.dragged = "true";
-      window.setTimeout(() => { box.dataset.dragged = "false"; }, 700);
+      window.setTimeout(() => {
+        box.dataset.dragged = "false";
+      }, 700);
       navigateLightbox(difference < 0 ? 1 : -1);
     });
   }
@@ -666,7 +711,7 @@ function renderLightbox() {
   const src = images[lightboxIndex];
   image.style.opacity = "0";
   image.onload = () => {
-    if (image.getAttribute('src') === src) image.style.opacity = "1";
+    if (image.getAttribute("src") === src) image.style.opacity = "1";
   };
   image.src = src;
   image.alt = `${product.name} — Image ${lightboxIndex + 1}`;
@@ -681,7 +726,10 @@ function renderLightbox() {
 function navigateLightbox(direction) {
   const images = currentProductImages();
   if (!images.length) return;
-  lightboxIndex = Math.max(0, Math.min(lightboxIndex + direction, images.length - 1));
+  lightboxIndex = Math.max(
+    0,
+    Math.min(lightboxIndex + direction, images.length - 1),
+  );
   renderLightbox();
 }
 
@@ -704,8 +752,12 @@ function renderInfo() {
 
   const wished = isWishlisted(product.id);
   const sizeGuideData = product?.sizeGuideMeasurements || {};
-  const sizeGuideColumns = Array.isArray(sizeGuideData.columns) ? sizeGuideData.columns : [];
-  const sizeGuideRows = Array.isArray(sizeGuideData.rows) ? sizeGuideData.rows : [];
+  const sizeGuideColumns = Array.isArray(sizeGuideData.columns)
+    ? sizeGuideData.columns
+    : [];
+  const sizeGuideRows = Array.isArray(sizeGuideData.rows)
+    ? sizeGuideData.rows
+    : [];
   const sizeAdvisor = buildSizeAdvisorMarkup(sizeGuideColumns, sizeGuideRows);
 
   const productInStock = isInStock(product);
@@ -969,7 +1021,7 @@ function renderInfo() {
       </span>
 
       <span>
-        Material: ${escapeHtml(product.material || 'Cotton blend')}
+        Material: ${escapeHtml(product.material || "Cotton blend")}
       </span>
 
     </div>
@@ -977,7 +1029,7 @@ function renderInfo() {
   `;
 
   bindInfoEvents();
-  bindSizeAdvisor('productInfo', sizeGuideColumns, sizeGuideRows);
+  bindSizeAdvisor("productInfo", sizeGuideColumns, sizeGuideRows);
   updateStockLine();
 }
 
@@ -1001,7 +1053,7 @@ function bindInfoEvents() {
       selectedColor = button.dataset.color;
 
       galleryIndex = 0;
-      galleryMode = 'color';
+      galleryMode = "color";
 
       renderGallery();
 
@@ -1056,7 +1108,12 @@ function bindInfoEvents() {
     });
 
     quantityInc.addEventListener("click", () => {
-      const maxQuantity = selectedSize ? Math.min(10, variantStockRemaining(product, selectedSize, selectedColor)) : 10;
+      const maxQuantity = selectedSize
+        ? Math.min(
+            10,
+            variantStockRemaining(product, selectedSize, selectedColor),
+          )
+        : 10;
       selectedQuantity = Math.min(maxQuantity, selectedQuantity + 1);
 
       quantityValue.textContent = selectedQuantity;
@@ -1207,12 +1264,23 @@ function openSizeGuide() {
   const guide = product?.sizeGuideMeasurements || {};
   const columns = Array.isArray(guide.columns) ? guide.columns : [];
   const rows = Array.isArray(guide.rows) ? guide.rows : [];
-  if (product?.sizeGuide || product?.sizeGuideImage || columns.length || rows.length) {
-    const table = columns.length && rows.length
-      ? `<table class="size-table"><thead><tr><th>Size</th>${columns.map((column) => `<th>${escapeHtml(column)}</th>`).join('')}</tr></thead><tbody>${rows.map((row) => `<tr><td>${escapeHtml(row.size)}</td>${columns.map((_, index) => `<td>${escapeHtml(row.values?.[index] || '—')}</td>`).join('')}</tr>`).join('')}</tbody></table>`
-      : '';
-    const image = product.sizeGuideImage ? `<img src="${escapeHtml(product.sizeGuideImage)}" alt="${escapeHtml(product.name)} size guide" style="display:block;width:100%;height:auto;margin:0 0 1rem;border-radius:8px" />` : '';
-    const modal = createModal({ title: 'Size Guide', bodyHTML: `${image}${table}${product.sizeGuide ? `<p class="text-muted" style="font-size:.85rem">${escapeHtml(product.sizeGuide).replace(/\n/g, '<br>')}</p>` : ''}` });
+  if (
+    product?.sizeGuide ||
+    product?.sizeGuideImage ||
+    columns.length ||
+    rows.length
+  ) {
+    const table =
+      columns.length && rows.length
+        ? `<table class="size-table"><thead><tr><th>Size</th>${columns.map((column) => `<th>${escapeHtml(column)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr><td>${escapeHtml(row.size)}</td>${columns.map((_, index) => `<td>${escapeHtml(row.values?.[index] || "—")}</td>`).join("")}</tr>`).join("")}</tbody></table>`
+        : "";
+    const image = product.sizeGuideImage
+      ? `<img src="${escapeHtml(product.sizeGuideImage)}" alt="${escapeHtml(product.name)} size guide" style="display:block;width:100%;height:auto;margin:0 0 1rem;border-radius:8px" />`
+      : "";
+    const modal = createModal({
+      title: "Size Guide",
+      bodyHTML: `${image}${table}${product.sizeGuide ? `<p class="text-muted" style="font-size:.85rem">${escapeHtml(product.sizeGuide).replace(/\n/g, "<br>")}</p>` : ""}`,
+    });
     modal.open();
     return;
   }
@@ -1308,16 +1376,20 @@ function openSizeGuide() {
 }
 
 const SIZE_MEASUREMENTS = [
-  { key: 'chest', label: 'Chest / bust', aliases: ['chest', 'bust', 'pit to pit', 'underarm'] },
-  { key: 'waist', label: 'Waist', aliases: ['waist'] },
-  { key: 'hips', label: 'Hips', aliases: ['hip', 'hips', 'seat'] },
+  {
+    key: "chest",
+    label: "Chest / bust",
+    aliases: ["chest", "bust", "pit to pit", "underarm"],
+  },
+  { key: "waist", label: "Waist", aliases: ["waist"] },
+  { key: "hips", label: "Hips", aliases: ["hip", "hips", "seat"] },
 ];
 
 function sizeGuideDimensions(columns) {
   return SIZE_MEASUREMENTS.map((measurement) => ({
     ...measurement,
     columnIndex: columns.findIndex((column) => {
-      const name = String(column || '').toLowerCase();
+      const name = String(column || "").toLowerCase();
       return measurement.aliases.some((alias) => name.includes(alias));
     }),
   })).filter((measurement) => measurement.columnIndex >= 0);
@@ -1325,15 +1397,17 @@ function sizeGuideDimensions(columns) {
 
 function sizeGuideProfileDimensions(columns) {
   return [
-    { key: 'height', aliases: ['height'] },
-    { key: 'weight', aliases: ['weight'] },
-  ].map((measurement) => ({
-    ...measurement,
-    columnIndex: columns.findIndex((column) => {
-      const name = String(column || '').toLowerCase();
-      return measurement.aliases.some((alias) => name.includes(alias));
-    }),
-  })).filter((measurement) => measurement.columnIndex >= 0);
+    { key: "height", aliases: ["height"] },
+    { key: "weight", aliases: ["weight"] },
+  ]
+    .map((measurement) => ({
+      ...measurement,
+      columnIndex: columns.findIndex((column) => {
+        const name = String(column || "").toLowerCase();
+        return measurement.aliases.some((alias) => name.includes(alias));
+      }),
+    }))
+    .filter((measurement) => measurement.columnIndex >= 0);
 }
 
 function buildSizeAdvisorMarkup(columns, rows) {
@@ -1341,18 +1415,25 @@ function buildSizeAdvisorMarkup(columns, rows) {
   const profileDimensions = sizeGuideProfileDimensions(columns);
   const hasProfileChart = profileDimensions.length > 0;
   const requiredProfileKeys = new Set(profileDimensions.map(({ key }) => key));
-  const chartReady = rows.length > 0 && rows.some((row) => row?.size) && (bodyDimensions.length > 0 || hasProfileChart);
+  const chartReady =
+    rows.length > 0 &&
+    rows.some((row) => row?.size) &&
+    (bodyDimensions.length > 0 || hasProfileChart);
   return `<section class="size-advisor" aria-labelledby="sizeAdvisorTitle">
     <h4 id="sizeAdvisorTitle">Find my size</h4>
-    <p class="text-muted">${!chartReady ? 'Enter your height and weight. This product’s size chart still needs recommendation measurements, so contact us if you need help choosing.' : hasProfileChart ? 'Enter your details to compare with this product’s size ranges.' : 'Height and weight alone can’t reliably predict clothing fit. Add at least one body measurement to compare with this product’s chart.'}</p>
+    <p class="text-muted">${!chartReady ? "Enter your height and weight. This product’s size chart still needs recommendation measurements, so contact us if you need help choosing." : hasProfileChart ? "Enter your details to compare with this product’s size ranges." : "Height and weight alone can’t reliably predict clothing fit. Add at least one body measurement to compare with this product’s chart."}</p>
     <form data-size-advisor novalidate>
       <div class="size-advisor__context">
-        <label>Height (cm)<input name="height" type="number" min="100" max="230" step="1" ${requiredProfileKeys.has('height') ? 'required' : ''} inputmode="numeric" placeholder="e.g. 168" /></label>
-        <label>Weight (kg)<input name="weight" type="number" min="25" max="250" step="0.1" ${requiredProfileKeys.has('weight') ? 'required' : ''} inputmode="decimal" placeholder="e.g. 62" /></label>
+        <label>Height (cm)<input name="height" type="number" min="100" max="230" step="1" ${requiredProfileKeys.has("height") ? "required" : ""} inputmode="numeric" placeholder="e.g. 168" /></label>
+        <label>Weight (kg)<input name="weight" type="number" min="25" max="250" step="0.1" ${requiredProfileKeys.has("weight") ? "required" : ""} inputmode="decimal" placeholder="e.g. 62" /></label>
       </div>
-      ${bodyDimensions.length ? `<label>How do you like your clothes to fit?
+      ${
+        bodyDimensions.length
+          ? `<label>How do you like your clothes to fit?
         <select name="fit"><option value="regular">Regular</option><option value="snug">Closer fit</option><option value="relaxed">Relaxed fit</option></select>
-      </label><fieldset><legend>Your body measurements (cm)</legend><div class="size-advisor__measurements">${bodyDimensions.map((dimension) => `<label>${dimension.label}<input name="${dimension.key}" type="number" min="40" max="180" step="0.5" inputmode="decimal" placeholder="Optional" /></label>`).join('')}</div><small>Measure around your body with a soft tape. For garment measurements laid flat, the calculator accounts for that.</small></fieldset>` : ''}
+      </label><fieldset><legend>Your body measurements (cm)</legend><div class="size-advisor__measurements">${bodyDimensions.map((dimension) => `<label>${dimension.label}<input name="${dimension.key}" type="number" min="40" max="180" step="0.5" inputmode="decimal" placeholder="Optional" /></label>`).join("")}</div><small>Measure around your body with a soft tape. For garment measurements laid flat, the calculator accounts for that.</small></fieldset>`
+          : ""
+      }
       <button class="btn btn-primary" type="button" data-size-advisor-submit>Recommend my size</button>
       <p class="size-advisor__result" data-size-result role="status" aria-live="polite" hidden></p>
     </form>
@@ -1361,96 +1442,153 @@ function buildSizeAdvisorMarkup(columns, rows) {
 
 function bindSizeAdvisor(containerId, columns, rows) {
   const container = document.getElementById(containerId);
-  const form = container?.querySelector('[data-size-advisor]');
+  const form = container?.querySelector("[data-size-advisor]");
   if (!form) return;
-  const result = form.querySelector('[data-size-result]');
-  form.addEventListener('input', () => {
-    form.querySelectorAll('[aria-invalid="true"]').forEach((field) => field.removeAttribute('aria-invalid'));
+  const result = form.querySelector("[data-size-result]");
+  form.addEventListener("input", () => {
+    form
+      .querySelectorAll('[aria-invalid="true"]')
+      .forEach((field) => field.removeAttribute("aria-invalid"));
     result.hidden = true;
-    result.textContent = '';
-    result.className = 'size-advisor__result';
+    result.textContent = "";
+    result.className = "size-advisor__result";
   });
   const calculateRecommendation = (event) => {
     event.preventDefault();
     result.hidden = true;
-    result.textContent = '';
+    result.textContent = "";
     result.hidden = false;
-    result.className = 'size-advisor__result size-advisor__result--error';
-    const invalidField = form.querySelector(':invalid');
+    result.className = "size-advisor__result size-advisor__result--error";
+    const invalidField = form.querySelector(":invalid");
     if (invalidField) {
-      const label = ({ height: 'Height', weight: 'Weight', chest: 'Chest', waist: 'Waist', hips: 'Hips' })[invalidField.name] || 'Measurement';
+      const label =
+        {
+          height: "Height",
+          weight: "Weight",
+          chest: "Chest",
+          waist: "Waist",
+          hips: "Hips",
+        }[invalidField.name] || "Measurement";
       result.textContent = invalidField.validationMessage
         ? `${label}: ${invalidField.validationMessage}`
         : `Please enter a valid ${label.toLowerCase()} before requesting a recommendation.`;
-      invalidField.setAttribute('aria-invalid', 'true');
+      invalidField.setAttribute("aria-invalid", "true");
       invalidField.focus();
       return;
     }
     const data = new FormData(form);
     const profile = sizeGuideProfileDimensions(columns)
-      .map(({ key, columnIndex }) => ({ key, value: Number(data.get(key)), columnIndex }))
+      .map(({ key, columnIndex }) => ({
+        key,
+        value: Number(data.get(key)),
+        columnIndex,
+      }))
       .filter((item) => Number.isFinite(item.value) && item.value > 0);
     const measurements = sizeGuideDimensions(columns)
-      .map(({ key, label, columnIndex }) => ({ key, label, value: Number(data.get(key)), columnIndex }))
-      .filter((measurement) => Number.isFinite(measurement.value) && measurement.value > 0);
+      .map(({ key, label, columnIndex }) => ({
+        key,
+        label,
+        value: Number(data.get(key)),
+        columnIndex,
+      }))
+      .filter(
+        (measurement) =>
+          Number.isFinite(measurement.value) && measurement.value > 0,
+      );
     if (!measurements.length && !profile.length) {
-      result.textContent = 'This product’s size chart is not set up for automatic recommendations yet. Please use the Size Guide or contact the shop.';
+      result.textContent =
+        "This product’s size chart is not set up for automatic recommendations yet. Please use the Size Guide or contact the shop.";
       return;
     }
-    const fit = String(data.get('fit') || 'regular');
+    const fit = String(data.get("fit") || "regular");
     const targetEase = { snug: 5, regular: 9, relaxed: 15 }[fit] || 9;
-    const ranked = rows.map((row) => {
-      if (product?.sizes?.length && (!product.sizes.includes(String(row.size)) || stockFor(product, String(row.size), selectedColor) <= 0)) return null;
-      let totalScore = 0;
-      let used = 0;
-      let tooSmall = false;
-      for (const item of profile) {
-        const raw = String(row.values?.[item.columnIndex] || '').replace(',', '.');
-        const values = [...raw.matchAll(/\d+(?:\.\d+)?/g)].map((match) => Number(match[0]));
-        if (!values.length) continue;
-        const low = Math.min(...values);
-        const high = values.length > 1 ? Math.max(...values) : low;
-        const midpoint = (low + high) / 2;
-        const outside = item.value < low ? low - item.value : item.value > high ? item.value - high : 0;
-        totalScore += outside * 2 + Math.abs(item.value - midpoint) * 0.05;
-        used += 1;
-      }
-      for (const measurement of measurements) {
-        const column = String(columns[measurement.columnIndex] || '').toLowerCase();
-        const raw = String(row.values?.[measurement.columnIndex] || '').replace(',', '.');
-        const numberMatch = raw.match(/-?\d+(?:\.\d+)?/);
-        if (!numberMatch) continue;
-        let garment = Number(numberMatch[0]);
-        const inches = /\b(in|inch|inches)\b/.test(column);
-        if (inches) garment *= 2.54;
-        const alreadyCircumference = /circumference|around|full/.test(column);
-        if (!alreadyCircumference) garment *= 2;
-        const ease = garment - measurement.value;
-        if (ease < 0) tooSmall = true;
-        const deficit = Math.max(0, targetEase - ease);
-        totalScore += Math.abs(ease - targetEase) + deficit * 2;
-        used += 1;
-      }
-      return used ? { size: String(row.size), score: totalScore / used, tooSmall } : null;
-    }).filter(Boolean).sort((a, b) => a.score - b.score);
+    const ranked = rows
+      .map((row) => {
+        if (
+          product?.sizes?.length &&
+          (!product.sizes.includes(String(row.size)) ||
+            stockFor(product, String(row.size), selectedColor) <= 0)
+        )
+          return null;
+        let totalScore = 0;
+        let used = 0;
+        let tooSmall = false;
+        for (const item of profile) {
+          const raw = String(row.values?.[item.columnIndex] || "").replace(
+            ",",
+            ".",
+          );
+          const values = [...raw.matchAll(/\d+(?:\.\d+)?/g)].map((match) =>
+            Number(match[0]),
+          );
+          if (!values.length) continue;
+          const low = Math.min(...values);
+          const high = values.length > 1 ? Math.max(...values) : low;
+          const midpoint = (low + high) / 2;
+          const outside =
+            item.value < low
+              ? low - item.value
+              : item.value > high
+                ? item.value - high
+                : 0;
+          totalScore += outside * 2 + Math.abs(item.value - midpoint) * 0.05;
+          used += 1;
+        }
+        for (const measurement of measurements) {
+          const column = String(
+            columns[measurement.columnIndex] || "",
+          ).toLowerCase();
+          const raw = String(
+            row.values?.[measurement.columnIndex] || "",
+          ).replace(",", ".");
+          const numberMatch = raw.match(/-?\d+(?:\.\d+)?/);
+          if (!numberMatch) continue;
+          let garment = Number(numberMatch[0]);
+          const inches = /\b(in|inch|inches)\b/.test(column);
+          if (inches) garment *= 2.54;
+          const alreadyCircumference = /circumference|around|full/.test(column);
+          if (!alreadyCircumference) garment *= 2;
+          const ease = garment - measurement.value;
+          if (ease < 0) tooSmall = true;
+          const deficit = Math.max(0, targetEase - ease);
+          totalScore += Math.abs(ease - targetEase) + deficit * 2;
+          used += 1;
+        }
+        return used
+          ? { size: String(row.size), score: totalScore / used, tooSmall }
+          : null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.score - b.score);
     if (!ranked.length) {
-      result.textContent = 'No in-stock size has matching measurements in this chart. Please use the chart or contact us for help.';
+      result.textContent =
+        "No in-stock size has matching measurements in this chart. Please use the chart or contact us for help.";
       return;
     }
     const best = ranked[0];
-    const alternative = ranked[1] && ranked[1].score - best.score <= 2.5 ? ranked[1] : null;
-    const caution = best.tooSmall || best.score > 18
-      ? ' The chart suggests this may be a close fit; please double-check the measurements before ordering.'
-      : ' This recommendation is calculated from the measurements and size ranges in this product’s chart.';
-    const recommendation = document.createElement('strong');
+    const alternative =
+      ranked[1] && ranked[1].score - best.score <= 2.5 ? ranked[1] : null;
+    const caution =
+      best.tooSmall || best.score > 18
+        ? " The chart suggests this may be a close fit; please double-check the measurements before ordering."
+        : " This recommendation is calculated from the measurements and size ranges in this product’s chart.";
+    const recommendation = document.createElement("strong");
     recommendation.textContent = `Recommended size: ${best.size}`;
-    result.replaceChildren(recommendation, document.createTextNode(`${alternative ? ` (also consider ${alternative.size} if you prefer more room).` : '.'}${caution}`));
-    result.className = 'size-advisor__result size-advisor__result--recommendation';
+    result.replaceChildren(
+      recommendation,
+      document.createTextNode(
+        `${alternative ? ` (also consider ${alternative.size} if you prefer more room).` : "."}${caution}`,
+      ),
+    );
+    result.className =
+      "size-advisor__result size-advisor__result--recommendation";
   };
-  form.addEventListener('submit', calculateRecommendation);
-  form.querySelector('[data-size-advisor-submit]')?.addEventListener('click', calculateRecommendation);
-  form.addEventListener('keydown', (event) => {
-    if (event.key !== 'Enter' || !event.target.matches('input')) return;
+  form.addEventListener("submit", calculateRecommendation);
+  form
+    .querySelector("[data-size-advisor-submit]")
+    ?.addEventListener("click", calculateRecommendation);
+  form.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" || !event.target.matches("input")) return;
     event.preventDefault();
     calculateRecommendation(event);
   });
@@ -1467,16 +1605,19 @@ function updateStockLine() {
 
   if (!element) return;
 
-  const remaining = selectedSize ? variantStockRemaining(product, selectedSize, selectedColor) : null;
+  const remaining = selectedSize
+    ? variantStockRemaining(product, selectedSize, selectedColor)
+    : null;
   const maxQuantity = selectedSize ? Math.min(10, remaining) : 10;
   selectedQuantity = Math.max(1, Math.min(selectedQuantity, maxQuantity || 1));
-  const quantityValue = document.getElementById('qtyValue');
-  const quantityInc = document.getElementById('qtyInc');
-  const quantityDec = document.getElementById('qtyDec');
-  const addButton = document.getElementById('addToCartBtn');
-  const buyNowButton = document.getElementById('buyNowBtn');
+  const quantityValue = document.getElementById("qtyValue");
+  const quantityInc = document.getElementById("qtyInc");
+  const quantityDec = document.getElementById("qtyDec");
+  const addButton = document.getElementById("addToCartBtn");
+  const buyNowButton = document.getElementById("buyNowBtn");
   if (quantityValue) quantityValue.textContent = selectedQuantity;
-  if (quantityInc) quantityInc.disabled = !selectedSize || selectedQuantity >= maxQuantity;
+  if (quantityInc)
+    quantityInc.disabled = !selectedSize || selectedQuantity >= maxQuantity;
   if (quantityDec) quantityDec.disabled = selectedQuantity <= 1;
   if (selectedSize && remaining === 0) {
     if (addButton) addButton.disabled = true;
@@ -1487,7 +1628,8 @@ function updateStockLine() {
   }
 
   if (!selectedSize && product.sizes?.length) {
-    element.innerHTML = '<span class="stock-dot"></span>Choose a size to see how many are available';
+    element.innerHTML =
+      '<span class="stock-dot"></span>Choose a size to see how many are available';
     return;
   }
   if (stock === 0) {
@@ -1498,7 +1640,8 @@ function updateStockLine() {
 
     `;
   } else if (remaining === 0) {
-    element.innerHTML = '<span class="stock-dot stock-dot--out"></span>Maximum quantity for this size is already in your bag';
+    element.innerHTML =
+      '<span class="stock-dot stock-dot--out"></span>Maximum quantity for this size is already in your bag';
   } else {
     element.innerHTML = `
 
@@ -1528,13 +1671,13 @@ function renderAccordion() {
     {
       title: "Returns",
 
-      body: "We offer exchange only, within 14 days of delivery, for unused items in original condition with the invoice. Refunds are not available except in the case of a reported manufacturing defect. See our full <a href=\"refund-policy.html\">Exchange &amp; Refund Policy</a>.",
+      body: 'We offer exchange only, within 14 days of delivery, for unused items in original condition with the invoice. Refunds are not available except in the case of a reported manufacturing defect. See our full <a href="refund-policy.html">Exchange &amp; Refund Policy</a>.',
     },
 
     {
       title: "Product Details",
 
-      body: `${escapeHtml(product.material || 'Cotton blend')}. Designed in-house. Model is 183cm and wears size M.`,
+      body: `${escapeHtml(product.material || "Cotton blend")}. Designed in-house. Model is 183cm and wears size M.`,
     },
   ];
 
@@ -1624,8 +1767,12 @@ async function loadRelated() {
   const section = document.getElementById("relatedSection");
   if (!element || !section) return;
   let list;
-  try { list = await fetchRelated(product, 4); }
-  catch { section.hidden = true; return; }
+  try {
+    list = await fetchRelated(product, 4);
+  } catch {
+    section.hidden = true;
+    return;
+  }
 
   if (!list.length) {
     section.hidden = true;
@@ -1680,8 +1827,13 @@ async function loadRecentlyViewed() {
     return;
   }
 
-  const list = (await Promise.all(recent.slice(0, 4).map((slug) => fetchProductBySlug(slug).catch(() => null))))
-    .filter(Boolean);
+  const list = (
+    await Promise.all(
+      recent
+        .slice(0, 4)
+        .map((slug) => fetchProductBySlug(slug).catch(() => null)),
+    )
+  ).filter(Boolean);
 
   if (!list.length) {
     section.hidden = true;

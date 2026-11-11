@@ -16,7 +16,10 @@ router.get("/", async (req, res) => {
   const { category, collection, search, limit, offset } = listQuery.parse(
     req.query,
   );
-  const escapedSearch = search?.replace(/[\\%_]/g, (character) => `\\${character}`);
+  const escapedSearch = search?.replace(
+    /[\\%_]/g,
+    (character) => `\\${character}`,
+  );
   const { rows } = await query(
     `SELECT ${columns} FROM products WHERE is_active = true AND ($1::text IS NULL OR category = $1) AND ($2::text IS NULL OR collection = $2) AND ($3::text IS NULL OR name ILIKE $3 ESCAPE E'\\\\' OR description ILIKE $3 ESCAPE E'\\\\') ORDER BY created_at DESC LIMIT $4 OFFSET $5`,
     [

@@ -1,57 +1,85 @@
-const PATTERNS = new Set(['solid', 'stripes', 'dots', 'checker', 'waves', 'diagonal', 'grid', 'bars', 'confetti', 'glow']);
+const PATTERNS = new Set([
+  "solid",
+  "stripes",
+  "dots",
+  "checker",
+  "waves",
+  "diagonal",
+  "grid",
+  "bars",
+  "confetti",
+  "glow",
+]);
 
 export function renderAnnouncementStrip(settings) {
-  const header = document.getElementById('site-header');
+  const header = document.getElementById("site-header");
   if (!header) return;
-  let strip = document.getElementById('storeAnnouncement');
-  if (!settings.announcementEnabled || !String(settings.announcementText || '').trim()) {
+  let strip = document.getElementById("storeAnnouncement");
+  if (
+    !settings.announcementEnabled ||
+    !String(settings.announcementText || "").trim()
+  ) {
     strip?.remove();
-    document.documentElement.style.removeProperty('--announcement-sticky-offset');
+    document.documentElement.style.removeProperty(
+      "--announcement-sticky-offset",
+    );
     return;
   }
 
   if (!strip) {
-    strip = document.createElement('div');
-    strip.id = 'storeAnnouncement';
-    strip.className = 'store-announcement';
-    strip.setAttribute('role', 'region');
-    strip.setAttribute('aria-label', 'Store announcement');
+    strip = document.createElement("div");
+    strip.id = "storeAnnouncement";
+    strip.className = "store-announcement";
+    strip.setAttribute("role", "region");
+    strip.setAttribute("aria-label", "Store announcement");
     header.parentNode.insertBefore(strip, header);
   }
-  const background = /^#[0-9a-f]{6}$/i.test(settings.announcementBackgroundColor || '')
+  const background = /^#[0-9a-f]{6}$/i.test(
+    settings.announcementBackgroundColor || "",
+  )
     ? settings.announcementBackgroundColor
-    : '#17251e';
-  const foreground = /^#[0-9a-f]{6}$/i.test(settings.announcementTextColor || '')
+    : "#17251e";
+  const foreground = /^#[0-9a-f]{6}$/i.test(
+    settings.announcementTextColor || "",
+  )
     ? settings.announcementTextColor
-    : '#ffffff';
-  const pattern = PATTERNS.has(settings.announcementPattern) ? settings.announcementPattern : 'solid';
-  const speedSeconds = Number.isInteger(settings.announcementSpeedSeconds) && settings.announcementSpeedSeconds >= 6 && settings.announcementSpeedSeconds <= 60
-    ? settings.announcementSpeedSeconds
-    : 26;
+    : "#ffffff";
+  const pattern = PATTERNS.has(settings.announcementPattern)
+    ? settings.announcementPattern
+    : "solid";
+  const speedSeconds =
+    Number.isInteger(settings.announcementSpeedSeconds) &&
+    settings.announcementSpeedSeconds >= 6 &&
+    settings.announcementSpeedSeconds <= 60
+      ? settings.announcementSpeedSeconds
+      : 26;
   strip.dataset.pattern = pattern;
-  strip.style.setProperty('--announcement-bg', background);
-  strip.style.setProperty('--announcement-fg', foreground);
-  document.documentElement.style.setProperty('--announcement-sticky-offset', `${strip.offsetHeight || 38}px`);
+  strip.style.setProperty("--announcement-bg", background);
+  strip.style.setProperty("--announcement-fg", foreground);
+  document.documentElement.style.setProperty(
+    "--announcement-sticky-offset",
+    `${strip.offsetHeight || 38}px`,
+  );
 
   const text = String(settings.announcementText).slice(0, 240);
-  let track = strip.querySelector('.store-announcement__track');
+  let track = strip.querySelector(".store-announcement__track");
   if (!track || track.dataset.message !== text) {
-    track = document.createElement('div');
-    track.className = 'store-announcement__track';
+    track = document.createElement("div");
+    track.className = "store-announcement__track";
     track.dataset.message = text;
     for (let index = 0; index < 2; index += 1) {
-      const group = document.createElement('span');
-      group.className = 'store-announcement__group';
-      if (index) group.setAttribute('aria-hidden', 'true');
+      const group = document.createElement("span");
+      group.className = "store-announcement__group";
+      if (index) group.setAttribute("aria-hidden", "true");
       for (let repeat = 0; repeat < 3; repeat += 1) {
-        const message = document.createElement('span');
+        const message = document.createElement("span");
         message.textContent = text;
-        if (repeat) message.setAttribute('aria-hidden', 'true');
+        if (repeat) message.setAttribute("aria-hidden", "true");
         group.append(message);
-        const separator = document.createElement('span');
-        separator.className = 'store-announcement__separator';
-        separator.setAttribute('aria-hidden', 'true');
-        separator.textContent = '✦';
+        const separator = document.createElement("span");
+        separator.className = "store-announcement__separator";
+        separator.setAttribute("aria-hidden", "true");
+        separator.textContent = "✦";
         group.append(separator);
       }
       track.append(group);
@@ -60,5 +88,5 @@ export function renderAnnouncementStrip(settings) {
   }
   // Keep the current animation running during settings refreshes. Replacing the
   // track here made the marquee jump back to its starting frame every refresh.
-  track.style.setProperty('--announcement-speed', `${speedSeconds}s`);
+  track.style.setProperty("--announcement-speed", `${speedSeconds}s`);
 }

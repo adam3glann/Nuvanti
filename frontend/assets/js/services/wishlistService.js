@@ -1,6 +1,6 @@
 // wishlistService — local-state wishlist, structured to later sync to a
 // signed-in user's account via API instead of localStorage.
-const STORAGE_KEY = 'nuvanti_wishlist_v1';
+const STORAGE_KEY = "nuvanti_wishlist_v1";
 let listeners = [];
 
 function read() {
@@ -17,7 +17,9 @@ function write(ids) {
 
 export function onWishlistChange(fn) {
   listeners.push(fn);
-  return () => { listeners = listeners.filter((l) => l !== fn); };
+  return () => {
+    listeners = listeners.filter((l) => l !== fn);
+  };
 }
 
 export function getWishlist() {
@@ -30,7 +32,9 @@ export function isWishlisted(productId) {
 
 export function toggleWishlist(productId) {
   const ids = read();
-  const next = ids.includes(productId) ? ids.filter((id) => id !== productId) : [...ids, productId];
+  const next = ids.includes(productId)
+    ? ids.filter((id) => id !== productId)
+    : [...ids, productId];
   write(next);
   return next;
 }

@@ -41,10 +41,16 @@ export function toPublicProduct(row) {
     // Storefront shoppers only need availability. Exact counts stay in the
     // authenticated admin API; checkout rechecks the real quantity in SQL.
     inventory: Object.fromEntries(
-      Object.entries(stock.inventory).map(([size, quantity]) => [size, Number(quantity) > 0 ? 10 : 0]),
+      Object.entries(stock.inventory).map(([size, quantity]) => [
+        size,
+        Number(quantity) > 0 ? 10 : 0,
+      ]),
     ),
     inventoryByVariant: Object.fromEntries(
-      Object.entries(stock.inventoryByVariant).map(([variant, quantity]) => [variant, Number(quantity) > 0 ? 10 : 0]),
+      Object.entries(stock.inventoryByVariant).map(([variant, quantity]) => [
+        variant,
+        Number(quantity) > 0 ? 10 : 0,
+      ]),
     ),
     sizeGuide: meta.sizeGuide || "",
     sizeGuideImage: meta.sizeGuideImage || "",

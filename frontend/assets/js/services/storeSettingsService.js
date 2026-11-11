@@ -1,24 +1,37 @@
-import { API_ORIGIN } from '../config.js';
+import { API_ORIGIN } from "../config.js";
 
 const DEFAULTS = Object.freeze({
-  storeName: 'Nuvanti', currency: 'EGP', standardShippingCents: 7500,
-  expressShippingCents: 15000, freeShippingThresholdCents: 300000,
-  announcementEnabled: false, announcementText: 'Welcome to Nuvanti',
-  announcementBackgroundColor: '#17251e', announcementTextColor: '#ffffff',
-  announcementPattern: 'stripes', announcementTheme: 'midnight', announcementSpeedSeconds: 26,
+  storeName: "Nuvanti",
+  currency: "EGP",
+  standardShippingCents: 7500,
+  expressShippingCents: 15000,
+  freeShippingThresholdCents: 300000,
+  announcementEnabled: false,
+  announcementText: "Welcome to Nuvanti",
+  announcementBackgroundColor: "#17251e",
+  announcementTextColor: "#ffffff",
+  announcementPattern: "stripes",
+  announcementTheme: "midnight",
+  announcementSpeedSeconds: 26,
 });
 let settingsPromise;
 
 export function loadStoreSettings() {
   if (!settingsPromise) {
-    settingsPromise = fetch(`${API_ORIGIN}/api/storefront/settings`, { cache: 'no-store' })
+    settingsPromise = fetch(`${API_ORIGIN}/api/storefront/settings`, {
+      cache: "no-store",
+    })
       .then((response) => {
-        if (!response.ok) throw new Error('Store settings are unavailable.');
+        if (!response.ok) throw new Error("Store settings are unavailable.");
         return response.json();
       })
       .catch((error) => {
         settingsPromise = null;
-        if (['localhost', '127.0.0.1'].includes(location.hostname) || location.protocol === 'file:') return DEFAULTS;
+        if (
+          ["localhost", "127.0.0.1"].includes(location.hostname) ||
+          location.protocol === "file:"
+        )
+          return DEFAULTS;
         throw error;
       });
   }

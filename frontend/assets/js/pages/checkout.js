@@ -1,20 +1,33 @@
-import { initShell } from '../main.js?v=announcement-strip-loop-2';
-import { formatPrice } from '../components/productCard.js';
-import { getCart, cartSubtotal, clearCart, syncCartWithProducts } from '../services/cartService.js';
-import { createOrder } from '../services/orderService.js?v=delivery-address-details-2';
-import { getCurrentUser } from '../services/authService.js';
-import { showToast } from '../components/toast.js';
-import { refreshCartDrawer } from '../components/cartDrawer.js';
-import { checkDiscount, getSavedDiscountCode, saveDiscountCode, clearDiscountCode } from '../services/discountService.js';
-import { loadStoreSettings, refreshStoreSettings } from '../services/storeSettingsService.js';
-import { startLiveRefresh } from '../services/liveRefresh.js';
-import { fetchProductBySlug } from '../services/productService.js';
-import { fetchAddresses } from '../services/addressService.js';
-import { API_ORIGIN } from '../config.js';
+import { initShell } from "../main.js?v=announcement-strip-loop-2";
+import { formatPrice } from "../components/productCard.js";
+import {
+  getCart,
+  cartSubtotal,
+  clearCart,
+  syncCartWithProducts,
+} from "../services/cartService.js";
+import { createOrder } from "../services/orderService.js?v=delivery-address-details-2";
+import { getCurrentUser } from "../services/authService.js";
+import { showToast } from "../components/toast.js";
+import { refreshCartDrawer } from "../components/cartDrawer.js";
+import {
+  checkDiscount,
+  getSavedDiscountCode,
+  saveDiscountCode,
+  clearDiscountCode,
+} from "../services/discountService.js";
+import {
+  loadStoreSettings,
+  refreshStoreSettings,
+} from "../services/storeSettingsService.js";
+import { startLiveRefresh } from "../services/liveRefresh.js";
+import { fetchProductBySlug } from "../services/productService.js";
+import { fetchAddresses } from "../services/addressService.js";
+import { API_ORIGIN } from "../config.js";
 
-initShell({ currentPage: 'shop' });
+initShell({ currentPage: "shop" });
 
-let delivery = 'standard';
+let delivery = "standard";
 // A code applied on the cart page is carried over and re-validated here
 // (subtotal may have changed, and delivery choice affects the total but
 // never the discount itself, which only ever applies to the subtotal).
@@ -29,68 +42,110 @@ let shippingLocation = null;
 
 let lines = getCart();
 if (lines.length === 0) {
-  window.location.href = 'cart.html';
+  window.location.href = "cart.html";
 } else {
   initializeCheckout();
 }
 
 async function initializeCheckout() {
-  const form = document.getElementById('checkoutForm');
-  const summary = document.getElementById('checkoutSummary');
-  form.innerHTML = '<div class="state-block"><h3>Preparing secure checkout</h3><p>Loading your account and current delivery rates.</p></div>';
+  const form = document.getElementById("checkoutForm");
+  const summary = document.getElementById("checkoutSummary");
+  form.innerHTML =
+    '<div class="state-block"><h3>Preparing secure checkout</h3><p>Loading your account and current delivery rates.</p></div>';
   try {
-    const initialProducts = await Promise.all([...new Set(lines.map((line) => line.slug))].map(fetchProductBySlug));
+    const initialProducts = await Promise.all(
+      [...new Set(lines.map((line) => line.slug))].map(fetchProductBySlug),
+    );
     const cartChanges = syncCartWithProducts(initialProducts);
     lines = getCart();
-    if (!lines.length) { window.location.href = 'cart.html'; return; }
-    if (cartChanges.removed.length || cartChanges.adjusted.length) {
-      try { sessionStorage.setItem('nuvanti_cart_notice', 'Your bag was updated because some items or quantities are no longer available. Review it before checkout.'); } catch { /* The cart page will still sync stock when opened. */ }
-      window.location.href = 'cart.html';
+    if (!lines.length) {
+      window.location.href = "cart.html";
       return;
     }
-    if (cartChanges.priceChanged) showToast('Bag prices were updated to today’s catalog.');
-    [currentUser, storeSettings] = await Promise.all([getCurrentUser(), loadStoreSettings()]);
+    if (cartChanges.removed.length || cartChanges.adjusted.length) {
+      try {
+        sessionStorage.setItem(
+          "nuvanti_cart_notice",
+          "Your bag was updated because some items or quantities are no longer available. Review it before checkout.",
+        );
+      } catch {
+        /* The cart page will still sync stock when opened. */
+      }
+      window.location.href = "cart.html";
+      return;
+    }
+    if (cartChanges.priceChanged)
+      showToast("Bag prices were updated to today’s catalog.");
+    [currentUser, storeSettings] = await Promise.all([
+      getCurrentUser(),
+      loadStoreSettings(),
+    ]);
     if (storeSettings.emergencyLockdown === true) {
-      form.innerHTML = '<div class="state-block"><h3>Ordering is temporarily paused</h3><p>The store has paused checkout while a security issue is reviewed. Your bag is saved; please try again later.</p></div>';
-      summary.innerHTML = '';
+      form.innerHTML =
+        '<div class="state-block"><h3>Ordering is temporarily paused</h3><p>The store has paused checkout while a security issue is reviewed. Your bag is saved; please try again later.</p></div>';
+      summary.innerHTML = "";
       return;
     }
     try {
-      const paymentResponse = await fetch(`${API_ORIGIN}/api/payments/config`, { credentials: 'include' });
-      onlinePaymentEnabled = paymentResponse.ok && (await paymentResponse.json()).onlinePaymentEnabled === true;
-    } catch { onlinePaymentEnabled = false; }
-    instapayEnabled = storeSettings.instapayEnabled === true && Boolean(storeSettings.instapayRecipient && storeSettings.instapayWhatsappPhone);
+      const paymentResponse = await fetch(`${API_ORIGIN}/api/payments/config`, {
+        credentials: "include",
+      });
+      onlinePaymentEnabled =
+        paymentResponse.ok &&
+        (await paymentResponse.json()).onlinePaymentEnabled === true;
+    } catch {
+      onlinePaymentEnabled = false;
+    }
+    instapayEnabled =
+      storeSettings.instapayEnabled === true &&
+      Boolean(
+        storeSettings.instapayRecipient && storeSettings.instapayWhatsappPhone,
+      );
     instapayDetails = instapayEnabled ? storeSettings : null;
   } catch {
-    form.innerHTML = '<div class="state-block"><h3>Checkout is temporarily unavailable</h3><p>We could not verify your account or current delivery prices. Your bag is saved—please try again shortly.</p></div>';
-    summary.innerHTML = '';
+    form.innerHTML =
+      '<div class="state-block"><h3>Checkout is temporarily unavailable</h3><p>We could not verify your account or current delivery prices. Your bag is saved—please try again shortly.</p></div>';
+    summary.innerHTML = "";
     return;
   }
   if (currentUser && !currentUser.emailVerifiedAt) {
-    form.innerHTML = '<div class="state-block"><h3>Verify your email to order</h3><p>Confirm your email address before placing an order. Open the confirmation link from your inbox, then return here to finish checkout.</p><a class="btn btn-primary" href="account.html?tab=profile">Open account and resend email</a></div>';
-    summary.innerHTML = '';
+    form.innerHTML =
+      '<div class="state-block"><h3>Verify your email to order</h3><p>Confirm your email address before placing an order. Open the confirmation link from your inbox, then return here to finish checkout.</p><a class="btn btn-primary" href="account.html?tab=profile">Open account and resend email</a></div>';
+    summary.innerHTML = "";
     return;
   }
   if (currentUser) {
-    try { savedAddress = (await fetchAddresses()).find((address) => address.isDefault) || null; }
-    catch { savedAddress = null; }
+    try {
+      savedAddress =
+        (await fetchAddresses()).find((address) => address.isDefault) || null;
+    } catch {
+      savedAddress = null;
+    }
   }
   render();
   await restoreSavedDiscount();
   renderSummary();
   startLiveRefresh(async () => {
-    const latestProducts = await Promise.all([...new Set(lines.map((line) => line.slug))].map(fetchProductBySlug));
+    const latestProducts = await Promise.all(
+      [...new Set(lines.map((line) => line.slug))].map(fetchProductBySlug),
+    );
     const stockChanges = syncCartWithProducts(latestProducts);
     lines = getCart();
     if (!lines.length) {
-      showToast('The items in your bag are no longer available.');
-      window.location.href = 'cart.html';
+      showToast("The items in your bag are no longer available.");
+      window.location.href = "cart.html";
       return;
     }
-    if (stockChanges.removed.length || stockChanges.adjusted.length || stockChanges.priceChanged) {
+    if (
+      stockChanges.removed.length ||
+      stockChanges.adjusted.length ||
+      stockChanges.priceChanged
+    ) {
       await restoreSavedDiscount();
       renderSummary();
-      showToast('Your bag was updated to match current stock and prices. Please review the order summary.');
+      showToast(
+        "Your bag was updated to match current stock and prices. Please review the order summary.",
+      );
     }
     const latest = await refreshStoreSettings();
     if (latest.emergencyLockdown === true) {
@@ -101,13 +156,25 @@ async function initializeCheckout() {
     if (JSON.stringify(latest) !== JSON.stringify(storeSettings)) {
       storeSettings = latest;
       const subtotal = cartSubtotal();
-      const standard = document.querySelector('.delivery-option[data-value="standard"] .delivery-option__price');
-      const express = document.querySelector('.delivery-option[data-value="express"] .delivery-option__price');
-      if (standard) standard.textContent = shippingLocation ? (subtotal >= storeSettings.freeShippingThresholdCents / 100 ? 'Free' : formatPrice(shippingLocation.standard)) : 'Choose location';
-      if (express) express.textContent = shippingLocation ? formatPrice(shippingLocation.express) : 'Choose location';
+      const standard = document.querySelector(
+        '.delivery-option[data-value="standard"] .delivery-option__price',
+      );
+      const express = document.querySelector(
+        '.delivery-option[data-value="express"] .delivery-option__price',
+      );
+      if (standard)
+        standard.textContent = shippingLocation
+          ? subtotal >= storeSettings.freeShippingThresholdCents / 100
+            ? "Free"
+            : formatPrice(shippingLocation.standard)
+          : "Choose location";
+      if (express)
+        express.textContent = shippingLocation
+          ? formatPrice(shippingLocation.express)
+          : "Choose location";
       renderSummary();
     }
-      await refreshPaymentAvailability();
+    await refreshPaymentAvailability();
   }, 15000);
 }
 
@@ -125,43 +192,48 @@ async function restoreSavedDiscount() {
 
 function render() {
   if (storeSettings?.emergencyLockdown === true) {
-    document.getElementById('checkoutForm').innerHTML = '<div class="state-block"><h3>Ordering is temporarily paused</h3><p>The store has paused checkout while a security issue is reviewed. Your bag is saved; please try again later.</p></div>';
-    document.getElementById('checkoutSummary').innerHTML = '';
+    document.getElementById("checkoutForm").innerHTML =
+      '<div class="state-block"><h3>Ordering is temporarily paused</h3><p>The store has paused checkout while a security issue is reviewed. Your bag is saved; please try again later.</p></div>';
+    document.getElementById("checkoutSummary").innerHTML = "";
     return;
   }
   const subtotal = cartSubtotal();
 
-  document.getElementById('checkoutForm').innerHTML = `
+  document.getElementById("checkoutForm").innerHTML = `
     <section class="checkout-section">
       <h3 class="h3" style="margin-bottom:1.25rem">Customer Information</h3>
-      <div class="field"><label for="fullName">Full Name</label><input type="text" id="fullName" value="${escapeAttr(savedAddress?.name || currentUser?.name || '')}" autocomplete="name" required /></div>
+      <div class="field"><label for="fullName">Full Name</label><input type="text" id="fullName" value="${escapeAttr(savedAddress?.name || currentUser?.name || "")}" autocomplete="name" required /></div>
       <div class="field-row">
         ${currentUser ? `<div class="field"><label>Order email</label><p class="text-muted">${escapeHtml(currentUser.email)}</p><p class="text-muted" style="font-size:var(--fs-micro)">Your confirmation and tracking link will be sent here.</p></div>` : `<div class="field"><label for="email">Email for receipt and tracking link <span lang="ar" dir="rtl">البريد الإلكتروني للإيصال ورابط التتبع</span></label><input type="email" id="email" autocomplete="email" maxlength="254" required /><p class="text-muted" style="font-size:var(--fs-micro)">We send your order confirmation and tracking link here, even if you check out as a guest.</p></div>`}
-        <div class="field"><label for="phone">Phone</label><input type="tel" id="phone" value="${escapeAttr(savedAddress?.phone || '')}" autocomplete="tel" required /></div>
+        <div class="field"><label for="phone">Phone</label><input type="tel" id="phone" value="${escapeAttr(savedAddress?.phone || "")}" autocomplete="tel" required /></div>
       </div>
-      ${!currentUser ? `<div class="guest-account-choice">
+      ${
+        !currentUser
+          ? `<div class="guest-account-choice">
         <p><strong>Continue as a guest</strong> — no account is needed to place your order. <span lang="ar" dir="rtl">يمكنك إتمام الطلب كضيف دون إنشاء حساب.</span></p>
         <label class="guest-account-choice__toggle"><input type="checkbox" id="createGuestAccount" /><span>Create an account for future orders <span lang="ar" dir="rtl">إنشاء حساب للطلبات القادمة</span></span></label>
         <div id="guestAccountFields" hidden>
           <div class="field"><label for="guestPassword">Choose a password <span lang="ar" dir="rtl">اختر كلمة مرور</span></label><input type="password" id="guestPassword" autocomplete="new-password" minlength="12" maxlength="128" /><p class="text-muted" style="font-size:var(--fs-micro)">At least 12 characters. We’ll send an email verification link. <span lang="ar" dir="rtl">12 حرفاً على الأقل. سنرسل رابطاً لتأكيد البريد الإلكتروني.</span></p></div>
           <div class="field"><label for="guestPasswordConfirm">Confirm password <span lang="ar" dir="rtl">تأكيد كلمة المرور</span></label><input type="password" id="guestPasswordConfirm" autocomplete="new-password" minlength="12" maxlength="128" /></div>
         </div>
-      </div>` : ''}
+      </div>`
+          : ""
+      }
     </section>
 
     <section class="checkout-section">
       <h3 class="h3" style="margin-bottom:1.25rem">Shipping Address</h3>
       <div class="field-row">
-        <div class="field"><label for="address">Street Name</label><input type="text" id="address" value="${escapeAttr(savedAddress?.address1 || '')}" autocomplete="street-address" maxlength="150" required /></div>
-        <div class="field"><label for="buildingNumber">Building Number</label><input type="text" id="buildingNumber" value="${escapeAttr(savedAddress?.buildingNumber || '')}" maxlength="30" required /></div>
+        <div class="field"><label for="address">Street Name</label><input type="text" id="address" value="${escapeAttr(savedAddress?.address1 || "")}" autocomplete="street-address" maxlength="150" required /></div>
+        <div class="field"><label for="buildingNumber">Building Number</label><input type="text" id="buildingNumber" value="${escapeAttr(savedAddress?.buildingNumber || "")}" maxlength="30" required /></div>
       </div>
       <div class="field-row">
-        <div class="field"><label for="propertyType">Address Type</label><select id="propertyType" required><option value="apartment" ${savedAddress?.propertyType !== 'office' && savedAddress?.propertyType !== 'villa' ? 'selected' : ''}>Apartment</option><option value="office" ${savedAddress?.propertyType === 'office' ? 'selected' : ''}>Office</option><option value="villa" ${savedAddress?.propertyType === 'villa' ? 'selected' : ''}>Villa</option></select></div>
-        <div class="field"><label for="floor">Floor</label><input type="text" id="floor" value="${escapeAttr(savedAddress?.floor || '')}" maxlength="20" /></div>
-        <div class="field"><label for="apartmentNumber">Apartment / Office Number</label><input type="text" id="apartmentNumber" value="${escapeAttr(savedAddress?.apartmentNumber || '')}" maxlength="30" /></div>
+        <div class="field"><label for="propertyType">Address Type</label><select id="propertyType" required><option value="apartment" ${savedAddress?.propertyType !== "office" && savedAddress?.propertyType !== "villa" ? "selected" : ""}>Apartment</option><option value="office" ${savedAddress?.propertyType === "office" ? "selected" : ""}>Office</option><option value="villa" ${savedAddress?.propertyType === "villa" ? "selected" : ""}>Villa</option></select></div>
+        <div class="field"><label for="floor">Floor</label><input type="text" id="floor" value="${escapeAttr(savedAddress?.floor || "")}" maxlength="20" /></div>
+        <div class="field"><label for="apartmentNumber">Apartment / Office Number</label><input type="text" id="apartmentNumber" value="${escapeAttr(savedAddress?.apartmentNumber || "")}" maxlength="30" /></div>
       </div>
-      <div class="field"><label for="shippingLocation">Delivery location</label><select id="shippingLocation" required><option value="" disabled ${!storeSettings.shippingLocations?.some((location) => savedAddress?.city === location.name) ? 'selected' : ''}>Choose where we should deliver</option>${(storeSettings.shippingLocations || []).map((location) => `<option value="${escapeAttr(location.id)}" ${savedAddress?.city === location.name ? 'selected' : ''}>${escapeAttr(location.name)}</option>`).join('')}</select>${!(storeSettings.shippingLocations || []).length ? '<small class="hint">Delivery locations are not configured yet. Please contact the store.</small>' : ''}</div>
-      <div class="field-row"><div class="field"><label for="postal">Postal Code</label><input type="text" id="postal" value="${escapeAttr(savedAddress?.postalCode || '')}" autocomplete="postal-code" /></div></div>
+      <div class="field"><label for="shippingLocation">Delivery location</label><select id="shippingLocation" required><option value="" disabled ${!storeSettings.shippingLocations?.some((location) => savedAddress?.city === location.name) ? "selected" : ""}>Choose where we should deliver</option>${(storeSettings.shippingLocations || []).map((location) => `<option value="${escapeAttr(location.id)}" ${savedAddress?.city === location.name ? "selected" : ""}>${escapeAttr(location.name)}</option>`).join("")}</select>${!(storeSettings.shippingLocations || []).length ? '<small class="hint">Delivery locations are not configured yet. Please contact the store.</small>' : ""}</div>
+      <div class="field-row"><div class="field"><label for="postal">Postal Code</label><input type="text" id="postal" value="${escapeAttr(savedAddress?.postalCode || "")}" autocomplete="postal-code" /></div></div>
       <div class="field"><label for="country">Country</label>
         <select id="country" required>
           <option selected>Egypt</option>
@@ -198,104 +270,184 @@ function render() {
     </p>
   `;
 
-  document.querySelectorAll('input[name="delivery"]').forEach((r) => r.addEventListener('change', (e) => {
-    delivery = e.target.value;
-    document.querySelectorAll('.delivery-option').forEach((el) => (el.dataset.active = String(el.dataset.value === delivery)));
-    renderSummary();
-  }));
-  document.getElementById('shippingLocation')?.addEventListener('change', (event) => {
-    shippingLocation = storeSettings.shippingLocations?.find((location) => location.id === event.target.value) || null;
-    renderLocationDeliveryPrices();
-    renderSummary();
-  });
-  const propertyType = document.getElementById('propertyType');
-  const floorInput = document.getElementById('floor');
-  const apartmentInput = document.getElementById('apartmentNumber');
+  document.querySelectorAll('input[name="delivery"]').forEach((r) =>
+    r.addEventListener("change", (e) => {
+      delivery = e.target.value;
+      document
+        .querySelectorAll(".delivery-option")
+        .forEach(
+          (el) => (el.dataset.active = String(el.dataset.value === delivery)),
+        );
+      renderSummary();
+    }),
+  );
+  document
+    .getElementById("shippingLocation")
+    ?.addEventListener("change", (event) => {
+      shippingLocation =
+        storeSettings.shippingLocations?.find(
+          (location) => location.id === event.target.value,
+        ) || null;
+      renderLocationDeliveryPrices();
+      renderSummary();
+    });
+  const propertyType = document.getElementById("propertyType");
+  const floorInput = document.getElementById("floor");
+  const apartmentInput = document.getElementById("apartmentNumber");
   const updateAddressRequirements = () => {
-    const unitRequired = propertyType.value === 'apartment' || propertyType.value === 'office';
+    const unitRequired =
+      propertyType.value === "apartment" || propertyType.value === "office";
     floorInput.required = unitRequired;
     apartmentInput.required = unitRequired;
-    floorInput.placeholder = unitRequired ? 'Required' : 'Optional';
-    apartmentInput.placeholder = propertyType.value === 'office' ? 'Office number' : unitRequired ? 'Required' : 'Optional';
+    floorInput.placeholder = unitRequired ? "Required" : "Optional";
+    apartmentInput.placeholder =
+      propertyType.value === "office"
+        ? "Office number"
+        : unitRequired
+          ? "Required"
+          : "Optional";
   };
-  propertyType.addEventListener('change', updateAddressRequirements);
+  propertyType.addEventListener("change", updateAddressRequirements);
   updateAddressRequirements();
-  shippingLocation = storeSettings.shippingLocations?.find((location) => location.id === document.getElementById('shippingLocation')?.value) || null;
+  shippingLocation =
+    storeSettings.shippingLocations?.find(
+      (location) =>
+        location.id === document.getElementById("shippingLocation")?.value,
+    ) || null;
   renderLocationDeliveryPrices();
   bindPaymentOptions();
   renderSummary();
 
-  document.getElementById('createGuestAccount')?.addEventListener('change', (event) => {
-    const fields = document.getElementById('guestAccountFields');
-    fields.hidden = !event.target.checked;
-    document.getElementById('guestPassword').required = event.target.checked;
-    document.getElementById('guestPasswordConfirm').required = event.target.checked;
-  });
+  document
+    .getElementById("createGuestAccount")
+    ?.addEventListener("change", (event) => {
+      const fields = document.getElementById("guestAccountFields");
+      fields.hidden = !event.target.checked;
+      document.getElementById("guestPassword").required = event.target.checked;
+      document.getElementById("guestPasswordConfirm").required =
+        event.target.checked;
+    });
 
-  document.getElementById('checkoutForm').addEventListener('submit', onSubmit);
+  document.getElementById("checkoutForm").addEventListener("submit", onSubmit);
 }
 
 function paymentOptionsMarkup() {
-  return `${onlinePaymentEnabled ? `<label class="payment-option" data-value="paymob" style="margin-top:.75rem">
+  return `${
+    onlinePaymentEnabled
+      ? `<label class="payment-option" data-value="paymob" style="margin-top:.75rem">
     <input type="radio" name="payment" value="paymob" style="margin-top:.2rem" />
     <div><strong>Pay online securely</strong><p class="text-muted" style="font-size:var(--fs-small)">Card and other methods enabled by the payment provider</p></div>
-  </label>` : ''}${instapayEnabled ? `<label class="payment-option" data-value="instapay" style="margin-top:.75rem">
+  </label>`
+      : ""
+  }${
+    instapayEnabled
+      ? `<label class="payment-option" data-value="instapay" style="margin-top:.75rem">
     <input type="radio" name="payment" value="instapay" style="margin-top:.2rem" />
     <div><strong>InstaPay transfer</strong><p class="text-muted" style="font-size:var(--fs-small)">Transfer after placing your order, then send a screenshot on WhatsApp</p></div>
-  </label>` : ''}`;
+  </label>`
+      : ""
+  }`;
 }
 
 function bindPaymentOptions() {
-  document.querySelectorAll('input[name="payment"]').forEach((radio) => radio.addEventListener('change', (event) => applyPaymentSelection(event.target.value)));
-  applyPaymentSelection(document.querySelector('input[name="payment"]:checked')?.value || 'cod');
+  document
+    .querySelectorAll('input[name="payment"]')
+    .forEach((radio) =>
+      radio.addEventListener("change", (event) =>
+        applyPaymentSelection(event.target.value),
+      ),
+    );
+  applyPaymentSelection(
+    document.querySelector('input[name="payment"]:checked')?.value || "cod",
+  );
 }
 
 function applyPaymentSelection(method) {
-  const online = method === 'paymob';
-  document.querySelectorAll('.payment-option').forEach((element) => { element.dataset.active = String(element.dataset.value === method); });
-  const button = document.getElementById('placeOrderBtn');
-  const note = document.getElementById('paymentNote');
-  if (button) button.textContent = online ? 'Continue to Secure Payment' : method === 'instapay' ? 'Place InstaPay Order' : 'Place Cash on Delivery Order';
-  if (note) note.textContent = online ? 'You will complete payment on the payment provider’s secure checkout. We never collect card details.' : method === 'instapay' ? 'Your order stays unpaid until we verify your transfer.' : 'Payment is due to the delivery courier when your order arrives. No card details are collected.';
+  const online = method === "paymob";
+  document.querySelectorAll(".payment-option").forEach((element) => {
+    element.dataset.active = String(element.dataset.value === method);
+  });
+  const button = document.getElementById("placeOrderBtn");
+  const note = document.getElementById("paymentNote");
+  if (button)
+    button.textContent = online
+      ? "Continue to Secure Payment"
+      : method === "instapay"
+        ? "Place InstaPay Order"
+        : "Place Cash on Delivery Order";
+  if (note)
+    note.textContent = online
+      ? "You will complete payment on the payment provider’s secure checkout. We never collect card details."
+      : method === "instapay"
+        ? "Your order stays unpaid until we verify your transfer."
+        : "Payment is due to the delivery courier when your order arrives. No card details are collected.";
   renderSummary();
 }
 
 async function refreshPaymentAvailability() {
   try {
-    const response = await fetch(`${API_ORIGIN}/api/payments/config`, { credentials: 'include', cache: 'no-store' });
+    const response = await fetch(`${API_ORIGIN}/api/payments/config`, {
+      credentials: "include",
+      cache: "no-store",
+    });
     if (!response.ok) return;
     const enabled = (await response.json()).onlinePaymentEnabled === true;
     const latestSettings = await refreshStoreSettings();
-    const newInstaEnabled = latestSettings.instapayEnabled === true && Boolean(latestSettings.instapayRecipient && latestSettings.instapayWhatsappPhone);
-    if (enabled === onlinePaymentEnabled && newInstaEnabled === instapayEnabled && JSON.stringify(latestSettings) === JSON.stringify(storeSettings)) return;
+    const newInstaEnabled =
+      latestSettings.instapayEnabled === true &&
+      Boolean(
+        latestSettings.instapayRecipient &&
+        latestSettings.instapayWhatsappPhone,
+      );
+    if (
+      enabled === onlinePaymentEnabled &&
+      newInstaEnabled === instapayEnabled &&
+      JSON.stringify(latestSettings) === JSON.stringify(storeSettings)
+    )
+      return;
     onlinePaymentEnabled = enabled;
     instapayEnabled = newInstaEnabled;
     instapayDetails = newInstaEnabled ? latestSettings : null;
-    const selected = document.querySelector('input[name="payment"]:checked')?.value || 'cod';
-    const safeSelection = (enabled || selected !== 'paymob') && (newInstaEnabled || selected !== 'instapay') ? selected : 'cod';
-    const section = document.getElementById('paymentSection');
+    const selected =
+      document.querySelector('input[name="payment"]:checked')?.value || "cod";
+    const safeSelection =
+      (enabled || selected !== "paymob") &&
+      (newInstaEnabled || selected !== "instapay")
+        ? selected
+        : "cod";
+    const section = document.getElementById("paymentSection");
     if (!section) return;
     section.innerHTML = `<h3 class="h3" style="margin-bottom:1.25rem">Payment</h3>
-      <label class="payment-option" data-active="${safeSelection === 'cod'}" data-value="cod">
-        <input type="radio" name="payment" value="cod" ${safeSelection === 'cod' ? 'checked' : ''} style="margin-top:.2rem" />
+      <label class="payment-option" data-active="${safeSelection === "cod"}" data-value="cod">
+        <input type="radio" name="payment" value="cod" ${safeSelection === "cod" ? "checked" : ""} style="margin-top:.2rem" />
         <div><strong>Cash on Delivery</strong><p class="text-muted" style="font-size:var(--fs-small)">Pay when your order arrives</p></div>
       </label>${paymentOptionsMarkup()}`;
-    section.querySelector(`input[value="${safeSelection}"]`)?.setAttribute('checked', 'checked');
+    section
+      .querySelector(`input[value="${safeSelection}"]`)
+      ?.setAttribute("checked", "checked");
     bindPaymentOptions();
-  } catch { /* Keep the last verified payment choices if refresh is unavailable. */ }
+  } catch {
+    /* Keep the last verified payment choices if refresh is unavailable. */
+  }
 }
 
 function renderSummary() {
   const subtotal = cartSubtotal();
-  const shippingCost = !shippingLocation ? 0 : delivery === 'express'
-    ? shippingLocation.express
-    : (subtotal >= storeSettings.freeShippingThresholdCents / 100 ? 0 : shippingLocation.standard);
+  const shippingCost = !shippingLocation
+    ? 0
+    : delivery === "express"
+      ? shippingLocation.express
+      : subtotal >= storeSettings.freeShippingThresholdCents / 100
+        ? 0
+        : shippingLocation.standard;
   const discount = discountInfo ? discountInfo.discountCents / 100 : 0;
   const total = Math.max(0, subtotal - discount) + shippingCost;
 
-  document.getElementById('checkoutSummary').innerHTML = `
+  document.getElementById("checkoutSummary").innerHTML = `
     <h3 class="h3" style="margin-bottom:1.25rem">Order Summary</h3>
-    ${lines.map((l) => `
+    ${lines
+      .map(
+        (l) => `
       <div class="mini-line">
         <img src="${escapeAttr(l.image)}" alt="${escapeAttr(l.name)}" loading="lazy" />
         <div>
@@ -304,28 +456,35 @@ function renderSummary() {
           <p style="font-size:var(--fs-small);margin-top:.25rem">${formatPrice(l.price * l.quantity)}</p>
         </div>
       </div>
-    `).join('')}
+    `,
+      )
+      .join("")}
     <hr class="hr" style="margin-block:1rem" />
     <div class="promo-row">
       <label class="visually-hidden" for="promoInput">Discount code</label>
-      <input type="text" id="promoInput" placeholder="Discount code" value="${discountInfo ? discountInfo.code : ''}" ${discountInfo ? 'disabled' : ''} />
-      <button type="button" class="btn btn-outline btn-sm" id="applyPromo" ${discountInfo ? 'disabled' : ''}>Apply</button>
+      <input type="text" id="promoInput" placeholder="Discount code" value="${discountInfo ? discountInfo.code : ""}" ${discountInfo ? "disabled" : ""} />
+      <button type="button" class="btn btn-outline btn-sm" id="applyPromo" ${discountInfo ? "disabled" : ""}>Apply</button>
     </div>
-    ${discountInfo ? `<button type="button" class="btn btn-text" id="removePromo" style="display:block;margin:-.5rem 0 1rem;padding:0;font-size:var(--fs-micro)">Remove code</button>` : ''}
+    ${discountInfo ? `<button type="button" class="btn btn-text" id="removePromo" style="display:block;margin:-.5rem 0 1rem;padding:0;font-size:var(--fs-micro)">Remove code</button>` : ""}
     <div id="promoMsg" style="font-size:var(--fs-micro);margin-bottom:1rem;color:var(--color-error)"></div>
     <div class="summary-row"><span>Subtotal</span><span>${formatPrice(subtotal)}</span></div>
-    ${discountInfo ? `<div class="summary-row"><span>Discount (${discountInfo.code})</span><span>-${formatPrice(discount)}</span></div>` : ''}
-    <div class="summary-row"><span>Shipping</span><span>${!shippingLocation ? 'Choose location' : shippingCost === 0 ? 'Free' : formatPrice(shippingCost)}</span></div>
+    ${discountInfo ? `<div class="summary-row"><span>Discount (${discountInfo.code})</span><span>-${formatPrice(discount)}</span></div>` : ""}
+    <div class="summary-row"><span>Shipping</span><span>${!shippingLocation ? "Choose location" : shippingCost === 0 ? "Free" : formatPrice(shippingCost)}</span></div>
     <div class="summary-row summary-row--total"><span>Total</span><span>${formatPrice(total)}</span></div>
-    ${instapayDetails && document.querySelector('input[name="payment"]:checked')?.value === 'instapay' ? `<div class="card" style="margin-top:1rem;padding:1rem"><strong>InstaPay transfer details</strong><p class="text-muted" style="font-size:var(--fs-small);margin:.5rem 0">Transfer exactly ${formatPrice(total)}. Your order remains unpaid until we verify it.</p><div class="summary-row"><span>Recipient</span><span>${escapeHtml(instapayDetails.instapayRecipient)}</span></div><button type="button" class="btn btn-outline btn-sm" id="copyInstaPayDetails">Copy InstaPay details</button></div>` : ''}
+    ${instapayDetails && document.querySelector('input[name="payment"]:checked')?.value === "instapay" ? `<div class="card" style="margin-top:1rem;padding:1rem"><strong>InstaPay transfer details</strong><p class="text-muted" style="font-size:var(--fs-small);margin:.5rem 0">Transfer exactly ${formatPrice(total)}. Your order remains unpaid until we verify it.</p><div class="summary-row"><span>Recipient</span><span>${escapeHtml(instapayDetails.instapayRecipient)}</span></div><button type="button" class="btn btn-outline btn-sm" id="copyInstaPayDetails">Copy InstaPay details</button></div>` : ""}
   `;
 
-  document.getElementById('applyPromo').addEventListener('click', async () => {
-    const btn = document.getElementById('applyPromo');
-    const msg = document.getElementById('promoMsg');
-    const val = document.getElementById('promoInput').value.trim().toUpperCase();
+  document.getElementById("applyPromo").addEventListener("click", async () => {
+    const btn = document.getElementById("applyPromo");
+    const msg = document.getElementById("promoMsg");
+    const val = document
+      .getElementById("promoInput")
+      .value.trim()
+      .toUpperCase();
     if (!val) return;
-    btn.disabled = true; btn.textContent = 'Checking…'; msg.textContent = '';
+    btn.disabled = true;
+    btn.textContent = "Checking…";
+    msg.textContent = "";
     try {
       const result = await checkDiscount(val, cartSubtotal());
       discountInfo = { code: result.code, discountCents: result.discountCents };
@@ -334,76 +493,132 @@ function renderSummary() {
     } catch (error) {
       discountInfo = null;
       msg.textContent = error.message;
-      btn.disabled = false; btn.textContent = 'Apply';
+      btn.disabled = false;
+      btn.textContent = "Apply";
     }
   });
-  const removeBtn = document.getElementById('removePromo');
-  if (removeBtn) removeBtn.addEventListener('click', () => {
-    discountInfo = null;
-    clearDiscountCode();
-    renderSummary();
-  });
-  document.getElementById('copyInstaPayDetails')?.addEventListener('click', async (event) => {
-    try { await navigator.clipboard.writeText(instapayDetails.instapayRecipient); event.currentTarget.textContent = 'Copied'; }
-    catch { showToast('Copy is unavailable. Select and copy the recipient details.'); }
-  });
+  const removeBtn = document.getElementById("removePromo");
+  if (removeBtn)
+    removeBtn.addEventListener("click", () => {
+      discountInfo = null;
+      clearDiscountCode();
+      renderSummary();
+    });
+  document
+    .getElementById("copyInstaPayDetails")
+    ?.addEventListener("click", async (event) => {
+      try {
+        await navigator.clipboard.writeText(instapayDetails.instapayRecipient);
+        event.currentTarget.textContent = "Copied";
+      } catch {
+        showToast(
+          "Copy is unavailable. Select and copy the recipient details.",
+        );
+      }
+    });
 }
 
 async function onSubmit(e) {
   e.preventDefault();
   const form = e.target;
-  const createAccount = document.getElementById('createGuestAccount')?.checked === true;
-  const requiredIds = ['fullName', 'phone', 'address', 'buildingNumber', 'propertyType', 'shippingLocation', 'country', ...(document.getElementById('floor').required ? ['floor', 'apartmentNumber'] : []), ...(!currentUser ? ['email'] : []), ...(createAccount ? ['guestPassword', 'guestPasswordConfirm'] : [])];
+  const createAccount =
+    document.getElementById("createGuestAccount")?.checked === true;
+  const requiredIds = [
+    "fullName",
+    "phone",
+    "address",
+    "buildingNumber",
+    "propertyType",
+    "shippingLocation",
+    "country",
+    ...(document.getElementById("floor").required
+      ? ["floor", "apartmentNumber"]
+      : []),
+    ...(!currentUser ? ["email"] : []),
+    ...(createAccount ? ["guestPassword", "guestPasswordConfirm"] : []),
+  ];
   let valid = true;
   requiredIds.forEach((id) => {
     const input = document.getElementById(id);
-    if (!input.checkValidity()) { valid = false; input.reportValidity(); }
+    if (!input.checkValidity()) {
+      valid = false;
+      input.reportValidity();
+    }
   });
   if (!valid) return;
 
-  const guestPassword = value('guestPassword');
-  if (createAccount && guestPassword !== value('guestPasswordConfirm')) {
-    showToast('The passwords do not match. · كلمتا المرور غير متطابقتين.');
+  const guestPassword = value("guestPassword");
+  if (createAccount && guestPassword !== value("guestPasswordConfirm")) {
+    showToast("The passwords do not match. · كلمتا المرور غير متطابقتين.");
     return;
   }
 
   const customer = {
-    name: document.getElementById('fullName').value,
-    email: currentUser?.email || value('email').trim(),
-    phone: document.getElementById('phone').value,
+    name: document.getElementById("fullName").value,
+    email: currentUser?.email || value("email").trim(),
+    phone: document.getElementById("phone").value,
   };
   const shipping = {
-    address: document.getElementById('address').value,
-    propertyType: document.getElementById('propertyType').value,
-    buildingNumber: document.getElementById('buildingNumber').value.trim(),
-    floor: document.getElementById('floor').value.trim(),
-    apartmentNumber: document.getElementById('apartmentNumber').value.trim(),
-    city: shippingLocation?.name || '',
-    locationId: shippingLocation?.id || '',
-    postal: document.getElementById('postal').value,
-    country: document.getElementById('country').value,
+    address: document.getElementById("address").value,
+    propertyType: document.getElementById("propertyType").value,
+    buildingNumber: document.getElementById("buildingNumber").value.trim(),
+    floor: document.getElementById("floor").value.trim(),
+    apartmentNumber: document.getElementById("apartmentNumber").value.trim(),
+    city: shippingLocation?.name || "",
+    locationId: shippingLocation?.id || "",
+    postal: document.getElementById("postal").value,
+    country: document.getElementById("country").value,
   };
 
-  const button = document.getElementById('placeOrderBtn');
-  const paymentMethod = document.querySelector('input[name="payment"]:checked')?.value || 'cod';
-  button.disabled = true; button.textContent = 'Placing order…';
+  const button = document.getElementById("placeOrderBtn");
+  const paymentMethod =
+    document.querySelector('input[name="payment"]:checked')?.value || "cod";
+  button.disabled = true;
+  button.textContent = "Placing order…";
   let placedOrder;
-  try { placedOrder = await createOrder({ lines, customer, shipping, delivery, paymentMethod, discountCode: discountInfo?.code, createAccount: createAccount ? { password: guestPassword } : undefined }); }
-  catch (error) {
+  try {
+    placedOrder = await createOrder({
+      lines,
+      customer,
+      shipping,
+      delivery,
+      paymentMethod,
+      discountCode: discountInfo?.code,
+      createAccount: createAccount ? { password: guestPassword } : undefined,
+    });
+  } catch (error) {
     if (error.status === 409) {
       try {
-        const currentProducts = await Promise.all([...new Set(getCart().map((line) => line.slug))].map(fetchProductBySlug));
+        const currentProducts = await Promise.all(
+          [...new Set(getCart().map((line) => line.slug))].map(
+            fetchProductBySlug,
+          ),
+        );
         const changes = syncCartWithProducts(currentProducts);
         if (changes.adjusted.length || changes.removed.length) {
-          try { sessionStorage.setItem('nuvanti_cart_notice', 'Stock changed while you were checking out. Your bag was adjusted to the pieces still available; review it before placing the order.'); } catch { /* The cart page will still show current stock. */ }
-          window.location.href = 'cart.html';
+          try {
+            sessionStorage.setItem(
+              "nuvanti_cart_notice",
+              "Stock changed while you were checking out. Your bag was adjusted to the pieces still available; review it before placing the order.",
+            );
+          } catch {
+            /* The cart page will still show current stock. */
+          }
+          window.location.href = "cart.html";
           return;
         }
-      } catch { /* Keep the server's stock message visible if refresh fails. */ }
+      } catch {
+        /* Keep the server's stock message visible if refresh fails. */
+      }
     }
     showToast(error.message);
     button.disabled = false;
-    button.textContent = paymentMethod === 'paymob' ? 'Continue to Secure Payment' : paymentMethod === 'instapay' ? 'Place InstaPay Order' : 'Place Cash on Delivery Order';
+    button.textContent =
+      paymentMethod === "paymob"
+        ? "Continue to Secure Payment"
+        : paymentMethod === "instapay"
+          ? "Place InstaPay Order"
+          : "Place Cash on Delivery Order";
     return;
   }
   if (placedOrder.accountCreated) {
@@ -412,20 +627,48 @@ async function onSubmit(e) {
   clearCart();
   clearDiscountCode();
   refreshCartDrawer();
-  if (paymentMethod === 'paymob' && placedOrder.paymentUrl) { window.location.assign(placedOrder.paymentUrl); return; }
-  if (placedOrder.storageUnavailable && placedOrder.trackingUrl) { window.location.assign(placedOrder.trackingUrl); return; }
-  window.location.href = 'order-success.html';
+  if (paymentMethod === "paymob" && placedOrder.paymentUrl) {
+    window.location.assign(placedOrder.paymentUrl);
+    return;
+  }
+  if (placedOrder.storageUnavailable && placedOrder.trackingUrl) {
+    window.location.assign(placedOrder.trackingUrl);
+    return;
+  }
+  window.location.href = "order-success.html";
 }
 
 function renderLocationDeliveryPrices() {
-  const standard = document.querySelector('.delivery-option[data-value="standard"] .delivery-option__price');
-  const express = document.querySelector('.delivery-option[data-value="express"] .delivery-option__price');
-  if (standard) standard.textContent = !shippingLocation ? 'Choose location' : cartSubtotal() >= storeSettings.freeShippingThresholdCents / 100 ? 'Free' : formatPrice(shippingLocation.standard);
-  if (express) express.textContent = shippingLocation ? formatPrice(shippingLocation.express) : 'Choose location';
+  const standard = document.querySelector(
+    '.delivery-option[data-value="standard"] .delivery-option__price',
+  );
+  const express = document.querySelector(
+    '.delivery-option[data-value="express"] .delivery-option__price',
+  );
+  if (standard)
+    standard.textContent = !shippingLocation
+      ? "Choose location"
+      : cartSubtotal() >= storeSettings.freeShippingThresholdCents / 100
+        ? "Free"
+        : formatPrice(shippingLocation.standard);
+  if (express)
+    express.textContent = shippingLocation
+      ? formatPrice(shippingLocation.express)
+      : "Choose location";
 }
 
 function escapeHtml(value) {
-  return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+  return String(value ?? "").replace(
+    /[&<>"']/g,
+    (char) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
+        char
+      ],
+  );
 }
-function value(id) { return document.getElementById(id)?.value ?? ''; }
-function escapeAttr(value) { return escapeHtml(value); }
+function value(id) {
+  return document.getElementById(id)?.value ?? "";
+}
+function escapeAttr(value) {
+  return escapeHtml(value);
+}
