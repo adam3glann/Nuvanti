@@ -30,11 +30,6 @@ export function productCardHTML(product, index = 0) {
         aria-pressed="${wished}" aria-label="${wished ? 'Remove from wishlist' : 'Add to wishlist'}">
         ${icon('heart')}
       </button>
-      <div class="product-card__quick">
-        <button class="btn btn-sm" data-quick-add="${escapeHtml(product.id)}" ${!inStock ? 'disabled' : ''}>
-          ${inStock ? 'Quick Add' : 'Sold Out'}
-        </button>
-      </div>
       <a href="product.html?slug=${slug}">
         <p class="product-card__name">${name}</p>
         <div class="product-card__meta">
@@ -45,6 +40,11 @@ export function productCardHTML(product, index = 0) {
           ${colors.map((c) => `<span class="swatch" style="background:${colorHex(c, product.colorSwatches)}" title="${escapeHtml(c)}" aria-label="${escapeHtml(c)}"></span>`).join('')}
         </div>
       </a>
+      <div class="product-card__quick">
+        <button class="btn btn-sm" data-quick-add="${escapeHtml(product.id)}" ${!inStock ? 'disabled' : ''}>
+          ${inStock ? 'Quick Add' : 'Sold Out'}
+        </button>
+      </div>
     </article>
   `;
 }

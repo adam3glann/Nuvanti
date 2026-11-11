@@ -45,7 +45,18 @@ export const pool = new Pool({
       ? getProductionConnectionString(process.env.DATABASE_URL)
       : process.env.DATABASE_URL,
   ssl: getSslConfig(),
-  max: 10,
+  // Keep per-process usage configurable for small hosts and poolers such as
+  // Supavisor/PgBouncer. This is a per-instance limit, so multiply it by the
+  // maximum app instances when setting the database connection budget.
+  max: Math.max(1, Math.min(50, Number(process.env.DB_POOL_MAX) || 10)),
+  connectionTimeoutMillis: Math.max(
+    1000,
+    Math.min(30000, Number(process.env.DB_CONNECT_TIMEOUT_MS) || 10000),
+  ),
+  idleTimeoutMillis: Math.max(
+    1000,
+    Math.min(300000, Number(process.env.DB_IDLE_TIMEOUT_MS) || 30000),
+  ),
 });
 
 // PostgreSQL emits this when an idle pooled connection drops. Without a
@@ -55,7 +66,22 @@ pool.on("error", (error) => {
 });
 
 export async function query(text, params) {
-  return pool.query(text, params);
+  const startedAt = performance.now();
+  try {
+    return await pool.query(text, params);
+  } finally {
+    const durationMs = performance.now() - startedAt;
+    const threshold = Number(process.env.SLOW_QUERY_LOG_MS || 750);
+    if (Number.isFinite(threshold) && threshold > 0 && durationMs >= threshold) {
+      // Log duration and operation only. Avoid query text and bind values,
+      // which can contain private customer data.
+      const operation = /^\s*(SELECT|INSERT|UPDATE|DELETE|WITH)\b/i.exec(text)?.[1]?.toUpperCase() || "QUERY";
+      console.warn("Slow database query", {
+        operation,
+        durationMs: Math.round(durationMs),
+      });
+    }
+  }
 }
 
 export async function transaction(work) {

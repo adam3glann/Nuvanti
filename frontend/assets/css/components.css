@@ -2321,6 +2321,20 @@
    product.
    ========================================================= */
 @media (hover: none), (pointer: coarse) {
+  /* Keep quick add in the card's normal flow on touch screens. An overlay
+     pinned to the image can be covered by the finger while scrolling and
+     can remain stuck in its hover state after a tap. */
+  .product-card__quick {
+    position: static;
+    inset: auto;
+    z-index: auto;
+    opacity: 1;
+    transform: none;
+    margin-top: var(--space-3);
+  }
+  .product-card__quick .btn {
+    min-height: 42px;
+  }
   .product-card:hover .product-card__media {
     box-shadow: none;
     transform: none;

@@ -2433,19 +2433,30 @@ router.get(
   requirePermission("customers.view"),
   async (req, res) => {
     const { rows } =
-      await query(`WITH registered AS (
+      await query(`WITH registered_orders AS (
+  SELECT user_id, count(*) FILTER (WHERE status <> 'cancelled')::int AS "orderCount",
+    max(created_at) FILTER (WHERE status <> 'cancelled') AS "lastOrder",
+    coalesce(sum(total_cents) FILTER (WHERE payment_status = 'paid' AND status <> 'cancelled' AND payment_status <> 'refunded'), 0)::bigint AS "totalSpentCents"
+  FROM orders WHERE user_id IS NOT NULL GROUP BY user_id
+), latest_order_phone AS (
+  SELECT DISTINCT ON (user_id) user_id, nullif(btrim(shipping_address->>'phone'), '') AS phone
+  FROM orders WHERE user_id IS NOT NULL AND nullif(btrim(shipping_address->>'phone'), '') IS NOT NULL
+  ORDER BY user_id, created_at DESC, id DESC
+), latest_address_phone AS (
+  SELECT DISTINCT ON (user_id) user_id, nullif(btrim(phone), '') AS phone
+  FROM addresses WHERE nullif(btrim(phone), '') IS NOT NULL
+  ORDER BY user_id, is_default DESC, created_at DESC, id DESC
+), registered AS (
   SELECT u.id::text, u.name, u.email, u.is_active AS "isActive", u.created_at AS "createdAt",
-    false AS "isGuest",
-    coalesce(
-      (SELECT nullif(btrim(o.shipping_address->>'phone'), '') FROM orders o WHERE o.user_id = u.id AND nullif(btrim(o.shipping_address->>'phone'), '') IS NOT NULL ORDER BY o.created_at DESC LIMIT 1),
-      (SELECT nullif(btrim(a.phone), '') FROM addresses a WHERE a.user_id = u.id ORDER BY a.is_default DESC, a.created_at DESC LIMIT 1)
-    ) AS phone,
-    count(o.id) FILTER (WHERE o.status <> 'cancelled')::int AS "orderCount",
-    max(o.created_at) FILTER (WHERE o.status <> 'cancelled') AS "lastOrder",
-    coalesce(sum(o.total_cents) FILTER (WHERE o.payment_status = 'paid' AND o.status <> 'cancelled' AND o.payment_status <> 'refunded'), 0)::bigint AS "totalSpentCents",
+    false AS "isGuest", coalesce(op.phone, ap.phone) AS phone,
+    coalesce(o."orderCount", 0) AS "orderCount", o."lastOrder",
+    coalesce(o."totalSpentCents", 0)::bigint AS "totalSpentCents",
     count(*) OVER (PARTITION BY lower(btrim(u.email)))::int AS "matchingEmailAccounts"
-    FROM users u LEFT JOIN orders o ON o.user_id = u.id WHERE u.role = 'customer'
-    GROUP BY u.id
+  FROM users u
+  LEFT JOIN registered_orders o ON o.user_id = u.id
+  LEFT JOIN latest_order_phone op ON op.user_id = u.id
+  LEFT JOIN latest_address_phone ap ON ap.user_id = u.id
+  WHERE u.role = 'customer'
 ), guests AS (
   SELECT ('guest:' || md5(lower(btrim(o.shipping_address->>'email')))) AS id,
     coalesce((array_agg(nullif(btrim(o.shipping_address->>'name'), '') ORDER BY o.created_at DESC) FILTER (WHERE nullif(btrim(o.shipping_address->>'name'), '') IS NOT NULL))[1], 'Guest customer') AS name,
@@ -2474,9 +2485,18 @@ router.get(
     );
     if (!rows[0]) return res.status(404).json({ error: "Customer not found." });
     const { rows: orders } = await query(
-      `SELECT o.id::text, o.status, o.payment_status AS "paymentStatus", o.payment_method AS "paymentMethod", o.total_cents AS "totalCents", o.created_at AS "createdAt", o.shipping_address AS "shippingAddress",
-    coalesce((SELECT sum(i.quantity)::int FROM order_items i WHERE i.order_id = o.id), 0) AS "itemCount"
-    FROM orders o WHERE o.user_id = $1 ORDER BY o.created_at DESC`,
+      `WITH customer_orders AS (
+      SELECT id, status, payment_status, payment_method, total_cents, created_at, shipping_address
+      FROM orders WHERE user_id = $1
+    ), item_totals AS (
+      SELECT i.order_id, sum(i.quantity)::int AS "itemCount"
+      FROM order_items i JOIN customer_orders o ON o.id = i.order_id
+      GROUP BY i.order_id
+    )
+    SELECT o.id::text, o.status, o.payment_status AS "paymentStatus", o.payment_method AS "paymentMethod", o.total_cents AS "totalCents", o.created_at AS "createdAt", o.shipping_address AS "shippingAddress",
+      coalesce(item_totals."itemCount", 0) AS "itemCount"
+    FROM customer_orders o LEFT JOIN item_totals ON item_totals.order_id = o.id
+    ORDER BY o.created_at DESC`,
       [req.params.id],
     );
     const { rows: addresses } = await query(

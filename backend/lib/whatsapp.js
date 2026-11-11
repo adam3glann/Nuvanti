@@ -53,6 +53,7 @@ export async function sendOrderWhatsApp({ phone, message }) {
         "Content-Type": "application/x-www-form-urlencoded",
       },
       body,
+      signal: AbortSignal.timeout(10000),
     },
   );
   if (!response.ok)
