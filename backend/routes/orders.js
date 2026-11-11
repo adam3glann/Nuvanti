@@ -46,6 +46,12 @@ async function notifySuperAdminsOfOrder({
         .filter(Boolean),
     ),
   ];
+  if (!recipients.length) {
+    console.error(
+      `New order notification for NV-${orderId} was not sent: no active Super Admin email recipients were found.`,
+    );
+    return;
+  }
   const results = await Promise.allSettled(
     recipients.map((to) =>
       sendNewOrderNotification({
@@ -57,14 +63,20 @@ async function notifySuperAdminsOfOrder({
       }),
     ),
   );
+  let accepted = 0;
   for (const result of results) {
-    if (result.status === "rejected") {
+    if (result.status === "fulfilled") {
+      accepted += 1;
+    } else {
       console.error(
         `New order notification email failed for order NV-${orderId}:`,
         result.reason,
       );
     }
   }
+  console.info(
+    `New order notification for NV-${orderId}: email provider accepted ${accepted}/${recipients.length} message(s).`,
+  );
 }
 
 const checkout = z.object({
