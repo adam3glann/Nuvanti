@@ -1674,6 +1674,7 @@ function bindSizeAdvisor(containerId, columns, rows, advisorProduct = product, a
               size: String(row.size),
               bodyScore: bodyUsed ? bodyScore / bodyUsed : 0,
               profileScore: profileUsed ? profileScore / profileUsed : 0,
+              hasProfileScore: profileUsed > 0,
               fitWarnings,
               fitsBody: bodyUsed > 0 && fitWarnings.length === 0,
               rowIndex,
@@ -1697,24 +1698,50 @@ function bindSizeAdvisor(containerId, columns, rows, advisorProduct = product, a
       return;
     }
     const best = candidates[0];
+    const profileBest = ranked
+      .filter((candidate) => candidate.hasProfileScore)
+      .sort(
+        (a, b) =>
+          a.profileScore - b.profileScore || a.rowIndex - b.rowIndex,
+      )[0];
+    const profileConflict = Boolean(
+      measurements.length &&
+        profileBest &&
+        Math.abs(profileBest.rowIndex - best.rowIndex) > 1,
+    );
     const alternativeScore = (candidate) => candidate.bodyScore + candidate.profileScore * 0.08;
-    if (!best.fitWarnings.length) onRecommendation?.(best.size);
+    if (!best.fitWarnings.length && !profileConflict) onRecommendation?.(best.size);
     const alternative =
-      !best.fitWarnings.length && candidates[1] && alternativeScore(candidates[1]) - alternativeScore(best) <= 2.5 ? candidates[1] : null;
-    const caution =
-      best.fitWarnings.length
-        ? (() => {
-            const warning = best.fitWarnings[0];
-            const easeText = warning.ease < 0
-              ? `${Math.abs(warning.ease).toFixed(1)} cm smaller than your ${warning.label.toLowerCase()} measurement`
-              : `${warning.ease.toFixed(1)} cm of ease, below your selected ${fit} fit target of ${warning.targetEase} cm`;
-            return ` ${warning.label} has ${easeText}. No listed size meets your selected fit; check the chart before ordering.`;
-          })()
-        : best.bodyScore > 18
-          ? " The closest chart match is uncertain; double-check the measurements before ordering."
-          : " This recommendation is calculated from the measurements and size ranges in this product’s chart.";
+      !profileConflict &&
+      !best.fitWarnings.length &&
+      candidates[1] &&
+      alternativeScore(candidates[1]) - alternativeScore(best) <= 2.5
+        ? candidates[1]
+        : null;
+    const cautions = [];
+    if (profileConflict) {
+      cautions.push(
+        `Your body measurements point to ${best.size}, but this chart’s height/weight ranges point to ${profileBest.size}. The chart gives conflicting guidance; confirm the product measurements before ordering.`,
+      );
+    }
+    if (best.fitWarnings.length) {
+      const warning = best.fitWarnings[0];
+      const easeText = warning.ease < 0
+        ? `${Math.abs(warning.ease).toFixed(1)} cm smaller than your ${warning.label.toLowerCase()} measurement`
+        : `${warning.ease.toFixed(1)} cm of ease, below your selected ${fit} fit target of ${warning.targetEase} cm`;
+      cautions.push(
+        `${warning.label} has ${easeText}. No listed size meets your selected fit; check the chart before ordering.`,
+      );
+    }
+    if (!cautions.length && best.bodyScore > 18) {
+      cautions.push("The closest chart match is uncertain; double-check the measurements before ordering.");
+    }
+    if (!cautions.length) {
+      cautions.push("This recommendation is calculated from the measurements and size ranges in this product’s chart.");
+    }
+    const caution = ` ${cautions.join(" ")}`;
     const recommendation = document.createElement("strong");
-    recommendation.textContent = `${best.fitWarnings.length ? "Closest size" : "Recommended size"}: ${best.size}`;
+    recommendation.textContent = `${best.fitWarnings.length || profileConflict ? "Closest size" : "Recommended size"}: ${best.size}`;
     result.replaceChildren(
       recommendation,
       document.createTextNode(
