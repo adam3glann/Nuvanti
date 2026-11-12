@@ -1,5 +1,5 @@
 import { API_ORIGIN as API } from '../config.js';
-import { uploadAdminImage } from './imageUploadService.js';
+import { uploadAdminImage } from './imageUploadService.js?v=preserve-alpha-v1';
 async function request(path, options = {}) {
   const response = await fetch(`${API}${path}`, { credentials: 'include', headers: { 'Content-Type': 'application/json' }, ...options });
   if (response.status === 204) return true;

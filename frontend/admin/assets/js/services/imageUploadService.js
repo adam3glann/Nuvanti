@@ -49,9 +49,9 @@ export async function uploadAdminImage(file, { endpoint, onProgress } = {}) {
 }
 
 async function optimizeImage(file, onProgress) {
-  // Keep small assets and animated GIFs byte-for-byte; transcoding a GIF would
-  // discard its animation. Compress only when it materially helps uploads.
-  if (file.type === 'image/gif' || file.size <= 1_200_000) return file;
+  // Preserve PNG/WebP alpha and animated GIFs byte-for-byte. Compress only
+  // larger opaque JPEGs when it materially helps uploads.
+  if (file.type !== 'image/jpeg' || file.size <= 1_200_000) return file;
   if (!('createImageBitmap' in window)) return file;
 
   onProgress?.(0);

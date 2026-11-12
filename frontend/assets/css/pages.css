@@ -27,7 +27,7 @@
   position: relative;
   aspect-ratio: 4/5;
   overflow: hidden;
-  background: var(--color-border);
+  background: transparent;
   touch-action: pan-y pinch-zoom;
   cursor: zoom-in;
 }
@@ -39,6 +39,16 @@
   transition:
     opacity var(--dur-fast) var(--ease-editorial),
     transform var(--dur-med) var(--ease-editorial);
+}
+.gallery__main--cutout img {
+  object-fit: contain;
+}
+.gallery__thumbs--cutout .gallery__thumb,
+.gallery__thumbs--cutout .gallery__thumb img {
+  background: transparent;
+}
+.gallery__thumbs--cutout .gallery__thumb img {
+  object-fit: contain;
 }
 .gallery__thumbs {
   display: flex;

@@ -192,6 +192,10 @@ function renderGallery() {
 
   const images = currentProductImages();
   const allImages = allProductImageEntries();
+  const isSetCutout = Boolean(
+    product?.bundle?.crewneck && product?.bundle?.sweatpants,
+  );
+  const cutoutClass = isSetCutout ? "--cutout" : "";
 
   /*
    * If product has no images, show a clean fallback.
@@ -199,7 +203,7 @@ function renderGallery() {
   if (images.length === 0) {
     gallery.innerHTML = `
       <div
-        class="gallery__main"
+        class="gallery__main${cutoutClass}"
         style="cursor:default"
       >
         <div
@@ -225,7 +229,7 @@ function renderGallery() {
   gallery.innerHTML = `
 
     <div
-      class="gallery__main"
+      class="gallery__main${cutoutClass}"
       id="galleryMain"
       aria-label="Product image viewer"
     >
@@ -245,7 +249,7 @@ function renderGallery() {
       allImages.length > 1
         ? `
           <div
-            class="gallery__thumbs"
+          class="gallery__thumbs${cutoutClass}"
             role="tablist"
             aria-label="Product images"
           >

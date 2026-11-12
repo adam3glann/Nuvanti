@@ -1,5 +1,5 @@
 import { API_ORIGIN } from '../config.js';
-import { uploadAdminImage } from './imageUploadService.js';
+import { uploadAdminImage } from './imageUploadService.js?v=preserve-alpha-v1';
 
 async function request(path, options = {}) {
   const response = await fetch(`${API_ORIGIN}${path}`, {
