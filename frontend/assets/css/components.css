@@ -4334,7 +4334,12 @@
 :root[data-theme="dark"] .product-card--set,
 .section--ink .product-card--set {
   animation: set-card-float 5.8s ease-in-out infinite;
+  background: linear-gradient(155deg, #202a24, #141c18);
   box-shadow: 0 16px 34px rgba(0, 0, 0, .38), 0 4px 16px color-mix(in srgb, var(--set-accent, #d8a94c) 12%, transparent);
+}
+:root[data-theme="dark"] .product-card--set .product-card__name,
+.section--ink .product-card--set .product-card__name {
+  color: var(--color-text-inverse);
 }
 :root[data-theme="dark"] .product-card--set:hover,
 .section--ink .product-card--set:hover {
@@ -4361,7 +4366,15 @@
   box-shadow:0 0 calc(8px + (var(--set-intensity,1) - 1) * 4px) color-mix(in srgb,var(--set-accent,#d8a94c) 60%,transparent), 0 0 calc(18px + (var(--set-intensity,1) - 1) * 7px) color-mix(in srgb,var(--set-accent,#d8a94c) 30%,transparent);
 }
 .set-card--double::after { border:3px double var(--set-accent,#d8a94c); box-shadow:inset 0 0 0 3px color-mix(in srgb,var(--set-accent,#d8a94c) 22%,transparent); }
-.set-card--gradient::after { border:2px solid transparent; background:linear-gradient(var(--color-surface),var(--color-surface)) padding-box,linear-gradient(135deg,var(--set-accent,#d8a94c),#71ffb0,#c65eff) border-box; }
+.set-card--gradient::after {
+  inset: -2px;
+  padding: 2px;
+  border: 0;
+  background: linear-gradient(135deg,var(--set-accent,#d8a94c),#71ffb0,#c65eff);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
 .product-card--set:hover::after { opacity:calc(.72 + (var(--set-intensity,1) - 1) * .07); }
 .set-effect--fire::after { box-shadow:inset 0 0 calc(8px + (var(--set-intensity,1) - 1) * 3px) rgba(255,91,34,.22),0 0 calc(8px + (var(--set-intensity,1) - 1) * 4px) #ff7138,0 0 calc(20px + (var(--set-intensity,1) - 1) * 7px) color-mix(in srgb,#ff5b22 48%,transparent); animation:set-fire-glow 1.8s ease-in-out infinite alternate; }
 .set-effect--ice::after { box-shadow:inset 0 0 calc(8px + (var(--set-intensity,1) - 1) * 3px) rgba(98,217,255,.2),0 0 calc(8px + (var(--set-intensity,1) - 1) * 4px) #79e4ff,0 0 calc(20px + (var(--set-intensity,1) - 1) * 7px) color-mix(in srgb,#62d9ff 46%,transparent); }
