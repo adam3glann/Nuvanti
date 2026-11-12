@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { query } from "./db.js";
+import { getClientIp } from "./clientIp.js";
 
 const IP_FAILURE_LIMIT = 3;
 
@@ -14,9 +15,7 @@ function fingerprintIp(ip, accountId) {
 }
 
 function requestIp(req) {
-  return String(
-    req.trustedClientIp || req.ip || req.socket?.remoteAddress || "",
-  ).trim();
+  return getClientIp(req) || "";
 }
 
 export async function adminIpBlockStatus(req, accountId = req.user?.sub) {

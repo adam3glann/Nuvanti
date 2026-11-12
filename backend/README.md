@@ -110,6 +110,7 @@ The reset email is sent to the account's email address and will appear on the re
 - Permission checks (not just a role check) on every `/api/admin/*` endpoint, backed by a real 4-tier role model — see "Roles & permissions" above.
 - Brute-force lockout: an account locks for 15 minutes after 5 consecutive failed logins.
 - Audit log of security-relevant events (logins, lockouts, password changes/resets, administrator account changes, stock adjustments, and catalog/order actions) — visible on the **Audit Logs** admin page to `admin`/`super_admin`.
+- Client IPs in admin sign-in notifications and audit records come from a verified Cloudflare Pages signature or Railway's `X-Real-IP`. If a storefront request lacks a valid signature, its IP is marked unavailable rather than recording a proxy IP. Set the same `NUVANTI_PROXY_IP_SECRET` in backend and Cloudflare Pages.
 - Helmet headers, request size limits, strict CORS, origin checks on writes, validation, and rate limits.
 - Checkout re-prices products and locks inventory rows in a PostgreSQL transaction. A browser cannot choose prices or oversell stock.
 - Parameterized SQL and Zod input validation everywhere, including admin mutations.

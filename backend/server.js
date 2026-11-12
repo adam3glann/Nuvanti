@@ -31,6 +31,7 @@ import { requireUnblockedAdminIp } from "./lib/adminLoginSecurity.js";
 import { requireEmergencyLockdownInactive } from "./middleware/emergencyLockdown.js";
 import { errorHandler, notFound, sameOrigin } from "./middleware/security.js";
 import { query } from "./lib/db.js";
+import { trustRailwayClientIp } from "./lib/clientIp.js";
 import { emailDeliveryStatus } from "./lib/mail.js";
 import { hasPermission } from "./lib/permissions.js";
 import { expireAbandonedOrders } from "./lib/orderLifecycle.js";
@@ -206,6 +207,14 @@ function verifyForwardedClientIp(req, res, next) {
 }
 if (process.env.NODE_ENV === "production") {
   if (
+    !process.env.NUVANTI_PROXY_IP_SECRET ||
+    process.env.NUVANTI_PROXY_IP_SECRET.length < 32
+  ) {
+    console.warn(
+      "NUVANTI_PROXY_IP_SECRET is missing or too short; storefront requests through Cloudflare cannot be attributed to the original client IP.",
+    );
+  }
+  if (
     !process.env.JWT_SECRET ||
     process.env.JWT_SECRET.length < 32 ||
     /replace-with|example|paste_/i.test(process.env.JWT_SECRET)
@@ -274,6 +283,14 @@ const productSearchLimiter = rateLimit({
 });
 // Mount before the general limiter so it sees the full /api/products path.
 app.use(verifyForwardedClientIp);
+app.use((req, res, next) => {
+  const origin = req.get("Origin");
+  req.storefrontOriginRequest = Boolean(
+    origin && [...storeOrigins, storePreviewOrigin].filter(Boolean).includes(origin),
+  );
+  next();
+});
+app.use(trustRailwayClientIp);
 app.use(productSearchLimiter);
 app.use(
   rateLimit({

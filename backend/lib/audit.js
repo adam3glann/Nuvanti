@@ -1,4 +1,5 @@
 import { query } from "./db.js";
+import { getClientIp } from "./clientIp.js";
 
 // Records a security-relevant event. Never throws — a logging failure must
 // never break the request that triggered it — but always reports the
@@ -13,7 +14,7 @@ export async function logAudit({
 }) {
   const actorUserId = actor?.id ?? req?.user?.sub ?? null;
   const actorEmail = actor?.email ?? req?.user?.email ?? null;
-  const ip = req?.ip || req?.headers?.["x-forwarded-for"] || null;
+  const ip = getClientIp(req);
   try {
     await query(
       "INSERT INTO audit_logs (actor_user_id, actor_email, action, target_type, target_id, metadata, ip) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)",

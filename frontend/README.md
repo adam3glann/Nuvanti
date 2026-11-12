@@ -6,4 +6,4 @@ Set the Cloudflare Pages environment variable `NUVANTI_API_ORIGIN` to the backen
 
 Set `STORE_ORIGIN` on the backend to the exact public storefront origin (including `https://`, without a path), and leave `COOKIE_DOMAIN` blank. The function removes any upstream cookie domain so the browser stores the session only for the storefront host.
 
-Set `NUVANTI_PROXY_IP_SECRET` to the same unique random value (at least 32 characters) in the backend and Cloudflare Pages environment variables, then redeploy both. The Pages Function signs Cloudflare's client IP for API rate limiting; the backend ignores unsigned or stale client-IP headers.
+Set `NUVANTI_PROXY_IP_SECRET` to the same unique random value (at least 32 characters) in the backend and Cloudflare Pages environment variables, then redeploy both. The Pages Function signs Cloudflare's client IP for rate limiting, audit logs, and notifications; the backend ignores unsigned or stale client-IP headers. Direct requests to the Railway-hosted admin app use Railway's `X-Real-IP`. If a storefront request has no valid signature, the backend records its IP as unavailable instead of logging the Cloudflare/Railway proxy address.

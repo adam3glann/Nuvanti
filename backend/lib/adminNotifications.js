@@ -1,5 +1,6 @@
 import { query } from "./db.js";
 import { sendAdminLoginNotification, sendContactNotification } from "./mail.js";
+import { getClientIp } from "./clientIp.js";
 
 async function activeSuperAdminEmails() {
   const { rows } = await query(`SELECT email FROM users
@@ -25,7 +26,7 @@ export async function notifySuperAdminsOfLogin({ user, req }) {
       name: user.name,
       email: user.email,
       role: user.role,
-      ip: req.ip,
+      ip: getClientIp(req),
       userAgent: req.get("user-agent")?.slice(0, 500),
       loggedInAt: new Date().toISOString(),
     }),
