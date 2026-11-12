@@ -7,17 +7,22 @@ import { Counter } from "k6/metrics";
 
 const rateLimitedResponses = new Counter("rate_limited_responses");
 const serverErrorResponses = new Counter("server_error_responses");
+const failedResponses = new Counter("failed_responses");
 
-function recordResponse(response) {
-  if (response.status === 429) rateLimitedResponses.add(1);
-  if (response.status >= 500) serverErrorResponses.add(1);
+function recordResponse(response, endpoint) {
+  const tags = { endpoint, status: String(response.status) };
+  if (response.status >= 400) failedResponses.add(1, tags);
+  if (response.status === 429) rateLimitedResponses.add(1, tags);
+  if (response.status >= 500) serverErrorResponses.add(1, tags);
 }
 
 const baseUrl = (__ENV.BASE_URL || "").replace(/\/+$/, "");
 if (!baseUrl) throw new Error("Set BASE_URL to your staging storefront URL.");
 const apiBaseUrl = (__ENV.API_BASE_URL || baseUrl).replace(/\/+$/, "");
-const includePresenceWrites = __ENV.INCLUDE_PRESENCE_WRITES !== "false";
 const presenceOnly = __ENV.PRESENCE_ONLY === "true";
+const includePresenceWrites =
+  presenceOnly || __ENV.INCLUDE_PRESENCE_WRITES === "true";
+const includePageViewWrites = __ENV.INCLUDE_PAGE_VIEW_WRITES !== "false";
 // Use the synthetic forwarding IPs only for a local server configured with
 // TRUST_PROXY=1; never send them to a public environment.
 const apiRequestOptions = {
@@ -73,16 +78,16 @@ export default function () {
 
   if (__ITER === 0) {
     const home = http.get(`${baseUrl}/`);
-    recordResponse(home);
+    recordResponse(home, "storefront");
     check(home, { "storefront loads": (response) => response.status === 200 });
 
-    if (includePresenceWrites && !presenceOnly) {
+    if (includePageViewWrites && !presenceOnly) {
       const pageView = http.post(
         `${apiBaseUrl}/api/storefront/page-view`,
         null,
         apiRequestOptions,
       );
-      recordResponse(pageView);
+      recordResponse(pageView, "page-view");
       check(pageView, {
         "page view is recorded": (response) => response.status === 204,
       });
@@ -94,7 +99,7 @@ export default function () {
       `${apiBaseUrl}/api/products?limit=100`,
       apiRequestOptions,
     );
-    recordResponse(response);
+    recordResponse(response, "catalog-list");
     check(response, {
       "product list loads": (result) => result.status === 200,
     });
@@ -107,7 +112,7 @@ export default function () {
           `${apiBaseUrl}/api/products/${encodeURIComponent(product.slug)}`,
           apiRequestOptions,
         );
-        recordResponse(details);
+        recordResponse(details, "product-detail");
       }
     }
   }
@@ -124,7 +129,7 @@ export default function () {
         },
       },
     );
-    recordResponse(presence);
+    recordResponse(presence, "presence");
     check(presence, {
       "visitor presence is recorded": (result) => result.status === 204,
     });

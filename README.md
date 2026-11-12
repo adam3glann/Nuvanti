@@ -153,7 +153,7 @@ Follow [DEPLOYMENT-POSTGRES.md](DEPLOYMENT-POSTGRES.md) for the Railway, Supabas
 
 ## Run a Grafana Cloud k6 load test
 
-The manual GitHub Actions workflow runs `load-tests/store-browsing.js` against a staging storefront and reports results to Grafana Cloud k6. The test ramps to 100 virtual users and runs for about 10 minutes. It reads the storefront and product catalog and sends anonymous page-view and visitor-presence requests; it does not sign in, place orders, or start payments. The configured production hostnames are blocked.
+The manual GitHub Actions workflow runs `load-tests/store-browsing.js` against a staging storefront and reports results to Grafana Cloud k6. The test ramps to 100 virtual users and runs for about 10 minutes. It reads the storefront and product catalog and sends one anonymous page-view request per virtual user; it does not sign in, place orders, or start payments. Visitor-presence heartbeats are off by default because k6 cloud workers share source IPs while the API rate-limits heartbeats per client IP. Set `INCLUDE_PRESENCE_WRITES=true` to include that endpoint in a separate test with enough source IPs. The configured production hostnames are blocked.
 
 Before the first run, add these under the repository's **Settings → Secrets and variables → Actions → New repository secret**:
 

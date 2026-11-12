@@ -34,6 +34,7 @@ if (-not $hasEnvironmentCredentials -and -not $hasSavedCredentials) {
 & k6 cloud run `
   --summary-mode full `
   -e "BASE_URL=$baseUrl" `
+  -e "INCLUDE_PRESENCE_WRITES=false" `
   'load-tests/store-browsing.js'
 
 exit $LASTEXITCODE

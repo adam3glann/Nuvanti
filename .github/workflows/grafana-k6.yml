@@ -61,6 +61,10 @@ jobs:
             exit 1
           fi
           args=(-e "BASE_URL=$BASE_URL")
+          # The cloud load zone shares source IPs across VUs. Keep the normal
+          # shopper heartbeat writes out of this catalog capacity run; those
+          # are tested separately because the API rate-limits them per IP.
+          args+=(-e "INCLUDE_PRESENCE_WRITES=false")
           if [ -n "$API_BASE_URL" ]; then
             args+=(-e "API_BASE_URL=$API_BASE_URL")
           fi
