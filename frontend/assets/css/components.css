@@ -1056,7 +1056,8 @@
   overflow-x: auto;
   scroll-snap-type: x proximity;
   scrollbar-width: none;
-  padding-bottom: var(--space-2);
+  /* Leave room for the set card's lift and outer glow inside the scrollport. */
+  padding-block: 30px 28px;
 }
 .carousel__track::-webkit-scrollbar {
   display: none;
@@ -1065,6 +1066,10 @@
   flex: 0 0 auto;
   width: min(72vw, 300px);
   scroll-snap-align: start;
+}
+.carousel__track .product-card--set:hover {
+  transform: none;
+  translate: 0 0;
 }
 .carousel__nav {
   display: none;
