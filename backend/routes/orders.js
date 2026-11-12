@@ -16,7 +16,6 @@ import {
   sendNewOrderNotification,
   sendOrderConfirmation,
 } from "../lib/mail.js";
-import { sendOrderWhatsApp } from "../lib/whatsapp.js";
 import { storePublicOrigin } from "../lib/publicOrigins.js";
 import { createPaymobCheckout, paymobReady } from "../lib/paymob.js";
 import { restoreOrderInventory } from "../lib/orderLifecycle.js";
@@ -595,6 +594,7 @@ router.post(
                   whatsappPhone: settings.instapayWhatsappPhone,
                 }
               : null,
+          supportWhatsappPhone: settings.instapayWhatsappPhone || null,
           itemSummaries: orderLines.map((item) => ({
             name: item.name,
             priceCents: item.unitPrice,
@@ -618,7 +618,13 @@ router.post(
         });
       throw error;
     }
-    const { order, itemSummaries, transferDetails, registeredUser } =
+    const {
+      order,
+      itemSummaries,
+      transferDetails,
+      supportWhatsappPhone,
+      registeredUser,
+    } =
       transactionResult;
     const storeOrigin = storePublicOrigin();
     const trackingUrl = `${storeOrigin}/track.html?order=${order.id}&token=${trackingToken}`;
@@ -741,19 +747,12 @@ router.post(
         paymentMethod,
         paymentUrl,
         transferDetails,
+        supportWhatsappPhone,
         guest: !req.user && !registeredUser,
         accountCreated: Boolean(registeredUser),
       },
       items: itemSummaries,
     });
-    if (paymentMethod === "cod" && shipping.phone) {
-      sendOrderWhatsApp({
-        phone: shipping.phone,
-        message: `Hi ${shipping.name}, we received your Nuvanti Cash on Delivery order NV-${order.id}. Please confirm it using the secure button on your order page: ${trackingUrl}`,
-      }).catch((error) =>
-        console.error("Order confirmation WhatsApp failed:", error),
-      );
-    }
   }),
 );
 
@@ -816,7 +815,8 @@ router.get("/track/:id", trackLimiter, async (req, res) => {
   const { rows } = await query(
     `SELECT o.id, o.status, o.payment_status AS "paymentStatus", o.payment_method AS "paymentMethod", o.customer_confirmed_at AS "customerConfirmedAt", o.delivery, o.total_cents AS "totalCents", o.created_at AS "createdAt", o.shipping_address AS "shippingAddress", o.tracking_token AS "trackingToken",
     CASE WHEN o.payment_method = 'instapay' THEN coalesce(o.instapay_recipient_snapshot, (SELECT CASE WHEN s.instapay_enabled AND s.updated_at <= o.created_at THEN s.instapay_recipient END FROM store_settings s WHERE s.id = 1)) END AS "instapayRecipient",
-    CASE WHEN o.payment_method = 'instapay' THEN coalesce(o.instapay_whatsapp_phone_snapshot, (SELECT NULLIF(s.instapay_whatsapp_phone, '') FROM store_settings s WHERE s.id = 1)) END AS "instapayWhatsappPhone"
+    CASE WHEN o.payment_method = 'instapay' THEN coalesce(o.instapay_whatsapp_phone_snapshot, (SELECT NULLIF(s.instapay_whatsapp_phone, '') FROM store_settings s WHERE s.id = 1)) END AS "instapayWhatsappPhone",
+    (SELECT NULLIF(s.instapay_whatsapp_phone, '') FROM store_settings s WHERE s.id = 1) AS "supportWhatsappPhone"
     FROM orders o WHERE o.id = $1`,
     [id],
   );
@@ -843,6 +843,7 @@ router.get("/track/:id", trackLimiter, async (req, res) => {
       paymentStatus: order.paymentStatus,
       paymentMethod: order.paymentMethod,
       customerConfirmed: Boolean(order.customerConfirmedAt),
+      supportWhatsappPhone: order.supportWhatsappPhone,
       instapayRecipient: order.instapayRecipient,
       instapayWhatsappPhone: order.instapayWhatsappPhone,
       delivery: order.delivery,

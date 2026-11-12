@@ -100,7 +100,7 @@ function renderOrder(order) {
       ${order.paymentMethod === "paymob" ? `<div class="order-detail-row"><span>Payment</span><span>${order.paymentStatus === "paid" ? "Paid online" : order.paymentStatus === "failed" ? "Payment not completed" : "Awaiting payment confirmation"}</span></div>` : order.paymentMethod === "instapay" ? `<div class="order-detail-row"><span>Payment</span><strong>${order.paymentStatus === "paid" ? "Paid" : cancelled ? "Cancelled · unpaid" : "Unpaid · transfer verification required"}</strong></div>` : ""}
     </div>
 
-    ${order.paymentMethod === "cod" && !cancelled ? `<section class="instapay-transfer-panel" style="margin-block:1rem"><h2>Confirm your Cash on Delivery order</h2>${order.customerConfirmed ? '<p class="instapay-transfer-panel__pending" role="status">Your order is confirmed. Thank you.</p>' : '<p>Please confirm that you want us to prepare and deliver this order.</p><button class="btn btn-primary" id="confirmCustomerOrder">Confirm Order</button><p id="confirmOrderStatus" role="status" aria-live="polite"></p>'}</section>` : ""}
+    ${order.paymentMethod === "cod" && !cancelled ? `<section class="instapay-transfer-panel" style="margin-block:1rem"><h2>Confirm your Cash on Delivery order</h2>${order.customerConfirmed ? '<p class="instapay-transfer-panel__pending" role="status">Your order is confirmed. Thank you.</p>' : `<p>${order.supportWhatsappPhone ? "Confirming opens WhatsApp with a message ready; tap Send there to message us." : "Confirm that you want us to prepare and deliver this order."}</p><button class="btn ${order.supportWhatsappPhone ? "instapay-whatsapp" : "btn-primary"}" id="confirmCustomerOrder">${order.supportWhatsappPhone ? "Confirm & open WhatsApp" : "Confirm Order"}</button><p id="confirmOrderStatus" role="status" aria-live="polite"></p>`}</section>` : ""}
 
     ${
       instaPending
@@ -172,6 +172,8 @@ function renderOrder(order) {
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || "Could not confirm the order.");
       button.parentElement.innerHTML = '<p class="instapay-transfer-panel__pending" role="status">Your order is confirmed. Thank you.</p>';
+      const whatsappUrl = createWhatsAppUrl(order.supportWhatsappPhone, `Hi Nuvanti, I confirm my Cash on Delivery order NV-${order.id}. Please prepare it.`);
+      if (whatsappUrl) window.location.assign(whatsappUrl);
     } catch (error) {
       button.disabled = false; button.textContent = "Confirm Order";
       document.getElementById("confirmOrderStatus").textContent = error.message;

@@ -6,6 +6,7 @@ import {
   getLastOrder,
 } from "../services/orderService.js";
 import { createWhatsAppUrl } from "../services/whatsapp.js";
+import { API_ORIGIN as API } from "../config.js";
 
 initShell({ currentPage: "shop" });
 
@@ -34,6 +35,10 @@ if (!order) {
     order.transferDetails?.whatsappPhone,
     instaMessage,
   );
+  const codWhatsAppUrl = createWhatsAppUrl(
+    order.supportWhatsappPhone,
+    `Hi Nuvanti, I confirm my Cash on Delivery order ${order.orderNumber}. Please prepare it.`,
+  );
   root.innerHTML = `
     <div class="order-success">
       <div class="order-success__icon">${icon("check")}</div>
@@ -59,6 +64,8 @@ if (!order) {
         <div class="order-detail-row" style="font-weight:700;font-size:1.05rem"><span>Total</span><span>${formatPrice(order.total)}</span></div>
         ${instaPending ? '<div class="order-detail-row"><span>Payment status</span><strong>Unpaid · awaiting transfer verification</strong></div>' : ""}
       </div>
+
+      ${order.paymentMethod === "cod" ? `<section class="instapay-transfer-panel" style="margin-block:1rem"><h2>Confirm your order</h2><p>${codWhatsAppUrl ? "Tap below to confirm your Cash on Delivery order. WhatsApp will open with a message ready; tap Send there to message us." : "Tap below to confirm your Cash on Delivery order."}</p><button class="btn ${codWhatsAppUrl ? "instapay-whatsapp" : "btn-primary"}" type="button" id="confirmOrderWhatsApp">${codWhatsAppUrl ? "Confirm &amp; open WhatsApp" : "Confirm Order"}</button><p id="codConfirmStatus" role="status" aria-live="polite"></p></section>` : ""}
 
       ${
         instaPending
@@ -100,6 +107,37 @@ if (!order) {
       }
     });
   if (onlinePending) refreshPaymentStatus(order);
+  document.getElementById("confirmOrderWhatsApp")?.addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    button.textContent = "Confirming…";
+    try {
+      const token = new URL(order.trackingUrl, location.origin).searchParams.get("token");
+      const response = await fetch(`${API}/api/orders/track/${encodeURIComponent(order.id)}/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || "Could not confirm this order.");
+      order.customerConfirmed = true;
+      try { sessionStorage.setItem("nuvanti_last_order_v1", JSON.stringify(order)); } catch {}
+      const status = document.getElementById("codConfirmStatus");
+      if (codWhatsAppUrl) {
+        status.textContent = "Order confirmed. WhatsApp is opening; tap Send to message us.";
+        button.textContent = "Order confirmed";
+        window.location.assign(codWhatsAppUrl);
+      } else {
+        status.textContent = "Order confirmed. The store WhatsApp contact is not available, but your confirmation is saved.";
+        button.textContent = "Order confirmed";
+        button.disabled = true;
+      }
+    } catch (error) {
+      button.disabled = false;
+      button.textContent = codWhatsAppUrl ? "Confirm & open WhatsApp" : "Confirm Order";
+      document.getElementById("codConfirmStatus").textContent = error.message;
+    }
+  });
 }
 
 async function refreshPaymentStatus(order) {

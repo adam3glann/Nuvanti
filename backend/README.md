@@ -46,12 +46,13 @@ Account recovery is handled through the relevant sign-in page. Do not publish re
 
 ## Order confirmations & tracking
 
-Placing an order (`POST /api/orders`) fires two best-effort notifications after the order is saved — neither can fail the checkout itself:
+Placing an order (`POST /api/orders`) sends a best-effort receipt email after the order is saved; email delivery never fails checkout:
 
 Checkout supports guests and registered customers. Guests provide an email for their receipt and secure tracking link, plus their shipping/contact details; creating an account is optional. Selecting account creation sets a password and sends an email-verification link, while allowing the current order to complete before verification. Guest orders use a nullable `user_id`; an order number alone never grants access, since public tracking requires its random per-order token. Guest order creation is rate limited. Production deployments run `npm run migrate` before starting the API.
 
 - **Email** via the same SMTP config as password resets (`sendOrderConfirmation` in `lib/mail.js`).
-- **WhatsApp** via Twilio's WhatsApp API (`lib/whatsapp.js`), only if `TWILIO_*` is configured and the shipping phone number is in a recognizable international format (a leading `+`). If not configured, or the number can't be normalized, it's skipped silently — checkout is unaffected either way.
+
+Cash-on-delivery customers can tap **Confirm & open WhatsApp** on the order-success or tracking page. The server records their confirmation, then WhatsApp opens with a ready-to-send message to the store contact; the customer must tap Send. This is customer-initiated and does not use Twilio or send an automated WhatsApp message. The receipt email is deliberately neutral and never asks the customer to confirm, since the customer may already have done so.
 
 Both messages include a tracking link: `GET /api/orders/track/:id?token=...`, a public (no-login) endpoint guarded by a random per-order token (not the order's numeric id — that alone proves nothing). It returns order status, items, delivery method, and city/country only — no email, phone, or full address. The storefront's `track.html` page renders it, and also offers a manual order-number + tracking-code lookup for someone who lost the link. Signed-in customers see the same link for every past order under **My Account → Orders**, which now lists real order history instead of only the most recent order in that browser.
 

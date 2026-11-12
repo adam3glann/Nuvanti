@@ -73,6 +73,7 @@ export async function createOrder({
     paymentStatus: "pending",
     paymentUrl: body.order.paymentUrl || null,
     transferDetails: body.order.transferDetails || null,
+    supportWhatsappPhone: body.order.supportWhatsappPhone || null,
     emailDelivery: body.order.emailDelivery || {
       sent: false,
       configured: false,

@@ -560,15 +560,15 @@ export async function sendOrderConfirmation({
   const orderContent = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr><td colspan="3" bgcolor="#f2f2ec" style="padding:12px 14px;background-color:#f2f2ec;border:1px solid #e4e5df;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;color:#17211d"><strong>Order NV-${escapeHtml(orderId)}</strong></td></tr>${itemRows}</table><div style="padding-top:18px">${summaryHtml}</div><div style="margin-top:18px;padding:14px;background-color:#f7f7f2;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:18px;color:#59645e"><strong style="color:#17211d">Delivering to</strong><br>${escapeHtml(address)}</div>`;
   await deliver({
     to,
-    subject: `We received your Nuvanti order NV-${orderId}`,
-    text: `Hi ${name}, we received your order. For Cash on Delivery, please confirm it using the secure order link below.\n\nOrder NV-${orderId}\nItems:\n${itemLines}\n\nSubtotal: ${subtotal} EGP\n${discountLine}Shipping (${deliveryLabel}): ${shippingCost} EGP\nTotal: ${total} EGP\n\nDelivering to: ${address}\n\nReview or confirm your order: ${trackingUrl}`,
+    subject: `Your Nuvanti order NV-${orderId} was received`,
+    text: `Hi ${name}, we received your order. Your order details and current status are available using the secure link below.\n\nOrder NV-${orderId}\nItems:\n${itemLines}\n\nSubtotal: ${subtotal} EGP\n${discountLine}Shipping (${deliveryLabel}): ${shippingCost} EGP\nTotal: ${total} EGP\n\nDelivering to: ${address}\n\nView your order: ${trackingUrl}`,
     html: emailLayout({
-      preheader: `We received order NV-${orderId}. Review it and confirm Cash on Delivery.`,
+      preheader: `We received order NV-${orderId}. View your order details and status.`,
       eyebrow: "ORDER RECEIVED",
       title: `Thanks, ${escapeHtml(name)}.`,
-      intro: "We’ve received your order. If you chose Cash on Delivery, please confirm it using your secure order link.",
+      intro: "We’ve received your order. Your order details and current status are available below.",
       content: orderContent,
-      actionLabel: "REVIEW OR CONFIRM ORDER",
+      actionLabel: "VIEW ORDER DETAILS",
       actionUrl: trackingUrl,
       footerNote:
         "You can also view your order details from your Nuvanti account.",
