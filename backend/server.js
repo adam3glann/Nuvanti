@@ -403,6 +403,13 @@ const adminApp = express();
 adminApp.disable("x-powered-by");
 adminApp.use(
   helmet({
+    permissionsPolicy: {
+      directives: {
+        camera: [],
+        microphone: [],
+        geolocation: [],
+      },
+    },
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
