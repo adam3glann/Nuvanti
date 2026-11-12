@@ -3,8 +3,11 @@ import { formatPrice } from "../components/productCard.js";
 import {
   getCart,
   cartSubtotal,
+  canIncreaseQuantity,
   clearCart,
+  onCartChange,
   syncCartWithProducts,
+  updateQuantity,
 } from "../services/cartService.js";
 import { createOrder } from "../services/orderService.js?v=delivery-address-details-2";
 import { getCurrentUser } from "../services/authService.js";
@@ -39,6 +42,8 @@ let onlinePaymentEnabled = false;
 let instapayEnabled = false;
 let instapayDetails = null;
 let shippingLocation = null;
+let checkoutCartRevision = 0;
+let checkoutOrderPlaced = false;
 
 let lines = getCart();
 if (lines.length === 0) {
@@ -125,6 +130,11 @@ async function initializeCheckout() {
   render();
   await restoreSavedDiscount();
   renderSummary();
+  onCartChange(() => refreshCheckoutCart());
+  window.addEventListener("storage", (event) => {
+    if (event.key === "nuvanti_cart_v1") refreshCheckoutCart();
+  });
+  window.addEventListener("pageshow", () => refreshCheckoutCart());
   startLiveRefresh(async () => {
     const latestProducts = await Promise.all(
       [...new Set(lines.map((line) => line.slug))].map(fetchProductBySlug),
@@ -432,6 +442,11 @@ async function refreshPaymentAvailability() {
 }
 
 function renderSummary() {
+  const summaryElement = document.getElementById("checkoutSummary");
+  if (!summaryElement.dataset.cartControlsBound) {
+    summaryElement.addEventListener("click", onCheckoutCartClick);
+    summaryElement.dataset.cartControlsBound = "true";
+  }
   const subtotal = cartSubtotal();
   const shippingCost = !shippingLocation
     ? 0
@@ -443,17 +458,23 @@ function renderSummary() {
   const discount = discountInfo ? discountInfo.discountCents / 100 : 0;
   const total = Math.max(0, subtotal - discount) + shippingCost;
 
-  document.getElementById("checkoutSummary").innerHTML = `
+  summaryElement.innerHTML = `
     <h3 class="h3" style="margin-bottom:1.25rem">Order Summary</h3>
     ${lines
       .map(
         (l) => `
-      <div class="mini-line">
+      <div class="mini-line checkout-mini-line">
         <img src="${escapeAttr(l.image)}" alt="${escapeAttr(l.name)}" loading="lazy" />
-        <div>
+        <div class="checkout-mini-line__details">
           <p style="font-weight:600;font-size:var(--fs-small)">${escapeAttr(l.name)}</p>
-          <p class="mini-line__meta">${escapeAttr(l.color)} · ${escapeAttr(l.size)} · Qty ${Number(l.quantity)}</p>
+          <p class="mini-line__meta">${escapeAttr(l.color)} · ${escapeAttr(l.size)}</p>
           <p style="font-size:var(--fs-small);margin-top:.25rem">${formatPrice(l.price * l.quantity)}</p>
+          <div class="checkout-qty" role="group" aria-label="Quantity for ${escapeAttr(l.name)}">
+            <button type="button" data-checkout-dec="${escapeAttr(l.lineId)}" aria-label="Decrease quantity">−</button>
+            <span aria-live="polite">${Number(l.quantity)}</span>
+            <button type="button" data-checkout-inc="${escapeAttr(l.lineId)}" aria-label="Increase quantity" ${canIncreaseQuantity(l.lineId) ? "" : "disabled"}>+</button>
+            <button type="button" class="checkout-qty__remove" data-checkout-remove="${escapeAttr(l.lineId)}">Remove</button>
+          </div>
         </div>
       </div>
     `,
@@ -462,8 +483,8 @@ function renderSummary() {
     <hr class="hr" style="margin-block:1rem" />
     <div class="promo-row">
       <label class="visually-hidden" for="promoInput">Discount code</label>
-      <input type="text" id="promoInput" placeholder="Discount code" value="${discountInfo ? discountInfo.code : ""}" ${discountInfo ? "disabled" : ""} />
-      <button type="button" class="btn btn-outline btn-sm" id="applyPromo" ${discountInfo ? "disabled" : ""}>Apply</button>
+      <input type="text" id="promoInput" placeholder="Discount code" value="${discountInfo?.code || getSavedDiscountCode() || ""}" ${discountInfo || cartEditInProgress ? "disabled" : ""} />
+      <button type="button" class="btn btn-outline btn-sm" id="applyPromo" ${discountInfo || cartEditInProgress ? "disabled" : ""}>Apply</button>
     </div>
     ${discountInfo ? `<button type="button" class="btn btn-text" id="removePromo" style="display:block;margin:-.5rem 0 1rem;padding:0;font-size:var(--fs-micro)">Remove code</button>` : ""}
     <div id="promoMsg" style="font-size:var(--fs-micro);margin-bottom:1rem;color:var(--color-error)"></div>
@@ -518,8 +539,74 @@ function renderSummary() {
     });
 }
 
+let cartEditInProgress = false;
+
+function onCheckoutCartClick(event) {
+  const decrease = event.target.closest("[data-checkout-dec]");
+  const increase = event.target.closest("[data-checkout-inc]");
+  const remove = event.target.closest("[data-checkout-remove]");
+  const lineId =
+    decrease?.dataset.checkoutDec ||
+    increase?.dataset.checkoutInc ||
+    remove?.dataset.checkoutRemove;
+  if (!lineId) return;
+
+  const line = getCart().find((item) => item.lineId === lineId);
+  if (!line) return;
+  if (remove) updateQuantity(lineId, 0);
+  else updateQuantity(lineId, line.quantity + (increase ? 1 : -1));
+}
+
+async function refreshCheckoutCart() {
+  if (!storeSettings || checkoutOrderPlaced) return;
+  const revision = ++checkoutCartRevision;
+  lines = getCart();
+  if (!lines.length) {
+    window.location.href = "cart.html";
+    return;
+  }
+
+  renderLocationDeliveryPrices();
+  const savedCode = discountInfo?.code || getSavedDiscountCode();
+  if (!savedCode) {
+    discountInfo = null;
+    cartEditInProgress = false;
+    renderSummary();
+    return;
+  }
+
+  // Revalidate percentage and minimum-spend discounts against the new subtotal.
+  // Show the updated item quantities and subtotal immediately while the check runs.
+  discountInfo = null;
+  cartEditInProgress = true;
+  renderSummary();
+  const placeOrderButton = document.getElementById("placeOrderBtn");
+  if (placeOrderButton) placeOrderButton.disabled = true;
+  try {
+    const result = await checkDiscount(savedCode, cartSubtotal());
+    if (revision !== checkoutCartRevision) return;
+    discountInfo = { code: result.code, discountCents: result.discountCents };
+    saveDiscountCode(result.code);
+  } catch {
+    if (revision !== checkoutCartRevision) return;
+    clearDiscountCode();
+    discountInfo = null;
+    showToast("The discount no longer applies to your updated bag.");
+  }
+  if (revision !== checkoutCartRevision) return;
+  cartEditInProgress = false;
+  renderSummary();
+  if (placeOrderButton) placeOrderButton.disabled = false;
+}
+
 async function onSubmit(e) {
   e.preventDefault();
+  lines = getCart();
+  if (!lines.length) {
+    window.location.href = "cart.html";
+    return;
+  }
+  if (cartEditInProgress) return;
   const form = e.target;
   const createAccount =
     document.getElementById("createGuestAccount")?.checked === true;
@@ -624,6 +711,7 @@ async function onSubmit(e) {
   if (placedOrder.accountCreated) {
     currentUser = await getCurrentUser().catch(() => null);
   }
+  checkoutOrderPlaced = true;
   clearCart();
   clearDiscountCode();
   refreshCartDrawer();

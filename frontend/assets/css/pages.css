@@ -387,6 +387,36 @@
   gap: var(--space-3);
   margin-bottom: var(--space-4);
 }
+.checkout-mini-line__details {
+  flex: 1;
+  min-width: 0;
+}
+.checkout-qty {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.65rem;
+}
+.checkout-qty button {
+  min-width: 2rem;
+  min-height: 2rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+}
+.checkout-qty button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.checkout-qty__remove {
+  margin-left: auto;
+  padding-inline: 0.55rem;
+  color: var(--color-muted) !important;
+  font-size: var(--fs-micro) !important;
+}
 .mini-line img {
   width: 56px;
   height: 70px;

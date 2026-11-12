@@ -895,11 +895,11 @@ router.post(
     const input = z
       .object({
         currentPassword: z.string().min(1).max(128),
-        code: z.string().regex(/^\d{6}$/),
+        code: z.string().trim().min(6).max(32),
       })
       .parse(req.body);
     const { rows } = await query(
-      `SELECT id, email, role, password_hash, session_version AS "sessionVersion", totp_secret_enc AS "totpSecret", totp_last_step AS "lastStep", totp_enabled_at AS "totpEnabledAt"
+      `SELECT id, email, role, password_hash, session_version AS "sessionVersion", totp_secret_enc AS "totpSecret", totp_last_step AS "lastStep", totp_enabled_at AS "totpEnabledAt", totp_recovery_codes AS "recoveryCodes"
     FROM users WHERE id = $1 AND is_active = true`,
       [req.user.sub],
     );
@@ -912,21 +912,36 @@ router.post(
         error:
           "Current password is incorrect or two-factor authentication is not enabled.",
       });
-    const step = verifyTotp(decryptTotpSecret(user.totpSecret), input.code);
-    if (step === null || step <= Number(user.lastStep))
+    const step = /^\d{6}$/.test(input.code)
+      ? verifyTotp(decryptTotpSecret(user.totpSecret), input.code)
+      : null;
+    const recoveryHash = hashRecoveryCode(input.code);
+    const recoveryCodeValid = Boolean(
+      recoveryHash && (user.recoveryCodes || []).includes(recoveryHash),
+    );
+    const authenticatorCodeValid =
+      step !== null && step > Number(user.lastStep);
+    if (!authenticatorCodeValid && !recoveryCodeValid)
       return res
         .status(401)
-        .json({ error: "Authenticator code is invalid or already used." });
-    const { rows: updated } = await query(
-      `UPDATE users SET totp_secret_enc = NULL, totp_enabled_at = NULL, totp_recovery_codes = '[]'::jsonb,
+        .json({ error: "Authenticator or recovery code is invalid or already used." });
+    const { rows: updated } = authenticatorCodeValid
+      ? await query(
+          `UPDATE users SET totp_secret_enc = NULL, totp_enabled_at = NULL, totp_recovery_codes = '[]'::jsonb,
     totp_pending_secret_enc = NULL, totp_pending_expires_at = NULL, totp_last_step = $2, session_version = session_version + 1
-    WHERE id = $1 AND totp_last_step < $2 RETURNING session_version AS "sessionVersion"`,
-      [user.id, step],
-    );
+    WHERE id = $1 AND totp_enabled_at IS NOT NULL AND totp_last_step < $2 RETURNING session_version AS "sessionVersion"`,
+          [user.id, step],
+        )
+      : await query(
+          `UPDATE users SET totp_secret_enc = NULL, totp_enabled_at = NULL, totp_recovery_codes = '[]'::jsonb,
+    totp_pending_secret_enc = NULL, totp_pending_expires_at = NULL, session_version = session_version + 1
+    WHERE id = $1 AND totp_enabled_at IS NOT NULL AND totp_recovery_codes @> $2::jsonb RETURNING session_version AS "sessionVersion"`,
+          [user.id, JSON.stringify([recoveryHash])],
+        );
     if (!updated[0])
       return res
         .status(401)
-        .json({ error: "Authenticator code is invalid or already used." });
+        .json({ error: "Authenticator or recovery code is invalid or already used." });
     const currentUser = {
       id: user.id,
       email: user.email,
