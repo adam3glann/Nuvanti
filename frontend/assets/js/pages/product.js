@@ -20,7 +20,7 @@ import {
 
 import { colorHex, stockFor, isInStock } from "../data/products.js";
 
-import { addToCart, variantStockRemaining } from "../services/cartService.js";
+import { addToCart, addBundleToCart, variantStockRemaining } from "../services/cartService.js";
 
 import { toggleWishlist, isWishlisted } from "../services/wishlistService.js";
 import { startLiveRefresh } from "../services/liveRefresh.js";
@@ -749,6 +749,10 @@ function renderInfo() {
   const container = document.getElementById("productInfo");
 
   if (!container) return;
+  if (product.bundle?.crewneck && product.bundle?.sweatpants) {
+    renderBundleInfo(container);
+    return;
+  }
 
   const wished = isWishlisted(product.id);
   const sizeGuideData = product?.sizeGuideMeasurements || {};
@@ -1031,6 +1035,23 @@ function renderInfo() {
   bindInfoEvents();
   bindSizeAdvisor("productInfo", sizeGuideColumns, sizeGuideRows);
   updateStockLine();
+}
+
+function renderBundleInfo(container) {
+  const bundle = product.bundle;
+  const component = (kind, title, item) => `<div class="option-group"><div class="option-group__head"><span class="label">${title} — ${escapeHtml(item.name)}</span></div><div class="set-choice-grid"><label>Color<select data-set-color="${kind}">${(item.colors || ["Default"]).map(c => `<option value="${escapeAttribute(c)}">${escapeHtml(c)}</option>`).join("")}</select></label><label>Size<select data-set-size="${kind}">${(item.sizes || ["One Size"]).map(s => `<option value="${escapeAttribute(s)}">${escapeHtml(s)}</option>`).join("")}</select></label></div></div>`;
+  const stocked = (item) => (item.sizes || []).some(s => (item.colors || ["Default"]).some(c => Number(item.inventoryByVariant?.[`${c}::${s}`] ?? item.inventory?.[s] ?? 0) > 0));
+  const inStock = stocked(bundle.crewneck) && stocked(bundle.sweatpants);
+  container.innerHTML = `<p class="label product-info__eyebrow">WINTER SET · TWO PIECES</p><h1 class="product-info__name">${escapeHtml(product.name)}</h1><div class="product-info__price"><span>${formatPrice(product.price)}</span></div><p class="product-info__desc">${escapeHtml(product.description || "A crewneck and matching sweatpants, sold together as one set.")}</p>${component("crewneck", "Crewneck", bundle.crewneck)}${component("sweatpants", "Sweatpants", bundle.sweatpants)}<div class="option-group"><span class="label">Quantity</span><div class="qty-stepper" style="width:fit-content"><button type="button" id="qtyDec" aria-label="Decrease quantity">${icon("minus")}</button><span id="qtyValue">${selectedQuantity}</span><button type="button" id="qtyInc" aria-label="Increase quantity">${icon("plus")}</button></div></div><p class="stock-line" id="stockLine"><span class="stock-dot"></span>Choose a size for each piece</p><div class="purchase-row"><button class="btn btn-primary" id="addToCartBtn" ${inStock ? "" : "disabled"}>${inStock ? "Add Set to Cart" : "Sold Out"}</button><button class="btn btn-outline" id="buyNowBtn" ${inStock ? "" : "disabled"}>Buy Set Now</button><button type="button" class="icon-btn" id="wishlistBtn" data-active="${isWishlisted(product.id)}" aria-label="Toggle wishlist">${icon("heart")}</button></div><p class="text-muted">Both pieces are reserved together. Cancelling an order restores stock for each piece.</p>`;
+  const selection = () => ({ crewneck: { color: container.querySelector('[data-set-color="crewneck"]').value, size: container.querySelector('[data-set-size="crewneck"]').value }, sweatpants: { color: container.querySelector('[data-set-color="sweatpants"]').value, size: container.querySelector('[data-set-size="sweatpants"]').value } });
+  const add = () => addBundleToCart({ product, ...selection(), quantity: selectedQuantity });
+  container.querySelectorAll("select").forEach(select => select.addEventListener("change", () => { const { crewneck, sweatpants } = selection(); const a = variantStockRemaining(bundle.crewneck, crewneck.size, crewneck.color); const b = variantStockRemaining(bundle.sweatpants, sweatpants.size, sweatpants.color); container.querySelector("#stockLine").innerHTML = a && b ? `<span class="stock-dot"></span>Both pieces available — ${Math.min(a,b)} set(s)` : '<span class="stock-dot stock-dot--out"></span>One or both selected variants are unavailable'; ["addToCartBtn", "buyNowBtn"].forEach(id => { container.querySelector(`#${id}`).disabled = !(a && b); }); }));
+  container.querySelector("select")?.dispatchEvent(new Event("change"));
+  container.querySelector("#qtyDec").onclick = () => { selectedQuantity = Math.max(1, selectedQuantity - 1); container.querySelector("#qtyValue").textContent = selectedQuantity; };
+  container.querySelector("#qtyInc").onclick = () => { selectedQuantity = Math.min(10, selectedQuantity + 1); container.querySelector("#qtyValue").textContent = selectedQuantity; };
+  container.querySelector("#addToCartBtn").onclick = () => { add(); refreshCartDrawer(); openCartDrawer(); };
+  container.querySelector("#buyNowBtn").onclick = () => { add(); location.href = "checkout.html"; };
+  container.querySelector("#wishlistBtn").onclick = () => toggleWishlist(product.id);
 }
 
 /* =========================================================

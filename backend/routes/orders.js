@@ -87,6 +87,10 @@ const checkout = z.object({
         quantity: z.coerce.number().int().min(1).max(10),
         color: z.string().max(60).optional(),
         size: z.string().max(20).optional(),
+        bundleSelection: z.object({
+          crewneck: z.object({ color: z.string().max(60), size: z.string().max(20) }),
+          sweatpants: z.object({ color: z.string().max(60), size: z.string().max(20) }),
+        }).optional(),
         image: z.string().max(500).optional(),
       }),
     )
@@ -290,7 +294,12 @@ router.post(
           registeredUser = users[0];
           orderUserId = registeredUser.id;
         }
-        const ids = [...new Set(items.map((item) => item.productId))];
+        const requestedIds = [...new Set(items.map((item) => item.productId))];
+        const { rows: requestedProducts } = await client.query(
+          "SELECT id, metadata FROM products WHERE id = ANY($1) AND is_active = true",
+          [requestedIds],
+        );
+        const ids = [...new Set([...requestedIds, ...requestedProducts.flatMap(p => [p.metadata?.bundle?.crewneckProductId, p.metadata?.bundle?.sweatpantsProductId].filter(Boolean).map(Number))])].sort((a,b) => a-b);
         const { rows: products } = await client.query(
           `SELECT id, name, price_cents, inventory, sizes, colors, images, metadata,
       CASE WHEN metadata->'inventory' IS NULL OR metadata->'inventory' = '{}'::jsonb
@@ -298,7 +307,7 @@ router.post(
       FROM products WHERE id = ANY($1) AND is_active = true FOR UPDATE`,
           [ids],
         );
-        if (products.length !== ids.length) {
+        if (products.length !== ids.length || requestedProducts.length !== requestedIds.length) {
           const error = new Error("One or more products are unavailable.");
           error.status = 400;
           throw error;
@@ -335,9 +344,34 @@ router.post(
         );
         const variantQuantities = new Map();
         const productQuantities = new Map();
+        const orderLines = [];
         let subtotal = 0;
         for (const item of items) {
           const product = map.get(item.productId);
+          if (product.metadata?.bundle) {
+            const bundle = product.metadata.bundle;
+            const crewneck = map.get(Number(bundle.crewneckProductId));
+            const sweatpants = map.get(Number(bundle.sweatpantsProductId));
+            const selection = item.bundleSelection;
+            if (!crewneck || !sweatpants || !selection || crewneck.metadata?.bundle || sweatpants.metadata?.bundle) {
+              const error = new Error(`Choose both pieces for ${product.name}.`); error.status = 409; throw error;
+            }
+            const parts = [[crewneck, selection.crewneck], [sweatpants, selection.sweatpants]];
+            for (const [part, choice] of parts) {
+              if ((part.sizes?.length && !part.sizes.includes(choice.size)) || (part.colors?.length && !part.colors.includes(choice.color))) {
+                const error = new Error(`${part.name} is unavailable in the selected variant.`); error.status = 409; throw error;
+              }
+              const key = JSON.stringify([Number(part.id), choice.color, choice.size]);
+              variantQuantities.set(key, { productId: Number(part.id), color: choice.color, size: choice.size, quantity: (variantQuantities.get(key)?.quantity || 0) + item.quantity });
+              productQuantities.set(Number(part.id), (productQuantities.get(Number(part.id)) || 0) + item.quantity);
+            }
+            subtotal += product.price_cents * item.quantity;
+            const weights = [Math.max(1, Number(crewneck.price_cents)), Math.max(1, Number(sweatpants.price_cents))];
+            const crewPrice = Math.round(Number(product.price_cents) * weights[0] / (weights[0] + weights[1]));
+            orderLines.push({ product: crewneck, name: `${product.name} — ${crewneck.name}`, unitPrice: crewPrice, quantity: item.quantity, color: selection.crewneck.color, size: selection.crewneck.size, image: selectedCatalogImage(crewneck, null) });
+            orderLines.push({ product: sweatpants, name: `${product.name} — ${sweatpants.name}`, unitPrice: Number(product.price_cents) - crewPrice, quantity: item.quantity, color: selection.sweatpants.color, size: selection.sweatpants.size, image: selectedCatalogImage(sweatpants, null) });
+            continue;
+          }
           const size = item.size || "One Size";
           if (product.sizes?.length && !product.sizes.includes(size)) {
             const error = new Error(
@@ -377,6 +411,7 @@ router.post(
             (productQuantities.get(item.productId) || 0) + item.quantity,
           );
           subtotal += product.price_cents * item.quantity;
+          orderLines.push({ product, name: product.name, unitPrice: product.price_cents, quantity: item.quantity, color, size, image: selectedCatalogImage(product, item.image) });
         }
         for (const variant of variantQuantities.values()) {
           const product = map.get(variant.productId);
@@ -502,20 +537,20 @@ router.post(
               : null,
           ],
         );
-        for (const item of items) {
-          const p = map.get(item.productId);
+        for (const item of orderLines) {
+          const p = item.product;
           await client.query(
             "INSERT INTO order_items (order_id, product_id, product_name, unit_price_cents, unit_cost_cents, quantity, color, size, image_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
             [
               rows[0].id,
               p.id,
-              p.name,
-              p.price_cents,
+              item.name,
+              item.unitPrice,
               p.unitCostCents,
               item.quantity,
-              item.color || p.colors?.[0] || "Default",
-              item.size || null,
-              selectedCatalogImage(p, item.image),
+              item.color,
+              item.size,
+              item.image,
             ],
           );
         }
@@ -559,14 +594,13 @@ router.post(
                   whatsappPhone: settings.instapayWhatsappPhone,
                 }
               : null,
-          itemSummaries: items.map((item) => ({
-            name: map.get(item.productId).name,
-            priceCents: map.get(item.productId).price_cents,
+          itemSummaries: orderLines.map((item) => ({
+            name: item.name,
+            priceCents: item.unitPrice,
             quantity: item.quantity,
-            color:
-              item.color || map.get(item.productId).colors?.[0] || "Default",
+            color: item.color,
             size: item.size || "",
-            image: selectedCatalogImage(map.get(item.productId), item.image),
+            image: item.image,
           })),
         };
       });

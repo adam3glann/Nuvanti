@@ -12,6 +12,45 @@ const listQuery = z.object({
 });
 const columns =
   "id, slug, name, description, price_cents, category, collection, images, colors, sizes, inventory, is_active, metadata";
+async function attachBundleComponents(products) {
+  const componentIds = [
+    ...new Set(
+      products.flatMap((product) =>
+        product.metadata?.bundle
+          ? [
+              Number(product.metadata.bundle.crewneckProductId),
+              Number(product.metadata.bundle.sweatpantsProductId),
+            ]
+          : [],
+      ),
+    ),
+  ].filter((id) => Number.isSafeInteger(id) && id > 0);
+  if (!componentIds.length) return products.map(toPublicProduct);
+
+  const { rows } = await query(
+    `SELECT ${columns} FROM products WHERE id = ANY($1::bigint[]) AND is_active = true`,
+    [componentIds],
+  );
+  const componentMap = new Map(
+    rows.map((row) => [String(row.id), toPublicProduct(row)]),
+  );
+  return products.map((row) => {
+    const product = toPublicProduct(row);
+    if (!product.bundle) return product;
+    return {
+      ...product,
+      bundle: {
+        ...product.bundle,
+        crewneck: componentMap.get(
+          String(product.bundle.crewneckProductId),
+        ) || null,
+        sweatpants: componentMap.get(
+          String(product.bundle.sweatpantsProductId),
+        ) || null,
+      },
+    };
+  });
+}
 router.get("/", async (req, res) => {
   const { category, collection, search, limit, offset } = listQuery.parse(
     req.query,
@@ -30,7 +69,9 @@ router.get("/", async (req, res) => {
       offset,
     ],
   );
-  res.set("Cache-Control", "no-store").json(rows.map(toPublicProduct));
+  res
+    .set("Cache-Control", "no-store")
+    .json(await attachBundleComponents(rows));
 });
 router.get("/:slug", async (req, res) => {
   const { rows } = await query(
@@ -42,6 +83,8 @@ router.get("/:slug", async (req, res) => {
       .set("Cache-Control", "no-store")
       .status(404)
       .json({ error: "Product not found." });
-  res.set("Cache-Control", "no-store").json(toPublicProduct(rows[0]));
+  res
+    .set("Cache-Control", "no-store")
+    .json((await attachBundleComponents(rows))[0]);
 });
 export default router;

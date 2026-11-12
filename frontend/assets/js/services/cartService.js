@@ -37,13 +37,15 @@ function normalizeLine(line) {
     return null;
   const size = String(line.size || "One Size").slice(0, 20);
   const color = String(line.color || "Default").slice(0, 60);
+  const bundleSelection = line.bundleSelection && typeof line.bundleSelection === "object" ? line.bundleSelection : null;
+  const lineId = bundleSelection ? JSON.stringify([productId, bundleSelection]) : JSON.stringify([productId, size, color]);
   const image = String(line.image || "");
   const safeImage =
     /^https:\/\//i.test(image) ||
     (/^\/?assets\/[\w./-]+(?:\?[\w%=&.-]*)?$/.test(image) &&
       !image.includes(".."));
   return {
-    lineId: JSON.stringify([productId, size, color]),
+    lineId,
     productId,
     slug: String(line.slug || "").slice(0, 160),
     name: String(line.name || "Nuvanti item").slice(0, 160),
@@ -53,6 +55,7 @@ function normalizeLine(line) {
     price,
     size,
     color,
+    ...(bundleSelection ? { bundleSelection } : {}),
     quantity: Math.min(quantity, 10),
   };
 }
@@ -92,6 +95,19 @@ export function syncCartWithProducts(products) {
     if (!product) {
       removed.push(line.name);
       return [];
+    }
+    if (line.bundleSelection) {
+      const b = product.bundle;
+      const c = line.bundleSelection.crewneck, s = line.bundleSelection.sweatpants;
+      if (!b?.crewneck || !b?.sweatpants || !c || !s) { removed.push(line.name); return []; }
+      const stockFor = (p, v) => Number(p.inventoryByVariant?.[`${v.color}::${v.size}`] ?? p.inventory?.[v.size] ?? 0);
+      const available = Math.min(stockFor(b.crewneck, c), stockFor(b.sweatpants, s));
+      if (available <= 0) { removed.push(line.name); return []; }
+      line.quantity = Math.min(line.quantity, available, 10);
+      line.price = Number(product.price);
+      line.name = product.name || line.name;
+      line.image = product.images?.[0] || line.image;
+      return [line];
     }
     if (
       (product.sizes?.length && !product.sizes.includes(line.size)) ||
@@ -182,6 +198,12 @@ export function canIncreaseQuantity(lineId) {
   if (!line) return false;
   const product = latestCatalog.get(String(line.productId));
   if (!product) return line.quantity < 10;
+  if (line.bundleSelection) {
+    const selection = line.bundleSelection;
+    const stock = (part, v) => Number(part?.inventoryByVariant?.[`${v.color}::${v.size}`] ?? part?.inventory?.[v.size] ?? 0);
+    const available = Math.min(stock(product.bundle?.crewneck, selection.crewneck), stock(product.bundle?.sweatpants, selection.sweatpants));
+    return line.quantity < Math.min(10, available);
+  }
   const stock = Math.floor(
     Number(
       product.inventoryByVariant?.[`${line.color}::${line.size}`] ??
@@ -259,6 +281,21 @@ export function addToCart({ product, size, color, quantity = 1 }) {
   return normalized;
 }
 
+export function addBundleToCart({ product, crewneck, sweatpants, quantity = 1 }) {
+  if (!product?.bundle || !crewneck?.size || !sweatpants?.size) return read();
+  const bundleSelection = { crewneck: { size: crewneck.size, color: crewneck.color || "Default" }, sweatpants: { size: sweatpants.size, color: sweatpants.color || "Default" } };
+  const lineId = JSON.stringify([Number(product.id), bundleSelection]);
+  const lines = read();
+  const stock = (item, v) => Math.max(0, Math.floor(Number(item.inventoryByVariant?.[`${v.color}::${v.size}`] ?? item.inventory?.[v.size] ?? 0)));
+  const remaining = Math.min(stock(product.bundle.crewneck, bundleSelection.crewneck), stock(product.bundle.sweatpants, bundleSelection.sweatpants));
+  const existing = lines.find(line => line.lineId === lineId);
+  const add = Math.min(10, remaining - lines.filter(l => l.lineId === lineId).reduce((n,l) => n+l.quantity,0), Math.max(1, Math.floor(Number(quantity)||1)));
+  if (add <= 0) return lines;
+  if (existing) existing.quantity += add;
+  else lines.push({ lineId, productId: Number(product.id), slug: product.slug, name: product.name, image: product.images?.[0], price: Number(product.price), size: "Set", color: "Set", bundleSelection, quantity: add });
+  const normalized = lines.map(normalizeLine).filter(Boolean); write(normalized); return normalized;
+}
+
 export function updateQuantity(lineId, quantity) {
   let lines = read();
   if (quantity <= 0) {
@@ -267,6 +304,13 @@ export function updateQuantity(lineId, quantity) {
     const target = lines.find((line) => line.lineId === lineId);
     if (!target) return lines;
     const product = latestCatalog.get(String(target?.productId));
+    if (target.bundleSelection) {
+      const s = target.bundleSelection;
+      const stock = (part, v) => Number(part?.inventoryByVariant?.[`${v.color}::${v.size}`] ?? part?.inventory?.[v.size] ?? 0);
+      const max = product ? Math.min(stock(product.bundle?.crewneck, s.crewneck), stock(product.bundle?.sweatpants, s.sweatpants)) : 10;
+      lines = lines.flatMap(line => line.lineId !== lineId ? [line] : max > 0 ? [{ ...line, quantity: Math.min(10, max, Math.floor(quantity)) }] : []);
+      write(lines); return lines;
+    }
     const stock = product
       ? Math.floor(
           Number(

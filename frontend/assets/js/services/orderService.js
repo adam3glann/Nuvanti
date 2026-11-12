@@ -22,6 +22,7 @@ export async function createOrder({
           color: line.color,
           size: line.size,
           image: line.image,
+          bundleSelection: line.bundleSelection,
         })),
         shipping: {
           name: customer.name,

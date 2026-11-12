@@ -7,6 +7,14 @@ export async function restoreOrderInventory(
   reason,
   actorUserId = null,
 ) {
+  const { rows: restored } = await client.query(
+    `UPDATE orders SET inventory_restored_at = NOW()
+    WHERE id = $1 AND inventory_restored_at IS NULL
+    RETURNING id`,
+    [orderId],
+  );
+  if (!restored.length) return false;
+
   const { rows: items } = await client.query(
     `SELECT product_id AS "productId",
       COALESCE(color, 'Default') AS color, COALESCE(size, 'One Size') AS size, SUM(quantity)::int AS quantity
@@ -61,6 +69,7 @@ export async function restoreOrderInventory(
       [item.productId, variantKey, item.quantity, reason, actorUserId],
     );
   }
+  return true;
 }
 
 // Paymob intentions expire after 30 minutes. A 15-minute callback grace period

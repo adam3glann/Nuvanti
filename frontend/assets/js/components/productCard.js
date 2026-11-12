@@ -17,15 +17,19 @@ export function productCardHTML(product, index = 0) {
   const slug = encodeURIComponent(String(product.slug || ""));
   const name = escapeHtml(product.name || "Nuvanti item");
   const wished = isWishlisted(product.id);
-  const inStock = isInStock(product) && sizes.length > 0;
+  const isSet = Boolean(product.bundle?.crewneck && product.bundle?.sweatpants);
+  const inStock = isSet ? [product.bundle.crewneck, product.bundle.sweatpants].every(part => (part.sizes || []).some(size => (part.colors || ["Default"]).some(color => Number(part.inventoryByVariant?.[`${color}::${size}`] ?? part.inventory?.[size] ?? 0) > 0))) : isInStock(product) && sizes.length > 0;
+  const style = product.setCardStyle || "none", effect = product.setCardEffect || "none";
+  const accent = /^#[0-9a-f]{6}$/i.test(product.setCardAccent || "") ? product.setCardAccent : "#d8a94c";
   return `
-    <article class="product-card reveal" data-product-id="${escapeHtml(product.id)}" style="--card-order:${Math.min(Number(index) || 0, 7)}">
+    <article class="product-card reveal ${isSet ? `product-card--set set-card--${style} set-effect--${effect}` : ""}" data-product-id="${escapeHtml(product.id)}" style="--card-order:${Math.min(Number(index) || 0, 7)};--set-accent:${accent};--set-intensity:${Math.min(3,Math.max(1,Number(product.setCardIntensity)||1))}">
       <a href="product.html?slug=${slug}" class="product-card__media" aria-label="View ${name}">
         <img src="${escapeHtml(image)}" alt="${name}" loading="lazy" width="600" height="750" />
         <img src="${escapeHtml(alt)}" alt="" class="img-alt" loading="lazy" width="600" height="750" />
       </a>
       <div class="product-card__badges">
         ${badges.map((b) => `<span class="badge ${b === "SALE" ? "badge--sale" : ""}">${escapeHtml(b)}</span>`).join("")}
+        ${isSet ? '<span class="badge">SET</span>' : ""}
         ${!inStock ? '<span class="badge badge--outline">Sold out</span>' : ""}
       </div>
       <button class="product-card__wishlist icon-btn" data-wishlist-toggle="${escapeHtml(product.id)}" data-active="${wished}"
@@ -44,7 +48,7 @@ export function productCardHTML(product, index = 0) {
       </a>
       <div class="product-card__quick">
         <button class="btn btn-sm" data-quick-add="${escapeHtml(product.id)}" ${!inStock ? "disabled" : ""}>
-          ${inStock ? "Quick Add" : "Sold Out"}
+          ${inStock ? (isSet ? "Choose Set" : "Quick Add") : "Sold Out"}
         </button>
       </div>
     </article>
@@ -163,6 +167,7 @@ export function bindProductCardEvents(
       const id = quickAdd.dataset.quickAdd;
       const product = binding.products.find((p) => String(p.id) === String(id));
       if (!product) return;
+      if (product.bundle?.crewneck && product.bundle?.sweatpants) { location.href = `product.html?slug=${encodeURIComponent(product.slug || "")}`; return; }
       const color =
         product.colors?.find((candidate) =>
           product.sizes.some(

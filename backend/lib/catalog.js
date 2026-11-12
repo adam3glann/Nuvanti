@@ -64,6 +64,11 @@ export function toPublicProduct(row) {
     newArrival: Boolean(meta.newArrival),
     sku: meta.sku || `NV-${row.id}`,
     compareAtPrice: meta.compareAtPrice || null,
+    bundle: meta.bundle || null,
+    setCardStyle: meta.setCardStyle || "none",
+    setCardEffect: meta.setCardEffect || "none",
+    setCardAccent: meta.setCardAccent || "#b87333",
+    setCardIntensity: Number(meta.setCardIntensity) || 1,
     status: row.is_active ? "active" : "draft",
   };
 }
@@ -166,6 +171,16 @@ export function productPayload(input) {
       newArrival: Boolean(input.newArrival),
       sku: input.sku || null,
       compareAtPrice: input.compareAtPrice || null,
+      bundle: input.bundle
+        ? {
+            crewneckProductId: Number(input.bundle.crewneckProductId),
+            sweatpantsProductId: Number(input.bundle.sweatpantsProductId),
+          }
+        : null,
+      setCardStyle: input.setCardStyle || "none",
+      setCardEffect: input.setCardEffect || "none",
+      setCardAccent: input.setCardAccent || "#b87333",
+      setCardIntensity: Number(input.setCardIntensity) || 1,
       costCents:
         input.cost == null || input.cost === ""
           ? null

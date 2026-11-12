@@ -1,7 +1,7 @@
 import { initAdminShell } from '../components/shell.js';
 import { icon } from '../components/icons.js';
 import { showAdminToast } from '../components/toast.js';
-import { fetchAdminProduct, updateAdminProduct, createAdminProduct, uploadAdminProductImage } from '../services/productService.js';
+import { fetchAdminProduct, fetchAdminProducts, updateAdminProduct, createAdminProduct, uploadAdminProductImage } from '../services/productService.js';
 import { fetchCategories, fetchCollections } from '../services/categoryService.js';
 
 const session = initAdminShell({ page: 'products', title: 'Edit Product' });
@@ -12,9 +12,13 @@ const id = params.get('id');
 const isNew = !id;
 
 async function init() {
-  let cats, cols, product;
+  let cats, cols, product, products;
   try {
-    [cats, cols] = await Promise.all([fetchCategories(), fetchCollections()]);
+    [cats, cols, products] = await Promise.all([
+      fetchCategories(),
+      fetchCollections(),
+      fetchAdminProducts({ perPage: 1000 }).then((result) => result.items),
+    ]);
     product = isNew ? blankProduct() : await fetchAdminProduct(id);
   } catch (error) {
     document.getElementById('editRoot').innerHTML = `<div class="admin-empty"><h3>Couldn't load the product form</h3><p>${esc(error.message)}</p><a href="products.html" class="btn btn-outline">Back to Products</a></div>`;
@@ -29,7 +33,7 @@ async function init() {
   document.title = `${isNew ? 'New Product' : product.name} — Nuvanti Admin`;
   document.getElementById('pageHeading').textContent = isNew ? 'New Product' : `Edit: ${product.name}`;
 
-  renderForm(product, cats, cols);
+  renderForm(product, cats, cols, products);
 }
 
 function blankProduct() {
@@ -42,7 +46,7 @@ function blankProduct() {
   };
 }
 
-function renderForm(product, cats, cols) {
+function renderForm(product, cats, cols, products) {
   document.getElementById('editRoot').innerHTML = `
     <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:1.25rem" class="pe-grid">
       <div>
@@ -65,6 +69,31 @@ function renderForm(product, cats, cols) {
               <div class="field"><label for="fCost">Cost Price</label><input type="text" inputmode="decimal" id="fCost" value="${product.cost == null ? '' : formatMoney(product.cost)}" placeholder="12,345" /></div>
             </div>
             <small class="hint">Enter amounts up to 21,474,836.47 EGP. Thousands are grouped automatically, e.g. 12,345.</small>
+          </div>
+        </div>
+
+        <div class="card" id="setProductCard" style="margin-bottom:1.25rem">
+          <div class="card-head"><h2>Set bundle</h2></div>
+          <div class="card-pad">
+            <label class="checkbox-row"><input type="checkbox" id="fIsSet" ${product.bundle ? 'checked' : ''}/> Sell this product as a two-piece set</label>
+            <p class="hint" style="margin:.5rem 0 1rem">The set price is the price above. Stock is always checked and deducted from both component products.</p>
+            <div id="setComponentFields" style="display:${product.bundle ? 'grid' : 'none'};gap:.75rem">
+              <div class="field"><label for="fCrewneckComponent">Crewneck product</label><select id="fCrewneckComponent"><option value="">Choose a crewneck</option>${products.filter((item) => String(item.id) !== String(product.id) && !item.bundle).map((item) => `<option value="${esc(item.id)}" ${String(product.bundle?.crewneckProductId) === String(item.id) ? 'selected' : ''}>${esc(item.name)}${item.status === 'active' ? '' : ' (Draft)'}</option>`).join('')}</select></div>
+              <div class="field"><label for="fSweatpantsComponent">Sweatpants product</label><select id="fSweatpantsComponent"><option value="">Choose sweatpants</option>${products.filter((item) => String(item.id) !== String(product.id) && !item.bundle).map((item) => `<option value="${esc(item.id)}" ${String(product.bundle?.sweatpantsProductId) === String(item.id) ? 'selected' : ''}>${esc(item.name)}${item.status === 'active' ? '' : ' (Draft)'}</option>`).join('')}</select></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" id="setCardStyleCard" style="display:${product.bundle ? 'block' : 'none'};margin-bottom:1.25rem">
+          <div class="card-head"><h2>Set shop-card effect</h2></div>
+          <div class="card-pad">
+            <p class="hint" style="margin-bottom:.75rem">Customize the outer border and animated glow shown on this set in the shop.</p>
+            <div class="field-row3">
+              <div class="field"><label for="fSetCardStyle">Outline</label><select id="fSetCardStyle"><option value="none" ${product.setCardStyle === 'none' ? 'selected' : ''}>None</option><option value="outline" ${product.setCardStyle === 'outline' ? 'selected' : ''}>Color outline</option><option value="neon" ${product.setCardStyle === 'neon' ? 'selected' : ''}>Neon outline</option></select></div>
+              <div class="field"><label for="fSetCardEffect">Glow effect</label><select id="fSetCardEffect"><option value="none" ${product.setCardEffect === 'none' ? 'selected' : ''}>None</option><option value="fire" ${product.setCardEffect === 'fire' ? 'selected' : ''}>Fire</option><option value="ice" ${product.setCardEffect === 'ice' ? 'selected' : ''}>Ice</option><option value="aurora" ${product.setCardEffect === 'aurora' ? 'selected' : ''}>Aurora</option></select></div>
+              <div class="field"><label for="fSetCardAccent">Accent color</label><input type="color" id="fSetCardAccent" value="${esc(product.setCardAccent || '#b87333')}" /></div>
+            </div>
+            <div class="field"><label for="fSetCardIntensity">Effect intensity <span id="fSetCardIntensityValue">${Number(product.setCardIntensity) || 1}</span></label><input type="range" id="fSetCardIntensity" min="1" max="3" step="1" value="${Number(product.setCardIntensity) || 1}" /></div>
           </div>
         </div>
 
@@ -178,6 +207,15 @@ function renderForm(product, cats, cols) {
   renderColorPalette(splitList(val('fColors')), colorSwatches);
   renderColorImageSets(splitList(val('fColors')), colorImages);
 
+  const isSet = document.getElementById('fIsSet');
+  isSet?.addEventListener('change', () => {
+    document.getElementById('setComponentFields').style.display = isSet.checked ? 'grid' : 'none';
+    document.getElementById('setCardStyleCard').style.display = isSet.checked ? 'block' : 'none';
+  });
+  document.getElementById('fSetCardIntensity')?.addEventListener('input', (event) => {
+    document.getElementById('fSetCardIntensityValue').textContent = event.target.value;
+  });
+
   for (const field of ['fPrice', 'fCompare', 'fCost']) {
     const input = document.getElementById(field);
     input.addEventListener('focus', () => { input.value = input.value.replace(/,/g, ''); });
@@ -241,7 +279,22 @@ function renderForm(product, cats, cols) {
       sizeGuide: val('fSizeGuide').trim(),
       sizeGuideImage: val('fSizeGuideImage').trim(),
       sizeGuideMeasurements: readSizeGuideMeasurements(),
+      bundle: document.getElementById('fIsSet').checked
+        ? {
+            crewneckProductId: Number(val('fCrewneckComponent')),
+            sweatpantsProductId: Number(val('fSweatpantsComponent')),
+          }
+        : null,
+      setCardStyle: val('fSetCardStyle'),
+      setCardEffect: val('fSetCardEffect'),
+      setCardAccent: val('fSetCardAccent'),
+      setCardIntensity: Number(val('fSetCardIntensity')),
     };
+    if (patch.bundle && (!patch.bundle.crewneckProductId || !patch.bundle.sweatpantsProductId)) {
+      button.disabled = false;
+      button.textContent = isNew ? 'Create Product' : 'Save Changes';
+      return showAdminToast('Choose both products in the set.', 'error');
+    }
     if (isNew) {
       patch.inventory = readInventory(stockProduct);
       patch.inventoryByVariant = readVariantInventory();

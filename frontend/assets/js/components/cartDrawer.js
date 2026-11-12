@@ -104,7 +104,7 @@ function render() {
       <img src="${escapeHtml(l.image)}" alt="${escapeHtml(l.name)}" width="80" height="100" loading="lazy" />
       <div>
         <p class="cart-line__name">${escapeHtml(l.name)}</p>
-        <p class="cart-line__meta">${escapeHtml(l.color)} · Size ${escapeHtml(l.size)}</p>
+        <p class="cart-line__meta">${l.bundleSelection ? `Crewneck: ${escapeHtml(l.bundleSelection.crewneck.color)} · ${escapeHtml(l.bundleSelection.crewneck.size)}<br>Sweatpants: ${escapeHtml(l.bundleSelection.sweatpants.color)} · ${escapeHtml(l.bundleSelection.sweatpants.size)}` : `${escapeHtml(l.color)} · Size ${escapeHtml(l.size)}`}</p>
         <div class="cart-line__row">
           <div class="qty-stepper">
             <button data-dec="${escapeHtml(l.lineId)}" aria-label="Decrease quantity">${icon("minus")}</button>

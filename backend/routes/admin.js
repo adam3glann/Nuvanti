@@ -163,6 +163,22 @@ const productFields = z.object({
     .max(21474836.47)
     .nullable()
     .optional(),
+  bundle: z
+    .object({
+      crewneckProductId: z.coerce.number().int().positive(),
+      sweatpantsProductId: z.coerce.number().int().positive(),
+    })
+    .nullable()
+    .optional()
+    .refine(
+      (bundle) =>
+        !bundle || bundle.crewneckProductId !== bundle.sweatpantsProductId,
+      "Choose two different products for the set.",
+    ),
+  setCardStyle: z.enum(["none", "outline", "neon"]).optional(),
+  setCardEffect: z.enum(["none", "fire", "ice", "aurora"]).optional(),
+  setCardAccent: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  setCardIntensity: z.coerce.number().int().min(1).max(3).optional(),
 });
 const productInput = productFields.refine(
   (value) => value.price !== undefined || value.priceCents !== undefined,
@@ -170,6 +186,36 @@ const productInput = productFields.refine(
 );
 const columns =
   "id, slug, name, description, price_cents, category, collection, images, colors, sizes, inventory, is_active, metadata";
+async function validateBundleComponents(client, bundle, productId = null) {
+  if (!bundle) return;
+  const componentIds = [
+    Number(bundle.crewneckProductId),
+    Number(bundle.sweatpantsProductId),
+  ];
+  if (
+    componentIds.some((id) => !Number.isSafeInteger(id) || id < 1) ||
+    componentIds[0] === componentIds[1] ||
+    componentIds.includes(Number(productId))
+  ) {
+    const error = new Error("Choose two different component products.");
+    error.status = 400;
+    throw error;
+  }
+  const { rows } = await client.query(
+    `SELECT id, metadata FROM products WHERE id = ANY($1::bigint[])`,
+    [componentIds],
+  );
+  if (
+    rows.length !== 2 ||
+    rows.some((row) => row.metadata?.bundle)
+  ) {
+    const error = new Error(
+      "Choose two existing, regular products for the set components.",
+    );
+    error.status = 400;
+    throw error;
+  }
+}
 const categoryImage = z
   .string()
   .trim()
@@ -2118,6 +2164,7 @@ router.post(
   requirePermission("products.create"),
   async (req, res) => {
     const p = productPayload(productInput.parse(req.body));
+    await validateBundleComponents(query, p.metadata.bundle);
     try {
       const { rows } = await query(
         `INSERT INTO products (slug,name,description,price_cents,category,collection,images,colors,sizes,inventory,is_active,metadata) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9::jsonb,$10,$11,$12::jsonb) RETURNING ${columns}`,
@@ -2173,6 +2220,7 @@ router.patch(
       delete merged.inventory;
       delete merged.inventoryByVariant;
       const p = productPayload(productInput.parse(merged));
+      await validateBundleComponents(client, p.metadata.bundle, current.id);
       delete p.metadata.inventory;
       delete p.metadata.inventoryByVariant;
       const oldVariantStock = current.inventoryByVariant || {};
@@ -2349,6 +2397,18 @@ router.delete(
   "/products/:id",
   requirePermission("products.delete"),
   async (req, res) => {
+    const setReference = await query(
+      `SELECT id FROM products WHERE id <> $1 AND (
+        metadata->'bundle'->>'crewneckProductId' = $1::text OR
+        metadata->'bundle'->>'sweatpantsProductId' = $1::text
+      ) LIMIT 1`,
+      [req.params.id],
+    );
+    if (setReference.rowCount)
+      return res.status(409).json({
+        error:
+          "This product is used by a set. Remove it from the set or unpublish the set before deleting it.",
+      });
     let result;
     try {
       result = await query("DELETE FROM products WHERE id = $1", [
