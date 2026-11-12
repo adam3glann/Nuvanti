@@ -1508,7 +1508,7 @@ function buildSizeAdvisorMarkup(columns, rows, title = "") {
         bodyDimensions.length
           ? `<label>How do you like your clothes to fit?
         <select name="fit"><option value="regular">Regular</option><option value="snug">Closer fit</option><option value="relaxed">Relaxed fit</option></select>
-      </label><fieldset><legend>Your body measurements (cm)</legend><div class="size-advisor__measurements">${bodyDimensions.map((dimension) => `<label>${dimension.label}<input name="${dimension.key}" type="number" min="40" max="180" step="0.5" inputmode="decimal" placeholder="Optional" /></label>`).join("")}</div><small>Measure around your body with a soft tape. For garment measurements laid flat, the calculator accounts for that.</small></fieldset>`
+      </label><fieldset><legend>Your body measurements (cm)</legend><div class="size-advisor__measurements">${bodyDimensions.map((dimension) => `<label>${dimension.label}<input name="${dimension.key}" type="number" min="40" max="180" step="0.5" inputmode="decimal" placeholder="${hasProfileChart ? "Optional" : "Needed for recommendation"}" /></label>`).join("")}</div><small>Measure around your body with a soft tape. For garment measurements laid flat, the calculator accounts for that.</small></fieldset>`
           : ""
       }
       <button class="btn btn-primary" type="button" data-size-advisor-submit>Recommend my size</button>
@@ -1573,8 +1573,10 @@ function bindSizeAdvisor(containerId, columns, rows, advisorProduct = product, a
           Number.isFinite(measurement.value) && measurement.value > 0,
       );
     if (!measurements.length && !profile.length) {
-      result.textContent =
-        `This ${title} chart is not set up for automatic recommendations yet. Please use the size chart or contact the shop.`;
+      const neededMeasurements = sizeGuideDimensions(columns).map(({ label }) => label.toLowerCase());
+      result.textContent = neededMeasurements.length
+        ? `Enter at least one body measurement (${neededMeasurements.join(" or ")}) above. This chart has no height or weight ranges, so those details alone can’t recommend a size.`
+        : `This ${title} chart needs body measurements or height/weight ranges before it can recommend a size. Please use the size chart or contact the shop.`;
       return;
     }
     const fit = String(data.get("fit") || "regular");
