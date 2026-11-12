@@ -202,7 +202,7 @@ async function validateBundleComponents(client, bundle, productId = null) {
     throw error;
   }
   const { rows } = await client.query(
-    `SELECT id, metadata FROM products WHERE id = ANY($1::bigint[])`,
+    `SELECT id, metadata, colors FROM products WHERE id = ANY($1::bigint[])`,
     [componentIds],
   );
   if (
@@ -212,6 +212,14 @@ async function validateBundleComponents(client, bundle, productId = null) {
     const error = new Error(
       "Choose two existing, regular products for the set components.",
     );
+    error.status = 400;
+    throw error;
+  }
+  const crewneckColors = rows.find((row) => Number(row.id) === componentIds[0])?.colors || [];
+  const sweatpantsColors = rows.find((row) => Number(row.id) === componentIds[1])?.colors || [];
+  const normalizedSweatpantsColors = new Set((sweatpantsColors.length ? sweatpantsColors : ["Default"]).map((color) => String(color).trim().toLowerCase()));
+  if (!(crewneckColors.length ? crewneckColors : ["Default"]).some((color) => normalizedSweatpantsColors.has(String(color).trim().toLowerCase()))) {
+    const error = new Error("The crewneck and sweatpants must have at least one matching color.");
     error.status = 400;
     throw error;
   }

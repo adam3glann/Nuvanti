@@ -4310,14 +4310,14 @@
   background: transparent;
   box-shadow: none;
 }
-.product-card--set { position: relative; isolation: isolate; }
-.product-card--set::after { content:""; position:absolute; inset:-2px; border-radius:inherit; pointer-events:none; z-index:-1; opacity:calc(.28 * var(--set-intensity,1)); transition:opacity .25s, filter .25s; }
+.product-card--set { position: relative; isolation: isolate; border-radius: 12px; }
+.product-card--set::after { content:""; position:absolute; inset:-3px; border-radius:inherit; pointer-events:none; z-index:0; opacity:calc(.58 * var(--set-intensity,1)); transition:opacity .25s, filter .25s, box-shadow .25s; }
 .set-card--outline::after { border:1px solid var(--set-accent,#d8a94c); }
-.set-card--neon::after { border:1px solid var(--set-accent,#d8a94c); box-shadow:0 0 calc(8px * var(--set-intensity,1)) var(--set-accent,#d8a94c), inset 0 0 14px color-mix(in srgb,var(--set-accent,#d8a94c) 22%,transparent); }
-.product-card--set:hover::after { opacity:calc(.65 * var(--set-intensity,1)); }
-.set-effect--fire::after { filter:drop-shadow(0 0 calc(7px * var(--set-intensity,1)) #ff5b22); }
-.set-effect--ice::after { filter:drop-shadow(0 0 calc(8px * var(--set-intensity,1)) #62d9ff); }
-.set-effect--aurora::after { filter:drop-shadow(0 0 calc(8px * var(--set-intensity,1)) #71ffb0) drop-shadow(0 0 10px #c65eff); }
+.set-card--neon::after { border:1px solid var(--set-accent,#d8a94c); box-shadow:0 0 calc(14px * var(--set-intensity,1)) var(--set-accent,#d8a94c), inset 0 0 18px color-mix(in srgb,var(--set-accent,#d8a94c) 28%,transparent); }
+.product-card--set:hover::after { opacity:calc(.82 * var(--set-intensity,1)); }
+.set-effect--fire::after { box-shadow:0 0 calc(13px * var(--set-intensity,1)) #ff5b22, 0 0 calc(26px * var(--set-intensity,1)) color-mix(in srgb,#ff5b22 45%,transparent); }
+.set-effect--ice::after { box-shadow:0 0 calc(14px * var(--set-intensity,1)) #62d9ff, 0 0 calc(28px * var(--set-intensity,1)) color-mix(in srgb,#62d9ff 45%,transparent); }
+.set-effect--aurora::after { box-shadow:0 0 calc(14px * var(--set-intensity,1)) #71ffb0, 0 0 calc(28px * var(--set-intensity,1)) #c65eff; }
 .set-choice-grid { display:grid; grid-template-columns:1fr 1fr; gap:.75rem; margin-top:.5rem; }
 .set-choice-grid label { display:grid; gap:.35rem; color:var(--color-muted); font-size:var(--fs-small); }
 .set-choice-grid select { width:100%; min-height:42px; padding:.5rem; border:1px solid var(--color-border); border-radius:6px; background:var(--color-surface); color:inherit; }

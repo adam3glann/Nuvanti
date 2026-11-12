@@ -89,7 +89,11 @@ const checkout = z.object({
         bundleSelection: z.object({
           crewneck: z.object({ color: z.string().max(60), size: z.string().max(20) }),
           sweatpants: z.object({ color: z.string().max(60), size: z.string().max(20) }),
-        }).optional(),
+        }).optional().superRefine((selection, context) => {
+          if (selection && selection.crewneck.color.trim().toLowerCase() !== selection.sweatpants.color.trim().toLowerCase()) {
+            context.addIssue({ code: z.ZodIssueCode.custom, message: "Choose one color for both pieces in the set." });
+          }
+        }),
         image: z.string().max(500).optional(),
       }),
     )
@@ -354,6 +358,9 @@ router.post(
             const selection = item.bundleSelection;
             if (!crewneck || !sweatpants || !selection || crewneck.metadata?.bundle || sweatpants.metadata?.bundle) {
               const error = new Error(`Choose both pieces for ${product.name}.`); error.status = 409; throw error;
+            }
+            if (selection.crewneck.color.trim().toLowerCase() !== selection.sweatpants.color.trim().toLowerCase()) {
+              const error = new Error("Choose one color for both pieces in the set."); error.status = 400; throw error;
             }
             const parts = [[crewneck, selection.crewneck], [sweatpants, selection.sweatpants]];
             for (const [part, choice] of parts) {

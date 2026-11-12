@@ -1039,23 +1039,41 @@ function renderInfo() {
 
 function renderBundleInfo(container) {
   const bundle = product.bundle;
+  const crewneckColors = bundle.crewneck.colors?.length ? bundle.crewneck.colors : ["Default"];
+  const sweatpantsColors = bundle.sweatpants.colors?.length ? bundle.sweatpants.colors : ["Default"];
+  const sharedColors = crewneckColors.flatMap((crewneckColor) => {
+    const sweatpantsColor = sweatpantsColors.find((color) => color.trim().toLowerCase() === crewneckColor.trim().toLowerCase());
+    return sweatpantsColor ? [{ crewneck: crewneckColor, sweatpants: sweatpantsColor }] : [];
+  });
+  const availableColors = sharedColors.filter(({ crewneck: crewneckColor, sweatpants: sweatpantsColor }) =>
+    [bundle.crewneck, bundle.sweatpants].every((part, index) => {
+      const color = index === 0 ? crewneckColor : sweatpantsColor;
+      return (part.sizes?.length ? part.sizes : ["One Size"]).some((size) => variantStockRemaining(part, size, color) > 0);
+    }),
+  );
+  const initialColor = availableColors[0] || sharedColors[0] || null;
+  const commonColorOptions = sharedColors.map(({ crewneck: crewneckColor, sweatpants: sweatpantsColor }) =>
+    `<option value="${escapeAttribute(crewneckColor)}" data-sweatpants-color="${escapeAttribute(sweatpantsColor)}" ${initialColor?.crewneck === crewneckColor ? "selected" : ""}>${escapeHtml(crewneckColor)}</option>`,
+  ).join("");
   const component = (kind, title, item) => {
     const guide = item.sizeGuideMeasurements || {};
     const columns = Array.isArray(guide.columns) ? guide.columns : [];
     const rows = Array.isArray(guide.rows) ? guide.rows : [];
     const advisorId = `${kind}SizeAdvisor`;
-    return `<div class="option-group"><div class="option-group__head"><span class="label">${title} — ${escapeHtml(item.name)}</span><button type="button" class="btn btn-outline btn-sm" data-set-size-guide="${kind}">View size chart</button></div><div class="set-choice-grid"><label>Color<select data-set-color="${kind}">${(item.colors || ["Default"]).map(c => `<option value="${escapeAttribute(c)}">${escapeHtml(c)}</option>`).join("")}</select></label><label>Size<select data-set-size="${kind}">${(item.sizes || ["One Size"]).map(s => `<option value="${escapeAttribute(s)}">${escapeHtml(s)}</option>`).join("")}</select></label></div><div id="${advisorId}">${buildSizeAdvisorMarkup(columns, rows, title)}</div></div>`;
+    return `<div class="option-group"><div class="option-group__head"><span class="label">${title} — ${escapeHtml(item.name)}</span><button type="button" class="btn btn-outline btn-sm" data-set-size-guide="${kind}">View size chart</button></div><div class="set-choice-grid"><label>Size<select data-set-size="${kind}">${(item.sizes?.length ? item.sizes : ["One Size"]).map(s => `<option value="${escapeAttribute(s)}">${escapeHtml(s)}</option>`).join("")}</select></label></div><div id="${advisorId}">${buildSizeAdvisorMarkup(columns, rows, title)}</div></div>`;
   };
-  const stocked = (item) => (item.sizes || []).some(s => (item.colors || ["Default"]).some(c => Number(item.inventoryByVariant?.[`${c}::${s}`] ?? item.inventory?.[s] ?? 0) > 0));
-  const inStock = stocked(bundle.crewneck) && stocked(bundle.sweatpants);
-  container.innerHTML = `<p class="label product-info__eyebrow">WINTER SET · TWO PIECES</p><h1 class="product-info__name">${escapeHtml(product.name)}</h1><div class="product-info__price"><span>${formatPrice(product.price)}</span></div><p class="product-info__desc">${escapeHtml(product.description || "A crewneck and matching sweatpants, sold together as one set.")}</p>${component("crewneck", "Crewneck", bundle.crewneck)}${component("sweatpants", "Sweatpants", bundle.sweatpants)}<div class="option-group"><span class="label">Quantity</span><div class="qty-stepper" style="width:fit-content"><button type="button" id="qtyDec" aria-label="Decrease quantity">${icon("minus")}</button><span id="qtyValue">${selectedQuantity}</span><button type="button" id="qtyInc" aria-label="Increase quantity">${icon("plus")}</button></div></div><p class="stock-line" id="stockLine"><span class="stock-dot"></span>Choose a size for each piece</p><div class="purchase-row"><button class="btn btn-primary" id="addToCartBtn" ${inStock ? "" : "disabled"}>${inStock ? "Add Set to Cart" : "Sold Out"}</button><button class="btn btn-outline" id="buyNowBtn" ${inStock ? "" : "disabled"}>Buy Set Now</button><button type="button" class="icon-btn" id="wishlistBtn" data-active="${isWishlisted(product.id)}" aria-label="Toggle wishlist">${icon("heart")}</button></div><p class="text-muted">Both pieces are reserved together. Cancelling an order restores stock for each piece.</p>`;
-  const selection = () => ({ crewneck: { color: container.querySelector('[data-set-color="crewneck"]').value, size: container.querySelector('[data-set-size="crewneck"]').value }, sweatpants: { color: container.querySelector('[data-set-color="sweatpants"]').value, size: container.querySelector('[data-set-size="sweatpants"]').value } });
+  const inStock = availableColors.length > 0;
+  container.innerHTML = `<p class="label product-info__eyebrow">WINTER SET · TWO PIECES</p><h1 class="product-info__name">${escapeHtml(product.name)}</h1><div class="product-info__price"><span>${formatPrice(product.price)}</span></div><p class="product-info__desc">${escapeHtml(product.description || "A crewneck and matching sweatpants, sold together as one set.")}</p><div class="option-group"><label class="label" for="setSharedColor">Set color · both pieces</label><select id="setSharedColor" ${sharedColors.length ? "" : "disabled"}>${commonColorOptions || '<option value="">No matching colors available</option>'}</select></div>${component("crewneck", "Crewneck", bundle.crewneck)}${component("sweatpants", "Sweatpants", bundle.sweatpants)}<div class="option-group"><span class="label">Quantity</span><div class="qty-stepper" style="width:fit-content"><button type="button" id="qtyDec" aria-label="Decrease quantity">${icon("minus")}</button><span id="qtyValue">${selectedQuantity}</span><button type="button" id="qtyInc" aria-label="Increase quantity">${icon("plus")}</button></div></div><p class="stock-line" id="stockLine"><span class="stock-dot"></span>Choose a size for each piece</p><div class="purchase-row"><button class="btn btn-primary" id="addToCartBtn" ${inStock ? "" : "disabled"}>${inStock ? "Add Set to Cart" : "Sold Out"}</button><button class="btn btn-outline" id="buyNowBtn" ${inStock ? "" : "disabled"}>Buy Set Now</button><button type="button" class="icon-btn" id="wishlistBtn" data-active="${isWishlisted(product.id)}" aria-label="Toggle wishlist">${icon("heart")}</button></div><p class="text-muted">Both pieces are reserved together. Cancelling an order restores stock for each piece.</p>`;
+  const selection = () => {
+    const colorOption = container.querySelector("#setSharedColor")?.selectedOptions[0];
+    return { crewneck: { color: colorOption?.value || "Default", size: container.querySelector('[data-set-size="crewneck"]').value }, sweatpants: { color: colorOption?.dataset.sweatpantsColor || "Default", size: container.querySelector('[data-set-size="sweatpants"]').value } };
+  };
   for (const [kind, title, item] of [["crewneck", "Crewneck", bundle.crewneck], ["sweatpants", "Sweatpants", bundle.sweatpants]]) {
     const guide = item.sizeGuideMeasurements || {};
     const columns = Array.isArray(guide.columns) ? guide.columns : [];
     const rows = Array.isArray(guide.rows) ? guide.rows : [];
     container.querySelector(`[data-set-size-guide="${kind}"]`).addEventListener("click", () => openComponentSizeGuide(item, title));
-    bindSizeAdvisor(`${kind}SizeAdvisor`, columns, rows, item, () => container.querySelector(`[data-set-color="${kind}"]`)?.value || "Default", (size) => {
+    bindSizeAdvisor(`${kind}SizeAdvisor`, columns, rows, item, () => selection()[kind].color, (size) => {
       const select = container.querySelector(`[data-set-size="${kind}"]`);
       if (select && [...select.options].some((option) => option.value === size)) {
         select.value = size;
@@ -1064,7 +1082,7 @@ function renderBundleInfo(container) {
     }, title);
   }
   const add = () => addBundleToCart({ product, ...selection(), quantity: selectedQuantity });
-  container.querySelectorAll("select").forEach(select => select.addEventListener("change", () => { const { crewneck, sweatpants } = selection(); const a = variantStockRemaining(bundle.crewneck, crewneck.size, crewneck.color); const b = variantStockRemaining(bundle.sweatpants, sweatpants.size, sweatpants.color); container.querySelector("#stockLine").innerHTML = a && b ? `<span class="stock-dot"></span>Both pieces available — ${Math.min(a,b)} set(s)` : '<span class="stock-dot stock-dot--out"></span>One or both selected variants are unavailable'; ["addToCartBtn", "buyNowBtn"].forEach(id => { container.querySelector(`#${id}`).disabled = !(a && b); }); }));
+  container.querySelectorAll("select").forEach(select => select.addEventListener("change", () => { const { crewneck, sweatpants } = selection(); const a = variantStockRemaining(bundle.crewneck, crewneck.size, crewneck.color); const b = variantStockRemaining(bundle.sweatpants, sweatpants.size, sweatpants.color); container.querySelector("#stockLine").innerHTML = a && b ? `<span class="stock-dot"></span>Matching ${escapeHtml(crewneck.color)} set available — ${Math.min(a,b)} set(s)` : '<span class="stock-dot stock-dot--out"></span>This color and size combination is unavailable'; ["addToCartBtn", "buyNowBtn"].forEach(id => { container.querySelector(`#${id}`).disabled = !(a && b); }); }));
   container.querySelector("select")?.dispatchEvent(new Event("change"));
   container.querySelector("#qtyDec").onclick = () => { selectedQuantity = Math.max(1, selectedQuantity - 1); container.querySelector("#qtyValue").textContent = selectedQuantity; };
   container.querySelector("#qtyInc").onclick = () => { selectedQuantity = Math.min(10, selectedQuantity + 1); container.querySelector("#qtyValue").textContent = selectedQuantity; };

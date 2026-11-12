@@ -12,6 +12,10 @@ const line = z.object({
   price: z.coerce.number().min(0), size: z.string().max(20),
   color: z.string().max(60), quantity: z.coerce.number().int().min(1).max(10),
   bundleSelection: z.object({ crewneck: selection, sweatpants: selection }).optional(),
+}).superRefine((item, context) => {
+  if (item.bundleSelection && item.bundleSelection.crewneck.color.trim().toLowerCase() !== item.bundleSelection.sweatpants.color.trim().toLowerCase()) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "Choose one color for both pieces in the set." });
+  }
 });
 
 router.get("/", requireAuth, async (req, res) => {

@@ -9,7 +9,7 @@ export function productCardHTML(product, index = 0) {
   const images = Array.isArray(product.images)
     ? product.images.filter(Boolean)
     : [];
-  const colors = Array.isArray(product.colors) ? product.colors : [];
+  let colors = Array.isArray(product.colors) ? product.colors : [];
   const badges = Array.isArray(product.badges) ? product.badges : [];
   const sizes = Array.isArray(product.sizes) ? product.sizes : [];
   const image = images[0] || "assets/img/brand/nuvanti-logo.png";
@@ -18,7 +18,21 @@ export function productCardHTML(product, index = 0) {
   const name = escapeHtml(product.name || "Nuvanti item");
   const wished = isWishlisted(product.id);
   const isSet = Boolean(product.bundle?.crewneck && product.bundle?.sweatpants);
-  const inStock = isSet ? [product.bundle.crewneck, product.bundle.sweatpants].every(part => (part.sizes || []).some(size => (part.colors || ["Default"]).some(color => Number(part.inventoryByVariant?.[`${color}::${size}`] ?? part.inventory?.[size] ?? 0) > 0))) : isInStock(product) && sizes.length > 0;
+  let sharedColors = [];
+  if (isSet) {
+    const crewneck = product.bundle.crewneck;
+    const sweatpants = product.bundle.sweatpants;
+    const crewneckColors = crewneck.colors?.length ? crewneck.colors : ["Default"];
+    const sweatpantsColors = sweatpants.colors?.length ? sweatpants.colors : ["Default"];
+    sharedColors = crewneckColors.flatMap((color) => {
+      const matching = sweatpantsColors.find((candidate) => candidate.trim().toLowerCase() === color.trim().toLowerCase());
+      if (!matching) return [];
+      const hasStock = (part, partColor) => (part.sizes?.length ? part.sizes : ["One Size"]).some((size) => Number(part.inventoryByVariant?.[`${partColor}::${size}`] ?? part.inventory?.[size] ?? 0) > 0);
+      return hasStock(crewneck, color) && hasStock(sweatpants, matching) ? [color] : [];
+    });
+    colors = sharedColors;
+  }
+  const inStock = isSet ? sharedColors.length > 0 : isInStock(product) && sizes.length > 0;
   const style = product.setCardStyle || "none", effect = product.setCardEffect || "none";
   const accent = /^#[0-9a-f]{6}$/i.test(product.setCardAccent || "") ? product.setCardAccent : "#d8a94c";
   return `
@@ -43,7 +57,7 @@ export function productCardHTML(product, index = 0) {
           ${product.compareAtPrice ? `<span class="product-card__compare">${formatPrice(product.compareAtPrice)}</span>` : ""}
         </div>
         <div class="product-card__swatches">
-          ${colors.map((c) => `<span class="swatch" style="background:${colorHex(c, product.colorSwatches)}" title="${escapeHtml(c)}" aria-label="${escapeHtml(c)}"></span>`).join("")}
+          ${colors.map((c) => `<span class="swatch" style="background:${colorHex(c, isSet ? product.bundle.crewneck.colorSwatches : product.colorSwatches)}" title="${escapeHtml(c)}" aria-label="${escapeHtml(c)}"></span>`).join("")}
         </div>
       </a>
       <div class="product-card__quick">

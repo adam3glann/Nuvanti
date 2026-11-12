@@ -163,6 +163,7 @@ export function syncCartWithProducts(products) {
   const removed = [];
   const adjusted = [];
   let priceChanged = false;
+  let bundleColorsAdjusted = false;
   const remainingByVariant = new Map();
   const lines = read().flatMap((line) => {
     const product = catalog.get(String(line.productId));
@@ -175,7 +176,22 @@ export function syncCartWithProducts(products) {
       const c = line.bundleSelection.crewneck, s = line.bundleSelection.sweatpants;
       if (!b?.crewneck || !b?.sweatpants || !c || !s) { removed.push(line.name); return []; }
       const stockFor = (p, v) => Number(p.inventoryByVariant?.[`${v.color}::${v.size}`] ?? p.inventory?.[v.size] ?? 0);
-      const available = Math.min(stockFor(b.crewneck, c), stockFor(b.sweatpants, s));
+      const crewneckColors = b.crewneck.colors?.length ? b.crewneck.colors : ["Default"];
+      const sweatpantsColors = b.sweatpants.colors?.length ? b.sweatpants.colors : ["Default"];
+      const commonColors = crewneckColors.flatMap((color) => {
+        const matching = sweatpantsColors.find((candidate) => candidate.trim().toLowerCase() === color.trim().toLowerCase());
+        return matching ? [{ crewneck: color, sweatpants: matching }] : [];
+      });
+      let matchingColor = commonColors.find(({ crewneck, sweatpants }) => crewneck.trim().toLowerCase() === c.color.trim().toLowerCase() && sweatpants.trim().toLowerCase() === s.color.trim().toLowerCase());
+      if (!matchingColor) matchingColor = commonColors.find(({ crewneck, sweatpants }) => stockFor(b.crewneck, { color: crewneck, size: c.size }) > 0 && stockFor(b.sweatpants, { color: sweatpants, size: s.size }) > 0);
+      if (!matchingColor) { removed.push(line.name); return []; }
+      if (c.color !== matchingColor.crewneck || s.color !== matchingColor.sweatpants) {
+        line.bundleSelection = { crewneck: { ...c, color: matchingColor.crewneck }, sweatpants: { ...s, color: matchingColor.sweatpants } };
+        line.lineId = JSON.stringify([Number(line.productId), line.bundleSelection]);
+        bundleColorsAdjusted = true;
+      }
+      const selection = line.bundleSelection;
+      const available = Math.min(stockFor(b.crewneck, selection.crewneck), stockFor(b.sweatpants, selection.sweatpants));
       if (available <= 0) { removed.push(line.name); return []; }
       line.quantity = Math.min(line.quantity, available, 10);
       line.price = Number(product.price);
@@ -222,7 +238,7 @@ export function syncCartWithProducts(products) {
     line.image = product.images?.[0] || line.image;
     return [line];
   });
-  if (removed.length || adjusted.length || priceChanged) write(lines);
+  if (removed.length || adjusted.length || priceChanged || bundleColorsAdjusted) write(lines);
   return { removed, adjusted, priceChanged };
 }
 
@@ -357,6 +373,7 @@ export function addToCart({ product, size, color, quantity = 1 }) {
 
 export function addBundleToCart({ product, crewneck, sweatpants, quantity = 1 }) {
   if (!product?.bundle || !crewneck?.size || !sweatpants?.size) return read();
+  if (String(crewneck.color || "Default").trim().toLowerCase() !== String(sweatpants.color || "Default").trim().toLowerCase()) return read();
   const bundleSelection = { crewneck: { size: crewneck.size, color: crewneck.color || "Default" }, sweatpants: { size: sweatpants.size, color: sweatpants.color || "Default" } };
   const lineId = JSON.stringify([Number(product.id), bundleSelection]);
   const lines = read();
