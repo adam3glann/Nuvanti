@@ -1494,6 +1494,27 @@ function sizeGuideProfileDimensions(columns) {
     .filter((measurement) => measurement.columnIndex >= 0);
 }
 
+function garmentCircumferenceCm(column, rawValue, key) {
+  const values = [...String(rawValue || "").replace(/,/g, ".").matchAll(/\d+(?:\.\d+)?/g)]
+    .map((match) => Number(match[0]))
+    .filter((value) => Number.isFinite(value) && value > 0);
+  if (!values.length) return null;
+
+  // Use the smaller end of a chart range so the recommendation remains safe.
+  let garment = Math.min(...values);
+  const name = String(column || "").toLowerCase();
+  if (/\b(in|inch|inches)\b/.test(name)) garment *= 2.54;
+
+  const isLaidFlat = /laid\s*flat|pit\s*to\s*pit|\bwidth\b|\bacross\b/.test(name);
+  const isCircumference = /circumference|around/.test(name);
+  const typicalFullCircumference =
+    (key === "chest" && garment >= 80) ||
+    (key === "waist" && garment >= 70) ||
+    (key === "hips" && garment >= 85);
+  if (isLaidFlat || (!isCircumference && !typicalFullCircumference)) garment *= 2;
+  return garment;
+}
+
 function buildSizeAdvisorMarkup(columns, rows, title = "") {
   const bodyDimensions = sizeGuideDimensions(columns);
   const profileDimensions = sizeGuideProfileDimensions(columns);
@@ -1518,7 +1539,7 @@ function buildSizeAdvisorMarkup(columns, rows, title = "") {
         bodyDimensions.length
           ? `<label>How do you like your clothes to fit?
         <select name="fit"><option value="regular">Regular</option><option value="snug">Closer fit</option><option value="relaxed">Relaxed fit</option></select>
-      </label><fieldset><legend>Your body measurements (cm)</legend><div class="size-advisor__measurements">${bodyDimensions.map((dimension) => `<label>${dimension.label}<input name="${dimension.key}" type="number" min="40" max="180" step="0.5" inputmode="decimal" placeholder="${hasProfileChart ? "Optional" : "Needed for recommendation"}" /></label>`).join("")}</div><small>Measure around your body with a soft tape. For garment measurements laid flat, the calculator accounts for that.</small></fieldset>`
+      </label><fieldset><legend>Your body measurements (cm)</legend><div class="size-advisor__measurements">${bodyDimensions.map((dimension) => `<label>${dimension.label}<input name="${dimension.key}" type="number" min="40" max="180" step="0.5" inputmode="decimal" placeholder="${hasProfileChart ? "Optional" : "Needed for recommendation"}" /></label>`).join("")}</div><small>Measure around your body with a soft tape. Flat garment widths are converted to circumference. The calculator leaves a small fit margin so borderline measurements move up a size.</small></fieldset>`
           : ""
       }
       <button class="btn btn-primary" type="button" data-size-advisor-submit>Recommend my size</button>
@@ -1591,16 +1612,17 @@ function bindSizeAdvisor(containerId, columns, rows, advisorProduct = product, a
     }
     const fit = String(data.get("fit") || "regular");
     const targetEase = { snug: 5, regular: 9, relaxed: 15 }[fit] || 9;
+    const boundaryMargin = 1;
     const ranked = rows
-      .map((row) => {
+      .map((row, rowIndex) => {
         if (
           advisorProduct?.sizes?.length &&
           (!advisorProduct.sizes.includes(String(row.size)) ||
             stockFor(advisorProduct, String(row.size), typeof advisorColor === "function" ? advisorColor() : advisorColor) <= 0)
         )
           return null;
-        let totalScore = 0;
-        let used = 0;
+        let profileScore = 0;
+        let profileUsed = 0;
         const fitWarnings = [];
         for (const item of profile) {
           const raw = String(row.values?.[item.columnIndex] || "").replace(
@@ -1620,50 +1642,65 @@ function bindSizeAdvisor(containerId, columns, rows, advisorProduct = product, a
               : item.value > high
                 ? item.value - high
                 : 0;
-          totalScore += outside * 2 + Math.abs(item.value - midpoint) * 0.05;
-          used += 1;
+          profileScore += outside * 2 + Math.abs(item.value - midpoint) * 0.05;
+          profileUsed += 1;
         }
+        let bodyScore = 0;
+        let bodyUsed = 0;
+        let hasMissingBodyChartValue = false;
         for (const measurement of measurements) {
-          const column = String(
-            columns[measurement.columnIndex] || "",
-          ).toLowerCase();
-          const raw = String(
-            row.values?.[measurement.columnIndex] || "",
-          ).replace(",", ".");
-          const numberMatch = raw.match(/-?\d+(?:\.\d+)?/);
-          if (!numberMatch) continue;
-          let garment = Number(numberMatch[0]);
-          const inches = /\b(in|inch|inches)\b/.test(column);
-          if (inches) garment *= 2.54;
-          const explicitCircumference = /circumference|around|full/.test(column);
-          const explicitlyLaidFlat = /laid\s*flat|pit\s*to\s*pit|\bwidth\b|\bacross\b/.test(column);
-          const likelyCircumference =
-            (measurement.key === "chest" && garment >= 80) ||
-            (measurement.key === "waist" && garment >= 70) ||
-            (measurement.key === "hips" && garment >= 85);
-          const isCircumference = explicitCircumference || (!explicitlyLaidFlat && likelyCircumference);
-          if (!isCircumference) garment *= 2;
+          const garment = garmentCircumferenceCm(
+            columns[measurement.columnIndex],
+            row.values?.[measurement.columnIndex],
+            measurement.key,
+          );
+          if (!Number.isFinite(garment)) {
+            hasMissingBodyChartValue = true;
+            continue;
+          }
           const ease = garment - measurement.value;
-          if (ease < targetEase) fitWarnings.push({ label: measurement.label, ease, targetEase });
-          const deficit = Math.max(0, targetEase - ease);
-          totalScore += Math.abs(ease - targetEase) + deficit * 2;
-          used += 1;
+          const requiredEase = targetEase + boundaryMargin;
+          if (ease < requiredEase) fitWarnings.push({ label: measurement.label, ease, targetEase: requiredEase });
+          const deficit = Math.max(0, requiredEase - ease);
+          const extraRoom = Math.max(0, ease - requiredEase);
+          // Undersizing is a hard penalty; a modest amount of extra room is safer.
+          bodyScore += deficit * 6 + extraRoom * 0.12;
+          bodyUsed += 1;
         }
+        if (measurements.length && hasMissingBodyChartValue) return null;
+        const used = bodyUsed + profileUsed;
         return used
-          ? { size: String(row.size), score: totalScore / used, fitWarnings }
+          ? {
+              size: String(row.size),
+              bodyScore: bodyUsed ? bodyScore / bodyUsed : 0,
+              profileScore: profileUsed ? profileScore / profileUsed : 0,
+              fitWarnings,
+              fitsBody: bodyUsed > 0 && fitWarnings.length === 0,
+              rowIndex,
+            }
           : null;
       })
-      .filter(Boolean)
-      .sort((a, b) => a.score - b.score);
+      .filter(Boolean);
+    const bodyFits = measurements.length
+      ? ranked.filter((candidate) => candidate.fitsBody)
+      : [];
+    const candidates = bodyFits.length ? bodyFits : ranked;
+    candidates.sort(
+      (a, b) =>
+        a.bodyScore - b.bodyScore ||
+        a.profileScore - b.profileScore ||
+        a.rowIndex - b.rowIndex,
+    );
     if (!ranked.length) {
       result.textContent =
         "No in-stock size has matching measurements in this chart. Please use the chart or contact us for help.";
       return;
     }
-    const best = ranked[0];
+    const best = candidates[0];
+    const alternativeScore = (candidate) => candidate.bodyScore + candidate.profileScore * 0.08;
     if (!best.fitWarnings.length) onRecommendation?.(best.size);
     const alternative =
-      !best.fitWarnings.length && ranked[1] && ranked[1].score - best.score <= 2.5 ? ranked[1] : null;
+      !best.fitWarnings.length && candidates[1] && alternativeScore(candidates[1]) - alternativeScore(best) <= 2.5 ? candidates[1] : null;
     const caution =
       best.fitWarnings.length
         ? (() => {
@@ -1673,7 +1710,7 @@ function bindSizeAdvisor(containerId, columns, rows, advisorProduct = product, a
               : `${warning.ease.toFixed(1)} cm of ease, below your selected ${fit} fit target of ${warning.targetEase} cm`;
             return ` ${warning.label} has ${easeText}. No listed size meets your selected fit; check the chart before ordering.`;
           })()
-        : best.score > 18
+        : best.bodyScore > 18
           ? " The closest chart match is uncertain; double-check the measurements before ordering."
           : " This recommendation is calculated from the measurements and size ranges in this product’s chart.";
     const recommendation = document.createElement("strong");
