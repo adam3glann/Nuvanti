@@ -262,6 +262,10 @@ function bindLayoutEvents() {
 }
 
 function syncFilterUI() {
+  document.querySelectorAll(".filter-option").forEach((option) => {
+    const radio = option.querySelector('input[type="radio"]');
+    option.dataset.selected = String(Boolean(radio?.checked));
+  });
   document.querySelectorAll("[data-size]").forEach((btn) => {
     btn.dataset.active = String(state.sizes.includes(btn.dataset.size));
   });

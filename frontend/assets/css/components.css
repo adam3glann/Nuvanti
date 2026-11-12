@@ -1563,9 +1563,20 @@
   padding-block: var(--space-2);
   font-size: var(--fs-small);
   cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition:
+    color var(--dur-fast) var(--ease-editorial),
+    background-color var(--dur-fast) var(--ease-editorial),
+    padding-inline var(--dur-fast) var(--ease-editorial);
+}
+.filter-option[data-selected="true"] {
+  color: var(--color-accent-strong);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  padding-inline: var(--space-2);
 }
 .filter-option input {
-  accent-color: var(--color-ink);
+  accent-color: var(--color-accent);
+  flex: 0 0 auto;
 }
 .color-filter-grid {
   display: flex;
