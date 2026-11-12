@@ -100,7 +100,7 @@ function renderOrder(order) {
       ${order.paymentMethod === "paymob" ? `<div class="order-detail-row"><span>Payment</span><span>${order.paymentStatus === "paid" ? "Paid online" : order.paymentStatus === "failed" ? "Payment not completed" : "Awaiting payment confirmation"}</span></div>` : order.paymentMethod === "instapay" ? `<div class="order-detail-row"><span>Payment</span><strong>${order.paymentStatus === "paid" ? "Paid" : cancelled ? "Cancelled · unpaid" : "Unpaid · transfer verification required"}</strong></div>` : ""}
     </div>
 
-    ${order.paymentMethod === "cod" && !cancelled ? `<section class="instapay-transfer-panel" style="margin-block:1rem"><h2>Confirm your Cash on Delivery order</h2>${order.customerConfirmed ? '<p class="instapay-transfer-panel__pending" role="status">Your order is confirmed. Thank you.</p>' : `<p>${order.supportWhatsappPhone ? "Confirming opens WhatsApp with a message ready; tap Send there to message us." : "Confirm that you want us to prepare and deliver this order."}</p><button class="btn ${order.supportWhatsappPhone ? "instapay-whatsapp" : "btn-primary"}" id="confirmCustomerOrder">${order.supportWhatsappPhone ? "Confirm & open WhatsApp" : "Confirm Order"}</button><p id="confirmOrderStatus" role="status" aria-live="polite"></p>`}</section>` : ""}
+    ${order.paymentMethod === "cod" && !cancelled ? `<section class="instapay-transfer-panel" id="codConfirmationCard" style="margin-block:1rem;border:2px solid var(--color-accent,#315b45)"><p class="instapay-transfer-panel__eyebrow">ACTION NEEDED · CASH ON DELIVERY</p><h2>Confirm your order</h2>${order.customerConfirmed ? '<p class="instapay-transfer-panel__pending" role="status">Your order is confirmed. Thank you.</p>' : `<p>${order.supportWhatsappPhone ? "Your order is not confirmed yet. Open WhatsApp below, send the message, then return and tap ‘I sent it’." : "Your order is not confirmed yet. Confirm below if you want us to prepare and deliver it."}</p>${order.supportWhatsappPhone ? `<a class="btn instapay-whatsapp" id="openOrderWhatsApp" target="_blank" rel="noopener noreferrer" href="${escapeHtml(createWhatsAppUrl(order.supportWhatsappPhone, `Hi Nuvanti, I confirm my Cash on Delivery order NV-${order.id}. Please prepare it.`))}">Open WhatsApp to confirm</a>` : ""}<button class="btn btn-primary" id="confirmCustomerOrder" ${order.supportWhatsappPhone ? 'hidden style="display:none"' : ""}>${order.supportWhatsappPhone ? "I sent the WhatsApp message" : "Confirm Order"}</button><p id="confirmOrderStatus" role="status" aria-live="polite">Order status: Awaiting your confirmation.</p>`}</section>` : ""}
 
     ${
       instaPending
@@ -165,17 +165,21 @@ function renderOrder(order) {
           "Copy unavailable. Select the recipient details above and copy them. · تعذّر النسخ. حدّد بيانات المستلم وانسخها.";
       }
     });
+  document.getElementById("openOrderWhatsApp")?.addEventListener("click", () => {
+    const confirmButton = document.getElementById("confirmCustomerOrder");
+    confirmButton.hidden = false;
+    confirmButton.style.display = "";
+    document.getElementById("confirmOrderStatus").textContent = "WhatsApp opened in another tab. Send the message there, return here, then tap ‘I sent the WhatsApp message’. Your order is still awaiting confirmation.";
+  });
   document.getElementById("confirmCustomerOrder")?.addEventListener("click", async event => {
-    const button = event.currentTarget; button.disabled = true; button.textContent = "Confirming…";
+    const button = event.currentTarget; button.disabled = true; button.textContent = "Saving confirmation…";
     try {
       const response = await fetch(`${API}/api/orders/track/${encodeURIComponent(order.id)}/confirm`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token }) });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || "Could not confirm the order.");
       button.parentElement.innerHTML = '<p class="instapay-transfer-panel__pending" role="status">Your order is confirmed. Thank you.</p>';
-      const whatsappUrl = createWhatsAppUrl(order.supportWhatsappPhone, `Hi Nuvanti, I confirm my Cash on Delivery order NV-${order.id}. Please prepare it.`);
-      if (whatsappUrl) window.location.assign(whatsappUrl);
     } catch (error) {
-      button.disabled = false; button.textContent = "Confirm Order";
+      button.disabled = false; button.textContent = order.supportWhatsappPhone ? "I sent the WhatsApp message" : "Confirm Order";
       document.getElementById("confirmOrderStatus").textContent = error.message;
     }
   });
