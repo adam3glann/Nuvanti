@@ -80,6 +80,7 @@ function renderForm(product, cats, cols, products) {
             <div id="setComponentFields" style="display:${product.bundle ? 'grid' : 'none'};gap:.75rem">
               <div class="field"><label for="fCrewneckComponent">Crewneck product</label><select id="fCrewneckComponent"><option value="">Choose a crewneck</option>${products.filter((item) => String(item.id) !== String(product.id) && !item.bundle).map((item) => `<option value="${esc(item.id)}" ${String(product.bundle?.crewneckProductId) === String(item.id) ? 'selected' : ''}>${esc(item.name)}${item.status === 'active' ? '' : ' (Draft)'}</option>`).join('')}</select></div>
               <div class="field"><label for="fSweatpantsComponent">Sweatpants product</label><select id="fSweatpantsComponent"><option value="">Choose sweatpants</option>${products.filter((item) => String(item.id) !== String(product.id) && !item.bundle).map((item) => `<option value="${esc(item.id)}" ${String(product.bundle?.sweatpantsProductId) === String(item.id) ? 'selected' : ''}>${esc(item.name)}${item.status === 'active' ? '' : ' (Draft)'}</option>`).join('')}</select></div>
+              <small class="hint">Set each size chart on its component product (open that product in the catalog editor). Shoppers will see separate charts and get a separate size recommendation for each piece.</small>
             </div>
           </div>
         </div>

@@ -1039,11 +1039,30 @@ function renderInfo() {
 
 function renderBundleInfo(container) {
   const bundle = product.bundle;
-  const component = (kind, title, item) => `<div class="option-group"><div class="option-group__head"><span class="label">${title} — ${escapeHtml(item.name)}</span></div><div class="set-choice-grid"><label>Color<select data-set-color="${kind}">${(item.colors || ["Default"]).map(c => `<option value="${escapeAttribute(c)}">${escapeHtml(c)}</option>`).join("")}</select></label><label>Size<select data-set-size="${kind}">${(item.sizes || ["One Size"]).map(s => `<option value="${escapeAttribute(s)}">${escapeHtml(s)}</option>`).join("")}</select></label></div></div>`;
+  const component = (kind, title, item) => {
+    const guide = item.sizeGuideMeasurements || {};
+    const columns = Array.isArray(guide.columns) ? guide.columns : [];
+    const rows = Array.isArray(guide.rows) ? guide.rows : [];
+    const advisorId = `${kind}SizeAdvisor`;
+    return `<div class="option-group"><div class="option-group__head"><span class="label">${title} — ${escapeHtml(item.name)}</span><button type="button" class="btn btn-outline btn-sm" data-set-size-guide="${kind}">View size chart</button></div><div class="set-choice-grid"><label>Color<select data-set-color="${kind}">${(item.colors || ["Default"]).map(c => `<option value="${escapeAttribute(c)}">${escapeHtml(c)}</option>`).join("")}</select></label><label>Size<select data-set-size="${kind}">${(item.sizes || ["One Size"]).map(s => `<option value="${escapeAttribute(s)}">${escapeHtml(s)}</option>`).join("")}</select></label></div><div id="${advisorId}">${buildSizeAdvisorMarkup(columns, rows, title)}</div></div>`;
+  };
   const stocked = (item) => (item.sizes || []).some(s => (item.colors || ["Default"]).some(c => Number(item.inventoryByVariant?.[`${c}::${s}`] ?? item.inventory?.[s] ?? 0) > 0));
   const inStock = stocked(bundle.crewneck) && stocked(bundle.sweatpants);
   container.innerHTML = `<p class="label product-info__eyebrow">WINTER SET · TWO PIECES</p><h1 class="product-info__name">${escapeHtml(product.name)}</h1><div class="product-info__price"><span>${formatPrice(product.price)}</span></div><p class="product-info__desc">${escapeHtml(product.description || "A crewneck and matching sweatpants, sold together as one set.")}</p>${component("crewneck", "Crewneck", bundle.crewneck)}${component("sweatpants", "Sweatpants", bundle.sweatpants)}<div class="option-group"><span class="label">Quantity</span><div class="qty-stepper" style="width:fit-content"><button type="button" id="qtyDec" aria-label="Decrease quantity">${icon("minus")}</button><span id="qtyValue">${selectedQuantity}</span><button type="button" id="qtyInc" aria-label="Increase quantity">${icon("plus")}</button></div></div><p class="stock-line" id="stockLine"><span class="stock-dot"></span>Choose a size for each piece</p><div class="purchase-row"><button class="btn btn-primary" id="addToCartBtn" ${inStock ? "" : "disabled"}>${inStock ? "Add Set to Cart" : "Sold Out"}</button><button class="btn btn-outline" id="buyNowBtn" ${inStock ? "" : "disabled"}>Buy Set Now</button><button type="button" class="icon-btn" id="wishlistBtn" data-active="${isWishlisted(product.id)}" aria-label="Toggle wishlist">${icon("heart")}</button></div><p class="text-muted">Both pieces are reserved together. Cancelling an order restores stock for each piece.</p>`;
   const selection = () => ({ crewneck: { color: container.querySelector('[data-set-color="crewneck"]').value, size: container.querySelector('[data-set-size="crewneck"]').value }, sweatpants: { color: container.querySelector('[data-set-color="sweatpants"]').value, size: container.querySelector('[data-set-size="sweatpants"]').value } });
+  for (const [kind, title, item] of [["crewneck", "Crewneck", bundle.crewneck], ["sweatpants", "Sweatpants", bundle.sweatpants]]) {
+    const guide = item.sizeGuideMeasurements || {};
+    const columns = Array.isArray(guide.columns) ? guide.columns : [];
+    const rows = Array.isArray(guide.rows) ? guide.rows : [];
+    container.querySelector(`[data-set-size-guide="${kind}"]`).addEventListener("click", () => openComponentSizeGuide(item, title));
+    bindSizeAdvisor(`${kind}SizeAdvisor`, columns, rows, item, () => container.querySelector(`[data-set-color="${kind}"]`)?.value || "Default", (size) => {
+      const select = container.querySelector(`[data-set-size="${kind}"]`);
+      if (select && [...select.options].some((option) => option.value === size)) {
+        select.value = size;
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    }, title);
+  }
   const add = () => addBundleToCart({ product, ...selection(), quantity: selectedQuantity });
   container.querySelectorAll("select").forEach(select => select.addEventListener("change", () => { const { crewneck, sweatpants } = selection(); const a = variantStockRemaining(bundle.crewneck, crewneck.size, crewneck.color); const b = variantStockRemaining(bundle.sweatpants, sweatpants.size, sweatpants.color); container.querySelector("#stockLine").innerHTML = a && b ? `<span class="stock-dot"></span>Both pieces available — ${Math.min(a,b)} set(s)` : '<span class="stock-dot stock-dot--out"></span>One or both selected variants are unavailable'; ["addToCartBtn", "buyNowBtn"].forEach(id => { container.querySelector(`#${id}`).disabled = !(a && b); }); }));
   container.querySelector("select")?.dispatchEvent(new Event("change"));
@@ -1281,6 +1300,22 @@ function showSizeError() {
    SIZE GUIDE
    ========================================================= */
 
+function openComponentSizeGuide(component, title) {
+  const guide = component?.sizeGuideMeasurements || {};
+  const columns = Array.isArray(guide.columns) ? guide.columns : [];
+  const rows = Array.isArray(guide.rows) ? guide.rows : [];
+  const table = columns.length && rows.length
+    ? `<table class="size-table"><thead><tr><th>Size</th>${columns.map((column) => `<th>${escapeHtml(column)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr><td>${escapeHtml(row.size)}</td>${columns.map((_, index) => `<td>${escapeHtml(row.values?.[index] || "—")}</td>`).join("")}</tr>`).join("")}</tbody></table>`
+    : "<p class=\"text-muted\">The size chart has not been added yet. Please contact us for help choosing.</p>";
+  const image = component?.sizeGuideImage
+    ? `<img src="${escapeAttribute(component.sizeGuideImage)}" alt="${escapeAttribute(`${title} size chart`)}" style="display:block;width:100%;height:auto;margin:0 0 1rem;border-radius:8px" />`
+    : "";
+  const notes = component?.sizeGuide
+    ? `<p class="text-muted" style="font-size:.85rem">${escapeHtml(component.sizeGuide).replace(/\n/g, "<br>")}</p>`
+    : "";
+  createModal({ title: `${title} Size Chart`, bodyHTML: `${image}${table}${notes}` }).open();
+}
+
 function openSizeGuide() {
   const guide = product?.sizeGuideMeasurements || {};
   const columns = Array.isArray(guide.columns) ? guide.columns : [];
@@ -1431,7 +1466,7 @@ function sizeGuideProfileDimensions(columns) {
     .filter((measurement) => measurement.columnIndex >= 0);
 }
 
-function buildSizeAdvisorMarkup(columns, rows) {
+function buildSizeAdvisorMarkup(columns, rows, title = "") {
   const bodyDimensions = sizeGuideDimensions(columns);
   const profileDimensions = sizeGuideProfileDimensions(columns);
   const hasProfileChart = profileDimensions.length > 0;
@@ -1440,9 +1475,12 @@ function buildSizeAdvisorMarkup(columns, rows) {
     rows.length > 0 &&
     rows.some((row) => row?.size) &&
     (bodyDimensions.length > 0 || hasProfileChart);
-  return `<section class="size-advisor" aria-labelledby="sizeAdvisorTitle">
-    <h4 id="sizeAdvisorTitle">Find my size</h4>
-    <p class="text-muted">${!chartReady ? "Enter your height and weight. This product’s size chart still needs recommendation measurements, so contact us if you need help choosing." : hasProfileChart ? "Enter your details to compare with this product’s size ranges." : "Height and weight alone can’t reliably predict clothing fit. Add at least one body measurement to compare with this product’s chart."}</p>
+  const headingId = `sizeAdvisorTitle-${(title || "product").toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+  const heading = title ? `Find my ${escapeHtml(title.toLowerCase())} size` : "Find my size";
+  const context = title ? `this ${escapeHtml(title.toLowerCase())}` : "this product";
+  return `<section class="size-advisor" aria-labelledby="${headingId}">
+    <h4 id="${headingId}">${heading}</h4>
+    <p class="text-muted">${!chartReady ? `${context[0].toUpperCase()}${context.slice(1)}’s size chart needs measurements before it can recommend a size. Please contact us for help choosing.` : hasProfileChart ? `Enter your details to compare with ${context}’s size ranges.` : `Height and weight alone can’t reliably predict fit. Add a body measurement to compare with ${context}’s chart.`}</p>
     <form data-size-advisor novalidate>
       <div class="size-advisor__context">
         <label>Height (cm)<input name="height" type="number" min="100" max="230" step="1" ${requiredProfileKeys.has("height") ? "required" : ""} inputmode="numeric" placeholder="e.g. 168" /></label>
@@ -1461,7 +1499,7 @@ function buildSizeAdvisorMarkup(columns, rows) {
   </section>`;
 }
 
-function bindSizeAdvisor(containerId, columns, rows) {
+function bindSizeAdvisor(containerId, columns, rows, advisorProduct = product, advisorColor = selectedColor, onRecommendation = null, title = "product") {
   const container = document.getElementById(containerId);
   const form = container?.querySelector("[data-size-advisor]");
   if (!form) return;
@@ -1518,7 +1556,7 @@ function bindSizeAdvisor(containerId, columns, rows) {
       );
     if (!measurements.length && !profile.length) {
       result.textContent =
-        "This product’s size chart is not set up for automatic recommendations yet. Please use the Size Guide or contact the shop.";
+        `This ${title} chart is not set up for automatic recommendations yet. Please use the size chart or contact the shop.`;
       return;
     }
     const fit = String(data.get("fit") || "regular");
@@ -1526,9 +1564,9 @@ function bindSizeAdvisor(containerId, columns, rows) {
     const ranked = rows
       .map((row) => {
         if (
-          product?.sizes?.length &&
-          (!product.sizes.includes(String(row.size)) ||
-            stockFor(product, String(row.size), selectedColor) <= 0)
+          advisorProduct?.sizes?.length &&
+          (!advisorProduct.sizes.includes(String(row.size)) ||
+            stockFor(advisorProduct, String(row.size), typeof advisorColor === "function" ? advisorColor() : advisorColor) <= 0)
         )
           return null;
         let totalScore = 0;
@@ -1587,6 +1625,7 @@ function bindSizeAdvisor(containerId, columns, rows) {
       return;
     }
     const best = ranked[0];
+    onRecommendation?.(best.size);
     const alternative =
       ranked[1] && ranked[1].score - best.score <= 2.5 ? ranked[1] : null;
     const caution =
