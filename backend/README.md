@@ -55,7 +55,18 @@ Checkout supports guests and registered customers. Guests provide an email for t
 
 Both messages include a tracking link: `GET /api/orders/track/:id?token=...`, a public (no-login) endpoint guarded by a random per-order token (not the order's numeric id — that alone proves nothing). It returns order status, items, delivery method, and city/country only — no email, phone, or full address. The storefront's `track.html` page renders it, and also offers a manual order-number + tracking-code lookup for someone who lost the link. Signed-in customers see the same link for every past order under **My Account → Orders**, which now lists real order history instead of only the most recent order in that browser.
 
-For production deployment, configure mail through the service's environment variables. On Railway plans where outbound SMTP is unavailable, use a transactional email HTTP API. SendGrid supports verifying a single sender address by email, so a custom domain is not required (domain authentication is recommended for deliverability). Create a **Mail Send** API key and verify the sender address in SendGrid, then set:
+For production deployment, configure mail through the service's environment variables. On Railway plans where outbound SMTP is unavailable, use an HTTPS API. SendGrid supports verifying a single sender address by email, but Gmail may defer those messages when the visible `From` domain does not align with the sending service's SPF or DKIM domain. For a Gmail sender without a custom domain, use the Gmail API instead. Enable Gmail API in a Google Cloud project, create OAuth credentials with the `https://www.googleapis.com/auth/gmail.send` scope, authorize the sending Gmail account, and set a refresh token in Railway:
+
+```env
+GMAIL_CLIENT_ID=your-oauth-client-id
+GMAIL_CLIENT_SECRET=your-oauth-client-secret
+GMAIL_REFRESH_TOKEN=your-oauth-refresh-token
+MAIL_FROM="Nuvanti <the-authorized-sending-account@gmail.com>"
+```
+
+The Gmail API path uses HTTPS, refreshes its access token per send, and takes priority when these credentials are present. Keep all three OAuth values private. The address in `MAIL_FROM` must be the same Gmail account that authorized the app.
+
+Alternatively, use SendGrid by creating a **Mail Send** API key and verifying the sender address, then set:
 
 ```env
 SENDGRID_API_KEY=your-sendgrid-mail-send-api-key

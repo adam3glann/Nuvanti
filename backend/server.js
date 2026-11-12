@@ -225,7 +225,7 @@ if (process.env.NODE_ENV === "production") {
   }
   if (!emailDeliveryStatus().configured)
     console.warn(
-      "Email is not configured; the website will run, but email actions will fail until SMTP or Resend is configured.",
+      "Email is not configured; the website will run, but email actions will fail until a mail provider is configured.",
     );
 }
 

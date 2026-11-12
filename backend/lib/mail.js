@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { randomUUID } from "node:crypto";
 import { adminPublicOrigin, storePublicOrigin } from "./publicOrigins.js";
 
 function hasValue(key) {
@@ -11,11 +12,17 @@ function hasValue(key) {
 
 export function emailDeliveryStatus() {
   const senderReady = hasValue("MAIL_FROM");
+  const gmailReady =
+    ["GMAIL_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN"].every(
+      hasValue,
+    ) && senderReady;
   const resendReady = hasValue("RESEND_API_KEY") && senderReady;
   const sendGridReady = hasValue("SENDGRID_API_KEY") && senderReady;
   const smtpReady =
     ["SMTP_HOST", "SMTP_USER", "SMTP_PASS"].every(hasValue) && senderReady;
-  const provider = sendGridReady
+  const provider = gmailReady
+    ? "Gmail API"
+    : sendGridReady
     ? "SendGrid"
     : resendReady
       ? "Resend"
@@ -24,7 +31,10 @@ export function emailDeliveryStatus() {
         : null;
   const missing = [];
   if (!senderReady) missing.push("MAIL_FROM");
-  if (!resendReady && !sendGridReady && !smtpReady) {
+  if (!gmailReady && !resendReady && !sendGridReady && !smtpReady) {
+    if (!hasValue("GMAIL_CLIENT_ID")) missing.push("GMAIL_CLIENT_ID");
+    if (!hasValue("GMAIL_CLIENT_SECRET")) missing.push("GMAIL_CLIENT_SECRET");
+    if (!hasValue("GMAIL_REFRESH_TOKEN")) missing.push("GMAIL_REFRESH_TOKEN");
     if (!hasValue("RESEND_API_KEY")) missing.push("RESEND_API_KEY");
     if (!hasValue("SENDGRID_API_KEY")) missing.push("SENDGRID_API_KEY");
     if (!["SMTP_HOST", "SMTP_USER", "SMTP_PASS"].every(hasValue)) {
@@ -57,6 +67,53 @@ async function deliver({
     if (process.env.NODE_ENV === "production")
       throw new Error("Email delivery is not configured.");
     console.info(`${devLabel} for ${to}: ${devDetail}`);
+    return;
+  }
+  if (status.provider === "Gmail API") {
+    const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: process.env.GMAIL_CLIENT_ID,
+        client_secret: process.env.GMAIL_CLIENT_SECRET,
+        refresh_token: process.env.GMAIL_REFRESH_TOKEN,
+        grant_type: "refresh_token",
+      }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    const tokenResult = await tokenResponse.json().catch(() => ({}));
+    if (!tokenResponse.ok || !tokenResult.access_token) {
+      throw new Error(
+        `Gmail API authorization failed (${tokenResponse.status}): ${tokenResult.error_description || tokenResult.error || "could not refresh access token"}`,
+      );
+    }
+    const raw = buildGmailRawMessage({
+      from: process.env.MAIL_FROM,
+      to,
+      subject,
+      text,
+      html,
+      replyTo,
+    });
+    const response = await fetch(
+      "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${tokenResult.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ raw }),
+        signal: AbortSignal.timeout(10_000),
+      },
+    );
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(
+        `Gmail API email delivery failed (${response.status}): ${result.error?.message || "provider rejected the message"}`,
+      );
+    }
+    console.info("Email accepted by Gmail API", { messageId: result.id || null });
     return;
   }
   if (status.provider === "Resend") {
@@ -147,6 +204,44 @@ function parseSender(value) {
     };
   }
   return { email: raw };
+}
+
+function buildGmailRawMessage({ from, to, subject, text, html, replyTo }) {
+  const sender = parseSender(from);
+  const safeHeader = (value) => String(value || "").replace(/[\r\n]+/g, " ");
+  const encodedSubject = `=?UTF-8?B?${Buffer.from(safeHeader(subject), "utf8").toString("base64")}?=`;
+  const boundary = `nuvanti-${randomUUID()}`;
+  const encodeBody = (value) =>
+    Buffer.from(String(value || ""), "utf8")
+      .toString("base64")
+      .match(/.{1,76}/g)
+      ?.join("\r\n") || "";
+  const parts = [];
+  if (text) {
+    parts.push(
+      `--${boundary}\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n${encodeBody(text)}`,
+    );
+  }
+  if (html) {
+    parts.push(
+      `--${boundary}\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n${encodeBody(html)}`,
+    );
+  }
+  parts.push(`--${boundary}--`);
+  const headers = [
+    `From: ${sender.name ? `=?UTF-8?B?${Buffer.from(sender.name, "utf8").toString("base64")}?= ` : ""}<${sender.email}>`,
+    `To: ${safeHeader(to)}`,
+    `Subject: ${encodedSubject}`,
+    ...(replyTo ? [`Reply-To: ${safeHeader(replyTo)}`] : []),
+    "MIME-Version: 1.0",
+    `Content-Type: multipart/alternative; boundary=\"${boundary}\"`,
+  ];
+  const mime = `${headers.join("\r\n")}\r\n\r\n${parts.join("\r\n\r\n")}`;
+  return Buffer.from(mime, "utf8")
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
 }
 
 export async function sendTestEmail({ to }) {
