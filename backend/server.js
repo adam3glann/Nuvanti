@@ -251,7 +251,7 @@ app.use(
       ),
     ],
     credentials: true,
-    methods: ["GET", "POST", "PATCH", "DELETE"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
   }),
 );
 app.use(express.json({ limit: "100kb" }));
@@ -265,6 +265,7 @@ app.use(
     "/api/auth",
     "/api/admin",
     "/api/addresses",
+    "/api/cart",
     "/api/orders/mine",
     "/api/orders/track",
     "/api/payments",
