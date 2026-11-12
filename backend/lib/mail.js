@@ -12,6 +12,9 @@ function hasValue(key) {
 
 export function emailDeliveryStatus() {
   const senderReady = hasValue("MAIL_FROM");
+  const gmailScriptReady =
+    ["GMAIL_APPS_SCRIPT_URL", "GMAIL_APPS_SCRIPT_SECRET"].every(hasValue) &&
+    senderReady;
   const gmailReady =
     ["GMAIL_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN"].every(
       hasValue,
@@ -20,7 +23,9 @@ export function emailDeliveryStatus() {
   const sendGridReady = hasValue("SENDGRID_API_KEY") && senderReady;
   const smtpReady =
     ["SMTP_HOST", "SMTP_USER", "SMTP_PASS"].every(hasValue) && senderReady;
-  const provider = gmailReady
+  const provider = gmailScriptReady
+    ? "Gmail Apps Script"
+    : gmailReady
     ? "Gmail API"
     : sendGridReady
     ? "SendGrid"
@@ -31,7 +36,17 @@ export function emailDeliveryStatus() {
         : null;
   const missing = [];
   if (!senderReady) missing.push("MAIL_FROM");
-  if (!gmailReady && !resendReady && !sendGridReady && !smtpReady) {
+  if (
+    !gmailScriptReady &&
+    !gmailReady &&
+    !resendReady &&
+    !sendGridReady &&
+    !smtpReady
+  ) {
+    if (!hasValue("GMAIL_APPS_SCRIPT_URL"))
+      missing.push("GMAIL_APPS_SCRIPT_URL");
+    if (!hasValue("GMAIL_APPS_SCRIPT_SECRET"))
+      missing.push("GMAIL_APPS_SCRIPT_SECRET");
     if (!hasValue("GMAIL_CLIENT_ID")) missing.push("GMAIL_CLIENT_ID");
     if (!hasValue("GMAIL_CLIENT_SECRET")) missing.push("GMAIL_CLIENT_SECRET");
     if (!hasValue("GMAIL_REFRESH_TOKEN")) missing.push("GMAIL_REFRESH_TOKEN");
@@ -67,6 +82,38 @@ async function deliver({
     if (process.env.NODE_ENV === "production")
       throw new Error("Email delivery is not configured.");
     console.info(`${devLabel} for ${to}: ${devDetail}`);
+    return;
+  }
+  if (status.provider === "Gmail Apps Script") {
+    const sender = parseSender(process.env.MAIL_FROM);
+    const response = await fetch(process.env.GMAIL_APPS_SCRIPT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        secret: process.env.GMAIL_APPS_SCRIPT_SECRET,
+        to,
+        subject,
+        text: text || "",
+        html: html || "",
+        replyTo: replyTo || "",
+        fromName: sender.name || "Nuvanti",
+      }),
+      signal: AbortSignal.timeout(20_000),
+    });
+    const responseText = await response.text();
+    let result = {};
+    try {
+      result = JSON.parse(responseText);
+    } catch {
+      // Apps Script may return an HTML error page when access is not public.
+    }
+    if (!response.ok || !result.ok) {
+      const detail = result.error || `HTTP ${response.status}`;
+      throw new Error(`Gmail Apps Script delivery failed: ${detail}`);
+    }
+    console.info("Email accepted by Gmail Apps Script", {
+      messageId: result.messageId || null,
+    });
     return;
   }
   if (status.provider === "Gmail API") {
