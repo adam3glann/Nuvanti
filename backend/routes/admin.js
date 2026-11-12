@@ -2165,25 +2165,27 @@ router.post(
   requirePermission("products.create"),
   async (req, res) => {
     const p = productPayload(productInput.parse(req.body));
-    await validateBundleComponents(query, p.metadata.bundle);
     try {
-      const { rows } = await query(
-        `INSERT INTO products (slug,name,description,price_cents,category,collection,images,colors,sizes,inventory,is_active,metadata) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9::jsonb,$10,$11,$12::jsonb) RETURNING ${columns}`,
-        [
-          p.slug,
-          p.name,
-          p.description,
-          p.priceCents,
-          p.category,
-          p.collection,
-          JSON.stringify(p.images),
-          JSON.stringify(p.colors),
-          JSON.stringify(p.sizes),
-          p.inventory,
-          p.isActive,
-          JSON.stringify(p.metadata),
-        ],
-      );
+      const { rows } = await transaction(async (client) => {
+        await validateBundleComponents(client, p.metadata.bundle);
+        return client.query(
+          `INSERT INTO products (slug,name,description,price_cents,category,collection,images,colors,sizes,inventory,is_active,metadata) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9::jsonb,$10,$11,$12::jsonb) RETURNING ${columns}`,
+          [
+            p.slug,
+            p.name,
+            p.description,
+            p.priceCents,
+            p.category,
+            p.collection,
+            JSON.stringify(p.images),
+            JSON.stringify(p.colors),
+            JSON.stringify(p.sizes),
+            p.inventory,
+            p.isActive,
+            JSON.stringify(p.metadata),
+          ],
+        );
+      });
       res.status(201).json(
         toAdminProduct(rows[0], {
           includeCost: hasPermission(req.user.role, "analytics.view"),
