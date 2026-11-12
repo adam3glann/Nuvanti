@@ -4459,6 +4459,17 @@
   overflow: visible;
   border-radius: 16px;
   background: transparent;
+  isolation: isolate;
+}
+.product-card--set .product-card__media::before {
+  content: "";
+  position: absolute;
+  inset: 7% 10%;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(183, 207, 188, .18), rgba(183, 207, 188, .07) 42%, transparent 74%);
+  filter: blur(16px);
+  pointer-events: none;
 }
 .product-card--set .product-card__media img:not(.img-alt) {
   translate: 0 0;
