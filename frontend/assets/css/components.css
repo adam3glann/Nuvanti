@@ -325,6 +325,10 @@
   transform: scaleX(1);
 }
 .primary-nav__link[href*="collection="] {
+  box-sizing: border-box;
+  min-height: 40px;
+  padding-block: 0.6rem;
+  line-height: 1.2;
   transition:
     color var(--dur-fast) var(--ease-editorial),
     scale var(--dur-fast) var(--ease-editorial);
@@ -2876,6 +2880,12 @@
   font-family: var(--font-body);
   font-size: 1rem;
   border-bottom: 1px solid var(--color-border);
+}
+.mobile-nav__submenu .mobile-nav__link[href*="collection="] {
+  box-sizing: border-box;
+  min-height: 48px;
+  padding-block: 0.75rem;
+  line-height: 1.25;
 }
 
 .menu-button__content {
