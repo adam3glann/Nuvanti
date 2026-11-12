@@ -915,6 +915,7 @@
     transform var(--dur-slow) var(--ease-editorial);
 }
 .product-card:hover .product-card__media img:not(.img-alt) {
+  opacity: 0;
   transform: scale(1.035);
 }
 .product-card__media img.img-alt {
@@ -2586,6 +2587,7 @@
     transform: none;
   }
   .product-card:hover .product-card__media img:not(.img-alt) {
+    opacity: 1;
     transform: none;
   }
   .product-card:hover .product-card__media img.img-alt {
