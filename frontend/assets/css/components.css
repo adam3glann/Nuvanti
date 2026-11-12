@@ -4348,7 +4348,6 @@
 .section--ink .product-card--set {
   position: relative;
   isolation: isolate;
-  width: 100%;
   min-width: 0;
   max-width: 100%;
   box-sizing: border-box;
