@@ -37,6 +37,7 @@ import {
   verifyTotp,
 } from "../lib/totp.js";
 import {
+  adminIpBlockStatus,
   clearAdminEmailCodeFailures,
   hashAdminEmailCode,
   recordAdminEmailCodeFailure,
@@ -227,7 +228,20 @@ router.post(
     };
     clearSession(res);
     if (STAFF_ROLES.includes(user.role)) {
-      if (await rejectBlockedAdminIp(req, res, user.id)) return;
+      // A valid password is enough to recover from an email-code lockout.
+      // Keep the email code as the second factor, but do not force a legitimate
+      // administrator to wait 24 hours after entering stale/incorrect codes.
+      if (await adminIpBlockStatus(req, user.id)) {
+        await clearAdminEmailCodeFailures(req, user.id);
+        await logAudit({
+          req,
+          actor: user,
+          action: "auth.admin_email_code_lockout_recovered",
+          targetType: "user",
+          targetId: user.id,
+          metadata: { recovery: "valid_password" },
+        });
+      }
       const challengeId = crypto.randomUUID();
       const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
       await query(
@@ -388,7 +402,7 @@ router.post(
         );
         return res.status(423).json({
           error:
-            "Three incorrect email codes temporarily blocked this admin account from this network.",
+            "Three incorrect email codes blocked this network. Enter your password again to request a fresh code.",
         });
       }
       return res.status(401).json({
@@ -525,7 +539,7 @@ router.post(
         );
         return res.status(423).json({
           error:
-            "Three incorrect verification codes temporarily blocked this admin account from this network.",
+            "Three incorrect verification codes blocked this network. Enter your password again to start a fresh sign-in.",
         });
       }
       return res.status(401).json({
