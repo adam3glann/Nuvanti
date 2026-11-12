@@ -1,5 +1,5 @@
-import { initShell } from "../main.js?v=announcement-strip-loop-2";
-import { formatPrice, escapeHtml } from "../components/productCard.js";
+import { initShell } from "../main.js?v=account-cart-sync-1";
+import { formatPrice, escapeHtml } from "../components/productCard.js?v=account-cart-sync-1";
 import { createWhatsAppUrl } from "../services/whatsapp.js";
 
 initShell({ currentPage: "" });
@@ -100,6 +100,8 @@ function renderOrder(order) {
       ${order.paymentMethod === "paymob" ? `<div class="order-detail-row"><span>Payment</span><span>${order.paymentStatus === "paid" ? "Paid online" : order.paymentStatus === "failed" ? "Payment not completed" : "Awaiting payment confirmation"}</span></div>` : order.paymentMethod === "instapay" ? `<div class="order-detail-row"><span>Payment</span><strong>${order.paymentStatus === "paid" ? "Paid" : cancelled ? "Cancelled · unpaid" : "Unpaid · transfer verification required"}</strong></div>` : ""}
     </div>
 
+    ${order.paymentMethod === "cod" && !cancelled ? `<section class="instapay-transfer-panel" style="margin-block:1rem"><h2>Confirm your Cash on Delivery order</h2>${order.customerConfirmed ? '<p class="instapay-transfer-panel__pending" role="status">Your order is confirmed. Thank you.</p>' : '<p>Please confirm that you want us to prepare and deliver this order.</p><button class="btn btn-primary" id="confirmCustomerOrder">Confirm Order</button><p id="confirmOrderStatus" role="status" aria-live="polite"></p>'}</section>` : ""}
+
     ${
       instaPending
         ? `<section class="instapay-transfer-panel" aria-labelledby="trackInstaPayTitle">
@@ -163,6 +165,18 @@ function renderOrder(order) {
           "Copy unavailable. Select the recipient details above and copy them. · تعذّر النسخ. حدّد بيانات المستلم وانسخها.";
       }
     });
+  document.getElementById("confirmCustomerOrder")?.addEventListener("click", async event => {
+    const button = event.currentTarget; button.disabled = true; button.textContent = "Confirming…";
+    try {
+      const response = await fetch(`${API}/api/orders/track/${encodeURIComponent(order.id)}/confirm`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token }) });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || "Could not confirm the order.");
+      button.parentElement.innerHTML = '<p class="instapay-transfer-panel__pending" role="status">Your order is confirmed. Thank you.</p>';
+    } catch (error) {
+      button.disabled = false; button.textContent = "Confirm Order";
+      document.getElementById("confirmOrderStatus").textContent = error.message;
+    }
+  });
 }
 
 function renderInstapayRecipient(value) {

@@ -1,7 +1,7 @@
-import { initShell } from "../main.js?v=announcement-strip-loop-2";
+import { initShell } from "../main.js?v=account-cart-sync-1";
 import { icon } from "../components/icons.js";
-import { formatPrice, escapeHtml } from "../components/productCard.js";
-import { refreshCartDrawer } from "../components/cartDrawer.js";
+import { formatPrice, escapeHtml } from "../components/productCard.js?v=account-cart-sync-1";
+import { refreshCartDrawer } from "../components/cartDrawer.js?v=account-cart-sync-1";
 import {
   getWishlist,
   removeFromWishlist,
@@ -9,7 +9,7 @@ import {
 import { fetchProducts } from "../services/productService.js";
 import { isInStock } from "../data/products.js";
 
-import { addToCart } from "../services/cartService.js";
+import { addToCart } from "../services/cartService.js?v=account-cart-sync-1";
 import { showToast } from "../components/toast.js";
 
 initShell({ currentPage: "shop" });

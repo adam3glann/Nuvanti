@@ -560,21 +560,50 @@ export async function sendOrderConfirmation({
   const orderContent = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr><td colspan="3" bgcolor="#f2f2ec" style="padding:12px 14px;background-color:#f2f2ec;border:1px solid #e4e5df;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;color:#17211d"><strong>Order NV-${escapeHtml(orderId)}</strong></td></tr>${itemRows}</table><div style="padding-top:18px">${summaryHtml}</div><div style="margin-top:18px;padding:14px;background-color:#f7f7f2;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:18px;color:#59645e"><strong style="color:#17211d">Delivering to</strong><br>${escapeHtml(address)}</div>`;
   await deliver({
     to,
-    subject: `Your Nuvanti order NV-${orderId} is confirmed`,
-    text: `Hi ${name}, thanks for your order!\n\nOrder NV-${orderId}\nItems:\n${itemLines}\n\nSubtotal: ${subtotal} EGP\n${discountLine}Shipping (${deliveryLabel}): ${shippingCost} EGP\nTotal: ${total} EGP\n\nDelivering to: ${address}\n\nTrack your order: ${trackingUrl}`,
+    subject: `We received your Nuvanti order NV-${orderId}`,
+    text: `Hi ${name}, we received your order. For Cash on Delivery, please confirm it using the secure order link below.\n\nOrder NV-${orderId}\nItems:\n${itemLines}\n\nSubtotal: ${subtotal} EGP\n${discountLine}Shipping (${deliveryLabel}): ${shippingCost} EGP\nTotal: ${total} EGP\n\nDelivering to: ${address}\n\nReview or confirm your order: ${trackingUrl}`,
     html: emailLayout({
-      preheader: `Order NV-${orderId} is confirmed. Track your Nuvanti order anytime.`,
-      eyebrow: "ORDER CONFIRMED",
-      title: `Thanks for your order, ${escapeHtml(name)}.`,
-      intro: "We’ve received your order and are getting it ready.",
+      preheader: `We received order NV-${orderId}. Review it and confirm Cash on Delivery.`,
+      eyebrow: "ORDER RECEIVED",
+      title: `Thanks, ${escapeHtml(name)}.`,
+      intro: "We’ve received your order. If you chose Cash on Delivery, please confirm it using your secure order link.",
       content: orderContent,
-      actionLabel: "TRACK YOUR ORDER",
+      actionLabel: "REVIEW OR CONFIRM ORDER",
       actionUrl: trackingUrl,
       footerNote:
         "You can also view your order details from your Nuvanti account.",
     }),
     devLabel: "Development order-confirmation email",
     devDetail: `order #${orderId}, ${trackingUrl}`,
+  });
+}
+
+export async function sendAbandonedCartReminder({ to, name, items, cartUrl }) {
+  const rows = items.map(item => {
+    const safeName = escapeHtml(item.name || "Nuvanti item");
+    const variant = item.bundleSelection
+      ? `Crewneck: ${escapeHtml(item.bundleSelection.crewneck.color)} / ${escapeHtml(item.bundleSelection.crewneck.size)}; Sweatpants: ${escapeHtml(item.bundleSelection.sweatpants.color)} / ${escapeHtml(item.bundleSelection.sweatpants.size)}`
+      : [item.color, item.size].filter(Boolean).map(escapeHtml).join(" / ");
+    const price = (Number(item.price || 0) * Number(item.quantity || 1)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return `<li style="padding:8px 0;color:#17211d">${safeName}${variant ? ` <span style="color:#66716b">(${variant})</span>` : ""} × ${Number(item.quantity)} — ${price} EGP</li>`;
+  }).join("");
+  const total = items.reduce((sum,item) => sum + Number(item.price || 0) * Number(item.quantity || 1), 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  await deliver({
+    to,
+    subject: "Your Nuvanti bag is saved",
+    text: `Hi ${name}, you left items in your Nuvanti bag. Your bag is still saved to your account.\n\n${items.map(item => `- ${item.name} x${item.quantity}`).join("\n")}\n\nCurrent estimated total: ${total} EGP\nContinue checkout: ${cartUrl}\n\nAvailability and prices are confirmed at checkout.`,
+    html: emailLayout({
+      preheader: "Your Nuvanti bag is saved to your account.",
+      eyebrow: "YOUR SAVED BAG",
+      title: `Your bag is waiting, ${escapeHtml(name)}.`,
+      intro: "You left a few items in your bag. Sign in to continue where you left off.",
+      content: `<ul style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:22px;padding-left:20px">${rows}</ul><p style="font-family:Arial,Helvetica,sans-serif;color:#17211d"><strong>Current estimated total: ${total} EGP</strong></p><p style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#66716b">Items are not reserved. Prices and availability may change before checkout.</p>`,
+      actionLabel: "RETURN TO YOUR BAG",
+      actionUrl: cartUrl,
+      footerNote: "You’re receiving this because you have an account with a saved bag. You can ignore this email if you’re no longer interested.",
+    }),
+    devLabel: "Development abandoned-cart reminder",
+    devDetail: `${items.length} cart line(s) for ${to}`,
   });
 }
 

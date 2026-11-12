@@ -17,7 +17,10 @@ function configured() {
 // bare local number — if the customer didn't include one, we skip sending
 // rather than message the wrong person.
 function toE164(phone) {
-  const cleaned = String(phone || "").replace(/[\s()-]/g, "");
+  let cleaned = String(phone || "").replace(/[\s()-]/g, "");
+  if (cleaned.startsWith("00")) cleaned = `+${cleaned.slice(2)}`;
+  if (/^01[0125]\d{8}$/.test(cleaned)) cleaned = `+20${cleaned.slice(1)}`;
+  if (/^1[0125]\d{8}$/.test(cleaned)) cleaned = `+20${cleaned}`;
   return /^\+[1-9]\d{7,14}$/.test(cleaned) ? cleaned : null;
 }
 

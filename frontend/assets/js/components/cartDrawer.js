@@ -9,7 +9,7 @@ import {
   amountToFreeShipping,
   freeShippingProgress,
   FREE_SHIPPING_THRESHOLD,
-} from "../services/cartService.js";
+} from "../services/cartService.js?v=account-cart-sync-1";
 import { refreshHeaderCounts } from "./header.js";
 
 let mounted = false;

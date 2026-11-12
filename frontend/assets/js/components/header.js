@@ -1,6 +1,6 @@
 import { icon } from "./icons.js";
 import { mainNav } from "../data/navigation.js";
-import { cartCount } from "../services/cartService.js";
+import { cartCount } from "../services/cartService.js?v=account-cart-sync-1";
 import { getWishlist } from "../services/wishlistService.js";
 import { openCartDrawer } from "./cartDrawer.js";
 import { fetchMenuLinks } from "../services/productService.js";

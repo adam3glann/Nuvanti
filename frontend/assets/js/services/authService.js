@@ -1,5 +1,6 @@
 // A short-lived UI mirror only. The HTTP-only API cookie remains the authority.
 import { API_ORIGIN as API } from "../config.js";
+import { initializeAccountCart, disconnectAccountCart } from "./cartService.js?v=account-cart-sync-1";
 const STORAGE_KEY = "nuvanti_customer_display_session";
 export function getSession() {
   try {
@@ -37,14 +38,17 @@ async function request(path, payload) {
   return body;
 }
 export async function login(email, password) {
-  return store((await request("/api/auth/login", { email, password })).user);
+  const user = store((await request("/api/auth/login", { email, password })).user);
+  await initializeAccountCart();
+  return user;
 }
 export async function register(name, email, password) {
-  return store(
-    (await request("/api/auth/register", { name, email, password })).user,
-  );
+  const user = store((await request("/api/auth/register", { name, email, password })).user);
+  await initializeAccountCart();
+  return user;
 }
 export async function logout() {
+  disconnectAccountCart({ clearLocal: true });
   clearDisplaySession();
   await fetch(`${API}/api/auth/logout`, {
     method: "POST",

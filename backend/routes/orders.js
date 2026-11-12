@@ -584,6 +584,7 @@ router.post(
             ],
           );
         }
+        if (orderUserId) await client.query("DELETE FROM customer_carts WHERE user_id = $1", [orderUserId]);
         return {
           order: rows[0],
           registeredUser,
@@ -748,7 +749,7 @@ router.post(
     if (paymentMethod === "cod" && shipping.phone) {
       sendOrderWhatsApp({
         phone: shipping.phone,
-        message: `Hi ${shipping.name}, your Nuvanti order #${order.id} is confirmed! Track it here: ${trackingUrl}`,
+        message: `Hi ${shipping.name}, we received your Nuvanti Cash on Delivery order NV-${order.id}. Please confirm it using the secure button on your order page: ${trackingUrl}`,
       }).catch((error) =>
         console.error("Order confirmation WhatsApp failed:", error),
       );
@@ -813,7 +814,7 @@ router.get("/track/:id", trackLimiter, async (req, res) => {
   if (!Number.isInteger(id) || !token)
     return res.status(400).json({ error: "Invalid tracking link." });
   const { rows } = await query(
-    `SELECT o.id, o.status, o.payment_status AS "paymentStatus", o.payment_method AS "paymentMethod", o.delivery, o.total_cents AS "totalCents", o.created_at AS "createdAt", o.shipping_address AS "shippingAddress", o.tracking_token AS "trackingToken",
+    `SELECT o.id, o.status, o.payment_status AS "paymentStatus", o.payment_method AS "paymentMethod", o.customer_confirmed_at AS "customerConfirmedAt", o.delivery, o.total_cents AS "totalCents", o.created_at AS "createdAt", o.shipping_address AS "shippingAddress", o.tracking_token AS "trackingToken",
     CASE WHEN o.payment_method = 'instapay' THEN coalesce(o.instapay_recipient_snapshot, (SELECT CASE WHEN s.instapay_enabled AND s.updated_at <= o.created_at THEN s.instapay_recipient END FROM store_settings s WHERE s.id = 1)) END AS "instapayRecipient",
     CASE WHEN o.payment_method = 'instapay' THEN coalesce(o.instapay_whatsapp_phone_snapshot, (SELECT NULLIF(s.instapay_whatsapp_phone, '') FROM store_settings s WHERE s.id = 1)) END AS "instapayWhatsappPhone"
     FROM orders o WHERE o.id = $1`,
@@ -841,6 +842,7 @@ router.get("/track/:id", trackLimiter, async (req, res) => {
       status: order.status,
       paymentStatus: order.paymentStatus,
       paymentMethod: order.paymentMethod,
+      customerConfirmed: Boolean(order.customerConfirmedAt),
       instapayRecipient: order.instapayRecipient,
       instapayWhatsappPhone: order.instapayWhatsappPhone,
       delivery: order.delivery,
@@ -851,5 +853,19 @@ router.get("/track/:id", trackLimiter, async (req, res) => {
       items,
     });
 });
+
+router.post("/track/:id/confirm", trackLimiter, asyncRoute(async (req, res) => {
+  const id = Number(req.params.id);
+  const token = z.string().min(32).max(128).parse(req.body?.token);
+  if (!Number.isSafeInteger(id) || id < 1) return res.status(400).json({ error: "Invalid order link." });
+  const { rows } = await query(
+    `UPDATE orders SET customer_confirmed_at = COALESCE(customer_confirmed_at, NOW())
+     WHERE id = $1 AND tracking_token = $2 AND payment_method = 'cod' AND status <> 'cancelled'
+     RETURNING customer_confirmed_at AS "confirmedAt"`,
+    [id, token],
+  );
+  if (!rows[0]) return res.status(404).json({ error: "This Cash on Delivery order could not be confirmed. Check the secure link or contact the store." });
+  res.json({ confirmed: true, confirmedAt: rows[0].confirmedAt });
+}));
 
 export default router;

@@ -1,7 +1,7 @@
 import { icon } from "./icons.js";
 import { colorHex, isInStock } from "../data/products.js";
 import { toggleWishlist, isWishlisted } from "../services/wishlistService.js";
-import { addToCart } from "../services/cartService.js";
+import { addToCart } from "../services/cartService.js?v=account-cart-sync-1";
 import { showToast } from "./toast.js";
 import { initScrollReveal } from "./scrollReveal.js";
 

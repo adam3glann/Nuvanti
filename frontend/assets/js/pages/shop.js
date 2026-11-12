@@ -1,11 +1,11 @@
-import { initShell } from "../main.js?v=announcement-strip-loop-2";
+import { initShell } from "../main.js?v=account-cart-sync-1";
 import { icon } from "../components/icons.js";
 import {
   productCardHTML,
   bindProductCardEvents,
   escapeHtml,
-} from "../components/productCard.js";
-import { refreshCartDrawer } from "../components/cartDrawer.js";
+} from "../components/productCard.js?v=account-cart-sync-1";
+import { refreshCartDrawer } from "../components/cartDrawer.js?v=account-cart-sync-1";
 import { fetchCategories, fetchProducts } from "../services/productService.js";
 import { categories as localCategories } from "../data/categories.js";
 import { colorHex } from "../data/products.js";

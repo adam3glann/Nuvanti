@@ -1,13 +1,13 @@
 import {
   initShell,
   initScrollReveal,
-} from "../main.js?v=announcement-strip-loop-2";
+} from "../main.js?v=account-cart-sync-1";
 import { icon } from "../components/icons.js";
 import {
   productCardHTML,
   bindProductCardEvents,
-} from "../components/productCard.js";
-import { refreshCartDrawer } from "../components/cartDrawer.js";
+} from "../components/productCard.js?v=account-cart-sync-1";
+import { refreshCartDrawer } from "../components/cartDrawer.js?v=account-cart-sync-1";
 import {
   subscribeToNewsletter,
   unsubscribeFromNewsletter,

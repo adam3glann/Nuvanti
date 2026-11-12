@@ -1454,7 +1454,7 @@ router.get(
         ? 100
         : z.coerce.number().int().min(1).max(100).parse(req.query.limit);
     const { rows } = await query(
-      `SELECT o.id, o.status, o.payment_status AS "paymentStatus", o.payment_transaction_id AS "paymentTransactionId", o.total_cents AS "totalCents", o.subtotal_cents AS "subtotalCents", o.shipping_cents AS "shippingCents", o.delivery, o.payment_method AS "paymentMethod", o.created_at AS "createdAt", o.shipping_address AS "shippingAddress", coalesce(u.email, o.shipping_address->>'email') AS email, coalesce(u.name, o.shipping_address->>'name') AS name,
+      `SELECT o.id, o.status, o.payment_status AS "paymentStatus", o.customer_confirmed_at AS "customerConfirmedAt", o.payment_transaction_id AS "paymentTransactionId", o.total_cents AS "totalCents", o.subtotal_cents AS "subtotalCents", o.shipping_cents AS "shippingCents", o.delivery, o.payment_method AS "paymentMethod", o.created_at AS "createdAt", o.shipping_address AS "shippingAddress", coalesce(u.email, o.shipping_address->>'email') AS email, coalesce(u.name, o.shipping_address->>'name') AS name,
     coalesce(json_agg(json_build_object('productId', i.product_id, 'name', i.product_name, 'price', i.unit_price_cents::numeric / 100, 'quantity', i.quantity, 'color', i.color, 'size', i.size, 'image', i.image_url)) FILTER (WHERE i.id IS NOT NULL), '[]') AS items
     FROM orders o LEFT JOIN users u ON u.id = o.user_id LEFT JOIN order_items i ON i.order_id = o.id GROUP BY o.id, u.email, u.name ORDER BY o.created_at DESC LIMIT $1`,
       [limit],
@@ -1467,6 +1467,7 @@ function mapAdminOrder(row) {
     id: `NV-${row.id}`,
     dbId: String(row.id),
     status: row.status,
+    customerConfirmedAt: row.customerConfirmedAt || null,
     paymentStatus:
       row.paymentStatus ||
       (["paid", "fulfilled"].includes(row.status) ? "paid" : "pending"),
@@ -1504,7 +1505,7 @@ router.get(
       .positive()
       .parse(String(req.params.id).replace(/^NV-/i, ""));
     const { rows } = await query(
-      `SELECT o.id, o.status, o.payment_status AS "paymentStatus", o.payment_transaction_id AS "paymentTransactionId", o.total_cents AS "totalCents", o.subtotal_cents AS "subtotalCents", o.shipping_cents AS "shippingCents", o.delivery, o.payment_method AS "paymentMethod", o.created_at AS "createdAt", o.shipping_address AS "shippingAddress", coalesce(u.email, o.shipping_address->>'email') AS email, coalesce(u.name, o.shipping_address->>'name') AS name,
+      `SELECT o.id, o.status, o.payment_status AS "paymentStatus", o.customer_confirmed_at AS "customerConfirmedAt", o.payment_transaction_id AS "paymentTransactionId", o.total_cents AS "totalCents", o.subtotal_cents AS "subtotalCents", o.shipping_cents AS "shippingCents", o.delivery, o.payment_method AS "paymentMethod", o.created_at AS "createdAt", o.shipping_address AS "shippingAddress", coalesce(u.email, o.shipping_address->>'email') AS email, coalesce(u.name, o.shipping_address->>'name') AS name,
         coalesce(json_agg(json_build_object('productId', i.product_id, 'name', i.product_name, 'price', i.unit_price_cents::numeric / 100, 'quantity', i.quantity, 'color', i.color, 'size', i.size, 'image', i.image_url)) FILTER (WHERE i.id IS NOT NULL), '[]') AS items
         FROM orders o LEFT JOIN users u ON u.id = o.user_id LEFT JOIN order_items i ON i.order_id = o.id WHERE o.id = $1 GROUP BY o.id, u.email, u.name`,
       [id],

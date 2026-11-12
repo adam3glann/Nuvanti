@@ -1,4 +1,4 @@
-import { initShell } from "../main.js?v=announcement-strip-loop-2";
+import { initShell } from "../main.js?v=account-cart-sync-1";
 import { icon } from "../components/icons.js";
 
 initShell({ currentPage: "faq" });

@@ -15,6 +15,7 @@ import navigationRouter from "./routes/navigation.js";
 import storefrontRouter from "./routes/storefront.js";
 import newsletterRouter from "./routes/newsletter.js";
 import ordersRouter from "./routes/orders.js";
+import cartRouter from "./routes/cart.js";
 import addressesRouter from "./routes/addresses.js";
 import contactRouter from "./routes/contact.js";
 import authRouter from "./routes/auth.js";
@@ -35,6 +36,7 @@ import { trustRailwayClientIp } from "./lib/clientIp.js";
 import { emailDeliveryStatus } from "./lib/mail.js";
 import { hasPermission } from "./lib/permissions.js";
 import { expireAbandonedOrders } from "./lib/orderLifecycle.js";
+import { sendAbandonedCartReminders } from "./lib/cartReminders.js";
 import {
   cleanupStorefrontPresence,
   flushStorefrontPageViews,
@@ -382,6 +384,7 @@ app.use("/api/navigation", navigationRouter);
 app.use("/api/storefront", storefrontRouter);
 app.use("/api/newsletter", newsletterRouter);
 app.use("/api/orders", ordersRouter);
+app.use("/api/cart", cartRouter);
 app.use("/api/addresses", addressesRouter);
 app.use("/api/contact", contactRouter);
 app.use(
@@ -544,6 +547,10 @@ if (isProduction) {
   const orderExpiryTimer = setInterval(sweepExpiredOrders, 60 * 1000);
   orderExpiryTimer.unref();
   sweepExpiredOrders();
+  const sendCartReminders = () => sendAbandonedCartReminders().catch(error => console.error("Unable to send abandoned-cart reminders:", error));
+  const cartReminderTimer = setInterval(sendCartReminders, 10 * 60 * 1000);
+  cartReminderTimer.unref();
+  sendCartReminders();
 }
 if (process.env.NODE_ENV === "production") {
   // Production exposes one service port for both the API and protected admin.

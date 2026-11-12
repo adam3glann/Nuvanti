@@ -1,5 +1,5 @@
-import { initShell } from "../main.js?v=announcement-strip-loop-2";
-import { formatPrice } from "../components/productCard.js";
+import { initShell } from "../main.js?v=account-cart-sync-1";
+import { formatPrice } from "../components/productCard.js?v=account-cart-sync-1";
 import {
   getCart,
   cartSubtotal,
@@ -8,11 +8,12 @@ import {
   onCartChange,
   syncCartWithProducts,
   updateQuantity,
-} from "../services/cartService.js";
+  initializeAccountCart,
+} from "../services/cartService.js?v=account-cart-sync-1";
 import { createOrder } from "../services/orderService.js?v=delivery-address-details-2";
-import { getCurrentUser } from "../services/authService.js";
+import { getCurrentUser } from "../services/authService.js?v=account-cart-sync-1";
 import { showToast } from "../components/toast.js";
-import { refreshCartDrawer } from "../components/cartDrawer.js";
+import { refreshCartDrawer } from "../components/cartDrawer.js?v=account-cart-sync-1";
 import {
   checkDiscount,
   getSavedDiscountCode,
@@ -46,11 +47,7 @@ let checkoutCartRevision = 0;
 let checkoutOrderPlaced = false;
 
 let lines = getCart();
-if (lines.length === 0) {
-  window.location.href = "cart.html";
-} else {
-  initializeCheckout();
-}
+initializeCheckout();
 
 async function initializeCheckout() {
   const form = document.getElementById("checkoutForm");
@@ -58,6 +55,9 @@ async function initializeCheckout() {
   form.innerHTML =
     '<div class="state-block"><h3>Preparing secure checkout</h3><p>Loading your account and current delivery rates.</p></div>';
   try {
+    await initializeAccountCart();
+    lines = getCart();
+    if (!lines.length) { window.location.href = "cart.html"; return; }
     const initialProducts = await Promise.all(
       [...new Set(lines.map((line) => line.slug))].map(fetchProductBySlug),
     );

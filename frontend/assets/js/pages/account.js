@@ -1,5 +1,5 @@
-import { initShell } from "../main.js?v=announcement-strip-loop-2";
-import { formatPrice } from "../components/productCard.js";
+import { initShell } from "../main.js?v=account-cart-sync-1";
+import { formatPrice } from "../components/productCard.js?v=account-cart-sync-1";
 import {
   getSession,
   getCurrentUser,
@@ -11,7 +11,7 @@ import {
   confirmPasswordReset,
   confirmEmailVerification,
   requestEmailVerification,
-} from "../services/authService.js";
+} from "../services/authService.js?v=account-cart-sync-1";
 import { fetchMyOrders } from "../services/orderService.js";
 import {
   fetchAddresses,

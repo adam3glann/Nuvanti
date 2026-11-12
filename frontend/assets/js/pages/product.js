@@ -1,4 +1,4 @@
-import { initShell } from "../main.js?v=announcement-strip-loop-2";
+import { initShell } from "../main.js?v=account-cart-sync-1";
 import { icon } from "../components/icons.js";
 
 import {
@@ -6,9 +6,9 @@ import {
   bindProductCardEvents,
   formatPrice,
   escapeHtml,
-} from "../components/productCard.js";
+} from "../components/productCard.js?v=account-cart-sync-1";
 
-import { refreshCartDrawer, openCartDrawer } from "../components/cartDrawer.js";
+import { refreshCartDrawer, openCartDrawer } from "../components/cartDrawer.js?v=account-cart-sync-1";
 
 import { createModal } from "../components/modal.js";
 import { showToast } from "../components/toast.js";
@@ -20,7 +20,7 @@ import {
 
 import { colorHex, stockFor, isInStock } from "../data/products.js";
 
-import { addToCart, addBundleToCart, variantStockRemaining } from "../services/cartService.js";
+import { addToCart, addBundleToCart, variantStockRemaining } from "../services/cartService.js?v=account-cart-sync-1";
 
 import { toggleWishlist, isWishlisted } from "../services/wishlistService.js";
 import { startLiveRefresh } from "../services/liveRefresh.js";

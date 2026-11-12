@@ -1,17 +1,17 @@
 import {
   renderHeader,
   refreshHeaderCounts,
-} from "./components/header.js?v=store-theme-1";
+} from "./components/header.js?v=account-cart-sync-1";
 import { renderFooter } from "./components/footer.js";
-import { mountCartDrawer, refreshCartDrawer } from "./components/cartDrawer.js";
+import { mountCartDrawer, refreshCartDrawer } from "./components/cartDrawer.js?v=account-cart-sync-1";
 import { initScrollReveal } from "./components/scrollReveal.js";
-import { onCartChange } from "./services/cartService.js";
+import { onCartChange, initializeAccountCart } from "./services/cartService.js?v=account-cart-sync-1";
 import { onWishlistChange } from "./services/wishlistService.js";
 import {
   loadStoreSettings,
   refreshStoreSettings,
 } from "./services/storeSettingsService.js";
-import { configureFreeShippingThreshold } from "./services/cartService.js";
+import { configureFreeShippingThreshold } from "./services/cartService.js?v=account-cart-sync-1";
 import { startStorePresence } from "./services/presenceService.js";
 import { startLiveRefresh } from "./services/liveRefresh.js";
 import { applyStoreTheme } from "./services/storeThemeService.js";
@@ -49,6 +49,7 @@ export function initShell({
   renderHeader({ transparentOnHero: transparentHeader, currentPage });
   renderFooter();
   mountCartDrawer();
+  initializeAccountCart().catch(() => {});
 
   onCartChange(() => {
     refreshCartDrawer();

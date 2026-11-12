@@ -1,7 +1,7 @@
-import { initShell } from "../main.js?v=announcement-strip-loop-2";
+import { initShell } from "../main.js?v=account-cart-sync-1";
 import { icon } from "../components/icons.js";
-import { formatPrice, escapeHtml } from "../components/productCard.js";
-import { refreshCartDrawer } from "../components/cartDrawer.js";
+import { formatPrice, escapeHtml } from "../components/productCard.js?v=account-cart-sync-1";
+import { refreshCartDrawer } from "../components/cartDrawer.js?v=account-cart-sync-1";
 import {
   getCart,
   updateQuantity,
@@ -11,7 +11,8 @@ import {
   syncCartWithProducts,
   canIncreaseQuantity,
   variantStock,
-} from "../services/cartService.js";
+  initializeAccountCart,
+} from "../services/cartService.js?v=account-cart-sync-1";
 import {
   loadStoreSettings,
   refreshStoreSettings,
@@ -44,6 +45,7 @@ initializeCart();
 
 async function initializeCart() {
   try {
+    await initializeAccountCart();
     const initialLines = getCart();
     const currentProducts = await Promise.all(
       [...new Set(initialLines.map((line) => line.slug))].map(

@@ -1,7 +1,9 @@
 // cartService — local-state cart, structured so `add/remove/updateQty`
 // can later dispatch to a Node API (POST /cart, PATCH /cart/:lineId, etc.)
 // instead of writing to localStorage.
+import { API_ORIGIN as API } from "../config.js";
 const STORAGE_KEY = "nuvanti_cart_v1";
+const ACCOUNT_KEY = "nuvanti_cart_account_v1";
 let FREE_SHIPPING_THRESHOLD = 3000;
 
 export function configureFreeShippingThreshold(value) {
@@ -10,6 +12,12 @@ export function configureFreeShippingThreshold(value) {
 
 let listeners = [];
 let latestCatalog = new Map();
+let accountCartReady = false;
+let pendingAccountSync = null;
+let accountPoll = null;
+let applyRemoteCart = false;
+let accountInitialization = null;
+let accountGeneration = 0;
 
 function read() {
   try {
@@ -66,6 +74,72 @@ function write(lines) {
     /* Keep this tab's UI responsive if browser storage is unavailable. */
   }
   listeners.forEach((fn) => fn(lines));
+  if (accountCartReady && !applyRemoteCart) {
+    clearTimeout(pendingAccountSync);
+    pendingAccountSync = setTimeout(() => saveAccountCart(lines), 450);
+  }
+}
+
+async function fetchAccountCart() {
+  const response = await fetch(`${API}/api/cart`, { credentials: "include", cache: "no-store" });
+  if (!response.ok) throw new Error("Account cart unavailable");
+  return await response.json();
+}
+
+async function saveAccountCart(lines) {
+  try {
+    const response = await fetch(`${API}/api/cart`, { method: "PUT", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items: lines }) });
+    if (response.status === 401) accountCartReady = false;
+  } catch { /* Local cart remains usable; next page load will retry. */ }
+}
+
+export function initializeAccountCart() {
+  if (accountInitialization) return accountInitialization;
+  accountInitialization = initializeAccountCartOnce().finally(() => { accountInitialization = null; });
+  return accountInitialization;
+}
+
+async function initializeAccountCartOnce() {
+  const generation = accountGeneration;
+  try {
+    const remoteData = await fetchAccountCart();
+    if (generation !== accountGeneration) return false;
+    const remote = remoteData.items || [];
+    const local = read();
+    const byId = new Map(remote.map(item => [normalizeLine(item)?.lineId, normalizeLine(item)]).filter(([id, item]) => id && item));
+    let priorAccount = ""; try { priorAccount = localStorage.getItem(ACCOUNT_KEY) || ""; } catch {}
+    for (const raw of (!priorAccount ? local : [])) {
+      const item = normalizeLine(raw); if (!item) continue;
+      const prior = byId.get(item.lineId);
+      if (prior) prior.quantity = Math.min(10, prior.quantity + item.quantity);
+      else byId.set(item.lineId, item);
+    }
+    const merged = [...byId.values()].slice(0, 30);
+    try { localStorage.setItem(ACCOUNT_KEY, String(remoteData.userId)); } catch {}
+    applyRemoteCart = true; write(merged); applyRemoteCart = false;
+    accountCartReady = true;
+    await saveAccountCart(merged);
+    clearInterval(accountPoll);
+    accountPoll = setInterval(async () => {
+      if (!accountCartReady || generation !== accountGeneration || document.visibilityState === "hidden" || pendingAccountSync) return;
+      try {
+        const current = await fetchAccountCart();
+        const normalized = (current.items || []).map(normalizeLine).filter(Boolean).slice(0,30);
+        if (JSON.stringify(normalized) !== JSON.stringify(read())) {
+          applyRemoteCart = true; write(normalized); applyRemoteCart = false;
+        }
+      } catch { accountCartReady = false; clearInterval(accountPoll); }
+    }, 15000);
+    return true;
+  } catch {
+    accountCartReady = false;
+    return false;
+  }
+}
+
+export function disconnectAccountCart({ clearLocal = false } = {}) {
+  accountGeneration += 1; accountCartReady = false; clearTimeout(pendingAccountSync); clearInterval(accountPoll);
+  if (clearLocal) { try { localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(ACCOUNT_KEY); } catch {} listeners.forEach(fn => fn([])); }
 }
 
 export function onCartChange(fn) {

@@ -1,4 +1,4 @@
-import { getCurrentUser } from "../services/authService.js";
+import { getCurrentUser } from "../services/authService.js?v=account-cart-sync-1";
 
 const DISMISSAL_KEY = "nuvanti_signup_offer_dismissed_until";
 const DISMISSAL_MS = 7 * 24 * 60 * 60 * 1000;

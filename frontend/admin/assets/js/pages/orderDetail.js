@@ -77,6 +77,7 @@ function render(order) {
           <div class="card-pad" style="font-size:.85rem;display:flex;flex-direction:column;gap:.5rem">
             <div style="display:flex;justify-content:space-between"><span class="text-muted" style="color:var(--a-muted)">Method</span><span>${order.paymentMethod}</span></div>
             <div style="display:flex;justify-content:space-between"><span style="color:var(--a-muted)">Status</span>${statusBadge(order.paymentStatus)}</div>
+            ${order.paymentMethodCode === 'cod' ? `<div style="display:flex;justify-content:space-between"><span style="color:var(--a-muted)">Customer confirmation</span><span>${order.customerConfirmedAt ? `Confirmed ${formatDateTime(order.customerConfirmedAt)}` : 'Awaiting customer'}</span></div>` : ''}
             <div style="display:flex;justify-content:space-between"><span style="color:var(--a-muted)">Transaction Ref</span><span class="mono">${order.transactionRef || '—'}</span></div>
           </div>
         </div>
