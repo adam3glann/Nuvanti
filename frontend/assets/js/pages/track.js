@@ -1,5 +1,5 @@
 import { initShell } from "../main.js?v=account-cart-sync-1";
-import { formatPrice, escapeHtml } from "../components/productCard.js?v=account-cart-sync-1";
+import { formatPrice, escapeHtml } from "../components/productCard.js?v=set-effects-v4";
 import { createWhatsAppUrl } from "../services/whatsapp.js";
 
 initShell({ currentPage: "" });

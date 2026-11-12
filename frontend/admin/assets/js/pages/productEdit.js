@@ -90,11 +90,11 @@ function renderForm(product, cats, cols, products) {
           <div class="card-pad">
             <p class="hint" style="margin-bottom:.75rem">Customize the outer border and animated glow shown on this set in the shop.</p>
             <div class="field-row3">
-              <div class="field"><label for="fSetCardStyle">Outline</label><select id="fSetCardStyle"><option value="none" ${product.setCardStyle === 'none' ? 'selected' : ''}>None</option><option value="outline" ${product.setCardStyle === 'outline' ? 'selected' : ''}>Color outline</option><option value="neon" ${product.setCardStyle === 'neon' ? 'selected' : ''}>Neon outline</option></select></div>
-              <div class="field"><label for="fSetCardEffect">Glow effect</label><select id="fSetCardEffect"><option value="none" ${product.setCardEffect === 'none' ? 'selected' : ''}>None</option><option value="fire" ${product.setCardEffect === 'fire' ? 'selected' : ''}>Fire</option><option value="ice" ${product.setCardEffect === 'ice' ? 'selected' : ''}>Ice</option><option value="aurora" ${product.setCardEffect === 'aurora' ? 'selected' : ''}>Aurora</option></select></div>
+              <div class="field"><label for="fSetCardStyle">Outline</label><select id="fSetCardStyle"><option value="none" ${product.setCardStyle === 'none' ? 'selected' : ''}>None</option><option value="outline" ${product.setCardStyle === 'outline' ? 'selected' : ''}>Color outline</option><option value="neon" ${product.setCardStyle === 'neon' ? 'selected' : ''}>Neon outline</option><option value="double" ${product.setCardStyle === 'double' ? 'selected' : ''}>Double outline</option><option value="gradient" ${product.setCardStyle === 'gradient' ? 'selected' : ''}>Gradient outline</option></select></div>
+              <div class="field"><label for="fSetCardEffect">Glow effect</label><select id="fSetCardEffect"><option value="none" ${product.setCardEffect === 'none' ? 'selected' : ''}>None</option><option value="fire" ${product.setCardEffect === 'fire' ? 'selected' : ''}>Fire</option><option value="ice" ${product.setCardEffect === 'ice' ? 'selected' : ''}>Ice</option><option value="aurora" ${product.setCardEffect === 'aurora' ? 'selected' : ''}>Aurora</option><option value="electric" ${product.setCardEffect === 'electric' ? 'selected' : ''}>Electric</option><option value="ember" ${product.setCardEffect === 'ember' ? 'selected' : ''}>Ember</option><option value="ocean" ${product.setCardEffect === 'ocean' ? 'selected' : ''}>Ocean</option><option value="prism" ${product.setCardEffect === 'prism' ? 'selected' : ''}>Prism</option><option value="gold" ${product.setCardEffect === 'gold' ? 'selected' : ''}>Gold</option></select></div>
               <div class="field"><label for="fSetCardAccent">Accent color</label><input type="color" id="fSetCardAccent" value="${esc(product.setCardAccent || '#b87333')}" /></div>
             </div>
-            <div class="field"><label for="fSetCardIntensity">Effect intensity <span id="fSetCardIntensityValue">${Number(product.setCardIntensity) || 1}</span></label><input type="range" id="fSetCardIntensity" min="1" max="3" step="1" value="${Number(product.setCardIntensity) || 1}" /></div>
+            <div class="field"><label for="fSetCardIntensity">Effect intensity <span id="fSetCardIntensityValue">${Math.min(5, Math.max(1, Number(product.setCardIntensity) || 1))}</span>/5</label><input type="range" id="fSetCardIntensity" min="1" max="5" step="1" value="${Math.min(5, Math.max(1, Number(product.setCardIntensity) || 1))}" /><small class="hint">Intensity is saved with the product. Refresh the shop card after saving to see the selected strength.</small></div>
           </div>
         </div>
 
@@ -132,7 +132,7 @@ function renderForm(product, cats, cols, products) {
             <div class="field"><label>Measurement table (one row per size)</label>
               <div class="field-row"><input id="guideColumns" aria-label="Measurement columns" placeholder="Chest (cm), Length (cm)" value="${esc((product.sizeGuideMeasurements?.columns || []).join(', '))}" /></div>
               <div id="guideRows"></div>
-              <small class="hint">Enter column names separated by commas. Garment measurements should be in cm (laid flat). For an automatic height/weight recommendation, add columns such as “Height range (cm)” and “Weight range (kg)” with ranges like “160-170” and “55-65” in each size row.</small>
+              <small class="hint">Label each measurement clearly: use “Chest circumference (cm)” for a full-around value, or “Chest width laid flat (cm)” for a flat width (the calculator doubles flat widths). Customer measurements are taken around the body. To recommend by height/weight alone, add matching range columns and ranges for every size.</small>
             </div>
           </div>
         </div>
@@ -213,9 +213,12 @@ function renderForm(product, cats, cols, products) {
     document.getElementById('setComponentFields').style.display = isSet.checked ? 'grid' : 'none';
     document.getElementById('setCardStyleCard').style.display = isSet.checked ? 'block' : 'none';
   });
-  document.getElementById('fSetCardIntensity')?.addEventListener('input', (event) => {
+  const intensityInput = document.getElementById('fSetCardIntensity');
+  const updateIntensityLabel = (event) => {
     document.getElementById('fSetCardIntensityValue').textContent = event.target.value;
-  });
+  };
+  intensityInput?.addEventListener('input', updateIntensityLabel);
+  intensityInput?.addEventListener('change', updateIntensityLabel);
 
   for (const field of ['fPrice', 'fCompare', 'fCost']) {
     const input = document.getElementById(field);

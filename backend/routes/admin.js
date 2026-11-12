@@ -175,10 +175,10 @@ const productFields = z.object({
         !bundle || bundle.crewneckProductId !== bundle.sweatpantsProductId,
       "Choose two different products for the set.",
     ),
-  setCardStyle: z.enum(["none", "outline", "neon"]).optional(),
-  setCardEffect: z.enum(["none", "fire", "ice", "aurora"]).optional(),
+  setCardStyle: z.enum(["none", "outline", "neon", "double", "gradient"]).optional(),
+  setCardEffect: z.enum(["none", "fire", "ice", "aurora", "electric", "ember", "ocean", "prism", "gold"]).optional(),
   setCardAccent: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
-  setCardIntensity: z.coerce.number().int().min(1).max(3).optional(),
+  setCardIntensity: z.coerce.number().int().min(1).max(5).optional(),
 });
 const productInput = productFields.refine(
   (value) => value.price !== undefined || value.priceCents !== undefined,

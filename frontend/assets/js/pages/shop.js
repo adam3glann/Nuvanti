@@ -4,7 +4,7 @@ import {
   productCardHTML,
   bindProductCardEvents,
   escapeHtml,
-} from "../components/productCard.js?v=account-cart-sync-1";
+} from "../components/productCard.js?v=set-effects-v4";
 import { refreshCartDrawer } from "../components/cartDrawer.js?v=account-cart-sync-1";
 import { fetchCategories, fetchProducts } from "../services/productService.js";
 import { categories as localCategories } from "../data/categories.js";

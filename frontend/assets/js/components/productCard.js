@@ -36,7 +36,7 @@ export function productCardHTML(product, index = 0) {
   const style = product.setCardStyle || "none", effect = product.setCardEffect || "none";
   const accent = /^#[0-9a-f]{6}$/i.test(product.setCardAccent || "") ? product.setCardAccent : "#d8a94c";
   return `
-    <article class="product-card reveal ${isSet ? `product-card--set set-card--${style} set-effect--${effect}` : ""}" data-product-id="${escapeHtml(product.id)}" style="--card-order:${Math.min(Number(index) || 0, 7)};--set-accent:${accent};--set-intensity:${Math.min(3,Math.max(1,Number(product.setCardIntensity)||1))}">
+    <article class="product-card reveal ${isSet ? `product-card--set set-card--${style} set-effect--${effect}` : ""}" data-product-id="${escapeHtml(product.id)}" style="--card-order:${Math.min(Number(index) || 0, 7)};--set-accent:${accent};--set-intensity:${Math.min(5,Math.max(1,Number(product.setCardIntensity)||1))}">
       <a href="product.html?slug=${slug}" class="product-card__media" aria-label="View ${name}">
         <img src="${escapeHtml(image)}" alt="${name}" loading="lazy" width="600" height="750" />
         <img src="${escapeHtml(alt)}" alt="" class="img-alt" loading="lazy" width="600" height="750" />

@@ -6,7 +6,7 @@ import {
   bindProductCardEvents,
   formatPrice,
   escapeHtml,
-} from "../components/productCard.js?v=account-cart-sync-1";
+} from "../components/productCard.js?v=set-effects-v4";
 
 import { refreshCartDrawer, openCartDrawer } from "../components/cartDrawer.js?v=account-cart-sync-1";
 
@@ -1591,7 +1591,7 @@ function bindSizeAdvisor(containerId, columns, rows, advisorProduct = product, a
           return null;
         let totalScore = 0;
         let used = 0;
-        let tooSmall = false;
+        const fitWarnings = [];
         for (const item of profile) {
           const raw = String(row.values?.[item.columnIndex] || "").replace(
             ",",
@@ -1625,16 +1625,22 @@ function bindSizeAdvisor(containerId, columns, rows, advisorProduct = product, a
           let garment = Number(numberMatch[0]);
           const inches = /\b(in|inch|inches)\b/.test(column);
           if (inches) garment *= 2.54;
-          const alreadyCircumference = /circumference|around|full/.test(column);
-          if (!alreadyCircumference) garment *= 2;
+          const explicitCircumference = /circumference|around|full/.test(column);
+          const explicitlyLaidFlat = /laid\s*flat|pit\s*to\s*pit|\bwidth\b|\bacross\b/.test(column);
+          const likelyCircumference =
+            (measurement.key === "chest" && garment >= 80) ||
+            (measurement.key === "waist" && garment >= 70) ||
+            (measurement.key === "hips" && garment >= 85);
+          const isCircumference = explicitCircumference || (!explicitlyLaidFlat && likelyCircumference);
+          if (!isCircumference) garment *= 2;
           const ease = garment - measurement.value;
-          if (ease < 0) tooSmall = true;
+          if (ease < targetEase) fitWarnings.push({ label: measurement.label, ease, targetEase });
           const deficit = Math.max(0, targetEase - ease);
           totalScore += Math.abs(ease - targetEase) + deficit * 2;
           used += 1;
         }
         return used
-          ? { size: String(row.size), score: totalScore / used, tooSmall }
+          ? { size: String(row.size), score: totalScore / used, fitWarnings }
           : null;
       })
       .filter(Boolean)
@@ -1645,15 +1651,23 @@ function bindSizeAdvisor(containerId, columns, rows, advisorProduct = product, a
       return;
     }
     const best = ranked[0];
-    onRecommendation?.(best.size);
+    if (!best.fitWarnings.length) onRecommendation?.(best.size);
     const alternative =
-      ranked[1] && ranked[1].score - best.score <= 2.5 ? ranked[1] : null;
+      !best.fitWarnings.length && ranked[1] && ranked[1].score - best.score <= 2.5 ? ranked[1] : null;
     const caution =
-      best.tooSmall || best.score > 18
-        ? " The chart suggests this may be a close fit; please double-check the measurements before ordering."
-        : " This recommendation is calculated from the measurements and size ranges in this product’s chart.";
+      best.fitWarnings.length
+        ? (() => {
+            const warning = best.fitWarnings[0];
+            const easeText = warning.ease < 0
+              ? `${Math.abs(warning.ease).toFixed(1)} cm smaller than your ${warning.label.toLowerCase()} measurement`
+              : `${warning.ease.toFixed(1)} cm of ease, below your selected ${fit} fit target of ${warning.targetEase} cm`;
+            return ` ${warning.label} has ${easeText}. No listed size meets your selected fit; check the chart before ordering.`;
+          })()
+        : best.score > 18
+          ? " The closest chart match is uncertain; double-check the measurements before ordering."
+          : " This recommendation is calculated from the measurements and size ranges in this product’s chart.";
     const recommendation = document.createElement("strong");
-    recommendation.textContent = `Recommended size: ${best.size}`;
+    recommendation.textContent = `${best.fitWarnings.length ? "Closest size" : "Recommended size"}: ${best.size}`;
     result.replaceChildren(
       recommendation,
       document.createTextNode(

@@ -1,5 +1,5 @@
 import { icon } from "./icons.js";
-import { productCardHTML, bindProductCardEvents } from "./productCard.js";
+import { productCardHTML, bindProductCardEvents } from "./productCard.js?v=set-effects-v4";
 import { searchProducts } from "../services/productService.js";
 import { refreshCartDrawer } from "./cartDrawer.js";
 

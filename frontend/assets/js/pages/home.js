@@ -6,7 +6,7 @@ import { icon } from "../components/icons.js";
 import {
   productCardHTML,
   bindProductCardEvents,
-} from "../components/productCard.js?v=account-cart-sync-1";
+} from "../components/productCard.js?v=set-effects-v4";
 import { refreshCartDrawer } from "../components/cartDrawer.js?v=account-cart-sync-1";
 import {
   subscribeToNewsletter,
