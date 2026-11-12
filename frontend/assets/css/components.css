@@ -4445,7 +4445,7 @@
   aspect-ratio:3 / 4;
   overflow:hidden;
   border-radius:16px;
-  background:color-mix(in srgb,var(--color-surface) 78%,transparent);
+  background:transparent;
 }
 .product-card__media img {
   object-fit:contain;
