@@ -4458,17 +4458,17 @@
 .product-card--set .product-card__media {
   overflow: visible;
   border-radius: 16px;
-  background: radial-gradient(ellipse 64% 72% at 50% 46%, rgba(190, 215, 195, .2), rgba(190, 215, 195, .08) 45%, transparent 78%);
+  background: transparent;
 }
 .product-card--set .product-card__media img {
-  filter: brightness(1.18) contrast(1.08) drop-shadow(0 0 9px rgba(188, 210, 191, .16)) drop-shadow(0 16px 13px rgba(0, 0, 0, .34));
+  filter: brightness(1.38) contrast(1.08) drop-shadow(0 0 2px rgba(228, 238, 229, .42)) drop-shadow(0 18px 15px rgba(0, 0, 0, .62));
 }
 .product-card--set .product-card__media img:not(.img-alt) {
   translate: 0 0;
-  transform: scale(1.08);
+  transform: scale(.94);
   animation: set-product-float 5s ease-in-out infinite;
 }
-.product-card--set:hover .product-card__media img:not(.img-alt) { transform: scale(1.11); }
+.product-card--set:hover .product-card__media img:not(.img-alt) { transform: scale(.96); }
 @keyframes set-product-float {
   0%, 100% { translate: 0 0; }
   50% { translate: 0 -5px; }
