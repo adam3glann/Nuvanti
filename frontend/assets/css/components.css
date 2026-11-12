@@ -1025,17 +1025,17 @@
 
 .product-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-5) var(--space-4);
 }
 @media (min-width: 640px) {
   .product-grid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 @media (min-width: 1100px) {
   .product-grid {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 .product-grid--list {
@@ -4338,6 +4338,10 @@
 .section--ink .product-card--set {
   position: relative;
   isolation: isolate;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   padding: 10px 10px 12px;
   overflow: visible;
   border: 1px solid color-mix(in srgb, var(--color-text-inverse) 10%, transparent);
@@ -4375,7 +4379,7 @@
 .product-card--set::after {
   content:"";
   position:absolute;
-  inset:-2px;
+  inset:0;
   border-radius:inherit;
   pointer-events:none;
   z-index:0;
@@ -4389,7 +4393,7 @@
 }
 .set-card--double::after { border:3px double var(--set-accent,#d8a94c); box-shadow:inset 0 0 0 3px color-mix(in srgb,var(--set-accent,#d8a94c) 22%,transparent); }
 .set-card--gradient::after {
-  inset: -2px;
+  inset: 0;
   padding: 2px;
   border: 0;
   background: linear-gradient(135deg,var(--set-accent,#d8a94c),#71ffb0,#c65eff);
