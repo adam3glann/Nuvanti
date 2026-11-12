@@ -112,7 +112,7 @@ function renderFilters() {
         )
         .join("")}
       <label class="filter-option">
-        <input type="radio" name="category" value="" ${state.category === "" ? "checked" : ""} />
+        <input type="radio" name="category" value="" ${state.category === "" && !state.badge ? "checked" : ""} />
         All Categories
       </label>
     </div>
@@ -155,10 +155,12 @@ function bindLayoutEvents() {
   ].forEach((container) => {
     container.addEventListener("change", (e) => {
       if (e.target.name === "category") {
+        clearBadgeShortcut();
         state.category = e.target.value;
         syncFilterUI();
       }
       if (e.target.name === "price") {
+        clearBadgeShortcut();
         if (!e.target.value) {
           state.minPrice = undefined;
           state.maxPrice = undefined;
@@ -170,6 +172,7 @@ function bindLayoutEvents() {
         syncFilterUI();
       }
       if (e.target.matches("[data-in-stock-only]")) {
+        clearBadgeShortcut();
         state.availability = e.target.checked ? "in-stock" : "";
         syncFilterUI();
       }
@@ -180,6 +183,7 @@ function bindLayoutEvents() {
       const sizeBtn = e.target.closest("[data-size]");
       const colorBtn = e.target.closest("[data-color]");
       if (sizeBtn) {
+        clearBadgeShortcut();
         const v = sizeBtn.dataset.size;
         state.sizes = state.sizes.includes(v)
           ? state.sizes.filter((s) => s !== v)
@@ -189,6 +193,7 @@ function bindLayoutEvents() {
         runFilter();
       }
       if (colorBtn) {
+        clearBadgeShortcut();
         const v = colorBtn.dataset.color;
         state.colors = state.colors.includes(v)
           ? state.colors.filter((c) => c !== v)
@@ -241,11 +246,20 @@ function bindLayoutEvents() {
     .addEventListener("click", closeFilterDrawer);
   document.getElementById("clearFilters").addEventListener("click", () => {
     state.category = "";
+    state.badge = "";
     state.colors = [];
     state.sizes = [];
     state.availability = "";
     state.minPrice = undefined;
     state.maxPrice = undefined;
+    const params = new URLSearchParams(location.search);
+    params.delete("filter");
+    const query = params.toString();
+    history.replaceState(
+      history.state,
+      "",
+      `${location.pathname}${query ? `?${query}` : ""}${location.hash}`,
+    );
     state.page = 1;
     document.querySelectorAll('input[name="price"]').forEach((input) => {
       input.checked = input.value === "";
@@ -261,6 +275,19 @@ function bindLayoutEvents() {
   });
 }
 
+function clearBadgeShortcut() {
+  if (!state.badge) return;
+  state.badge = "";
+  const params = new URLSearchParams(location.search);
+  params.delete("filter");
+  const query = params.toString();
+  history.replaceState(
+    history.state,
+    "",
+    `${location.pathname}${query ? `?${query}` : ""}${location.hash}`,
+  );
+}
+
 function syncFilterUI() {
   document.querySelectorAll(".filter-option").forEach((option) => {
     const radio = option.querySelector('input[type="radio"]');
@@ -273,7 +300,7 @@ function syncFilterUI() {
     btn.dataset.active = String(state.colors.includes(btn.dataset.color));
   });
   document.querySelectorAll('input[name="category"]').forEach((r) => {
-    r.checked = r.value === state.category;
+    r.checked = r.value === state.category && (r.value !== "" || !state.badge);
   });
   document.querySelectorAll("[data-in-stock-only]").forEach((input) => {
     input.checked = state.availability === "in-stock";
@@ -351,11 +378,12 @@ async function runFilter(append = false, quiet = false) {
     `${cache.length} Product${cache.length === 1 ? "" : "s"}`;
 
   if (cache.length === 0) {
+    const emptyForBestSellers = state.badge === "bestseller";
     resultsEl.innerHTML = `
       <div class="state-block" style="grid-column:1/-1">
-        <h3>No products match your filters</h3>
-        <p>Try removing a filter or searching for something else.</p>
-        <button class="btn btn-outline" id="resetFromEmpty">Clear Filters</button>
+        <h3>${emptyForBestSellers ? "No products are marked as Best Sellers yet" : "No products match your filters"}</h3>
+        <p>${emptyForBestSellers ? "Browse all products or choose a category to keep shopping." : "Try removing a filter or searching for something else."}</p>
+        <button class="btn btn-outline" id="resetFromEmpty">${emptyForBestSellers ? "Browse All Products" : "Clear Filters"}</button>
       </div>`;
     document
       .getElementById("resetFromEmpty")
