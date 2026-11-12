@@ -440,6 +440,11 @@ adminApp.get("/apple-touch-icon.png", (req, res) =>
 adminApp.get("/login.html", (req, res) =>
   res.sendFile(path.join(frontendRoot, "admin/login.html")),
 );
+// Google Search Console ownership proof for the Railway admin origin.
+// Keep this verification artifact public while all admin pages stay protected.
+adminApp.get("/google9d29e2d4b5e83109.html", (req, res) =>
+  res.sendFile(path.join(frontendRoot, "admin/google9d29e2d4b5e83109.html")),
+);
 // Login shell assets are public; admin documents and application assets below
 // remain server-authorized. Public JavaScript contains no credentials or data.
 adminApp.use(
