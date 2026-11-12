@@ -151,6 +151,19 @@ The expected production layout is:
 
 Follow [DEPLOYMENT-POSTGRES.md](DEPLOYMENT-POSTGRES.md) for the Railway, Supabase, and Cloudflare setup. Configure external credentials using the relevant provider sections in [backend/README.md](backend/README.md). Never place server secrets in frontend files, commit them, or paste them into issues or chat.
 
+## Run a Grafana Cloud k6 load test
+
+The manual GitHub Actions workflow runs `load-tests/store-browsing.js` against a staging storefront and reports results to Grafana Cloud k6. The test ramps to 100 virtual users and runs for about 10 minutes. It reads the storefront and product catalog and sends anonymous page-view and visitor-presence requests; it does not sign in, place orders, or start payments. The configured production hostnames are blocked.
+
+Before the first run, add these under the repository's **Settings → Secrets and variables → Actions → New repository secret**:
+
+- `NUVANTI_LOAD_TEST_BASE_URL`: HTTPS URL for the staging storefront.
+- `K6_CLOUD_TOKEN`: Grafana Cloud k6 API token.
+- `K6_CLOUD_STACK_ID`: Grafana Cloud stack ID.
+- `NUVANTI_LOAD_TEST_API_BASE_URL` (optional): staging API URL when the API is hosted separately from the storefront.
+
+Then open **Actions → Grafana k6 storefront load test → Run workflow**. Review the job output for the Grafana Cloud test link. Run this only against a staging environment you control.
+
 ### Optional provider setup
 
 - **Email:** configure either Resend or SMTP, plus `MAIL_FROM`. Verify delivery from Admin → Settings → Email.

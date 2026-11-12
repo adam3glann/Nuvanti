@@ -1,0 +1,67 @@
+name: Grafana k6 storefront load test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: grafana-k6-storefront
+  cancel-in-progress: false
+
+jobs:
+  load-test:
+    name: Run storefront test in Grafana Cloud k6
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate staging URL
+        env:
+          BASE_URL: ${{ secrets.NUVANTI_LOAD_TEST_BASE_URL }}
+          API_BASE_URL: ${{ secrets.NUVANTI_LOAD_TEST_API_BASE_URL }}
+        run: |
+          python - <<'PY'
+          import os
+          from urllib.parse import urlparse
+
+          base_url = os.environ.get("BASE_URL", "").strip().rstrip("/")
+          api_base_url = os.environ.get("API_BASE_URL", "").strip().rstrip("/")
+          if not base_url:
+              raise SystemExit("Set the NUVANTI_LOAD_TEST_BASE_URL repository secret to your staging storefront URL.")
+          production_hosts = {
+              "nuvanti-shop.pages.dev",
+              "nuvanti-production.up.railway.app",
+          }
+          for label, value in (("NUVANTI_LOAD_TEST_BASE_URL", base_url), ("NUVANTI_LOAD_TEST_API_BASE_URL", api_base_url)):
+              if not value:
+                  continue
+              parsed = urlparse(value)
+              if parsed.scheme != "https" or not parsed.hostname:
+                  raise SystemExit(f"{label} must be an absolute HTTPS URL.")
+              if parsed.hostname.lower() in production_hosts:
+                  raise SystemExit("Load tests against the configured production hosts are blocked. Use staging.")
+          PY
+
+      - name: Set up k6
+        uses: grafana/setup-k6-action@v1
+
+      - name: Run load test
+        env:
+          BASE_URL: ${{ secrets.NUVANTI_LOAD_TEST_BASE_URL }}
+          API_BASE_URL: ${{ secrets.NUVANTI_LOAD_TEST_API_BASE_URL }}
+          K6_CLOUD_TOKEN: ${{ secrets.K6_CLOUD_TOKEN }}
+          K6_CLOUD_STACK_ID: ${{ secrets.K6_CLOUD_STACK_ID }}
+        run: |
+          if [ -z "$K6_CLOUD_TOKEN" ] || [ -z "$K6_CLOUD_STACK_ID" ]; then
+            echo "Set K6_CLOUD_TOKEN and K6_CLOUD_STACK_ID repository secrets to connect Grafana Cloud k6."
+            exit 1
+          fi
+          args=(-e "BASE_URL=$BASE_URL")
+          if [ -n "$API_BASE_URL" ]; then
+            args+=(-e "API_BASE_URL=$API_BASE_URL")
+          fi
+          k6 cloud run --summary-mode full "${args[@]}" load-tests/store-browsing.js
