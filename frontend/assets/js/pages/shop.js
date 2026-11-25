@@ -1,4 +1,4 @@
-import { initShell } from "../main.js?v=account-cart-sync-1";
+import { initShell } from "../main.js?v=store-logo-dark-2";
 import { icon } from "../components/icons.js";
 import {
   productCardHTML,
