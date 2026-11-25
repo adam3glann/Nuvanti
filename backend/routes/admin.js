@@ -2953,6 +2953,7 @@ router.delete(
 const settingsInput = z.object({
   storeName: z.string().min(1).max(100).optional(),
   supportEmail: z.string().email().max(254).optional(),
+  logoUrl: z.string().trim().min(1).max(1000).refine((value) => /^https:\/\//i.test(value) || /^assets\/[a-z0-9_./% -]+$/i.test(value), { message: "Use an HTTPS image URL or a store asset path." }).optional(),
   currency: z.string().min(2).max(10).optional(),
   standardShipping: z.coerce.number().min(0).optional(),
   expressShipping: z.coerce.number().min(0).optional(),
@@ -3043,7 +3044,7 @@ router.get(
   requirePermission("settings.view"),
   async (req, res) => {
     const { rows } = await query(
-      `SELECT store_name AS "storeName", support_email AS "supportEmail", currency, standard_shipping_cents AS "standardShippingCents", express_shipping_cents AS "expressShippingCents", free_shipping_threshold_cents AS "freeShippingThresholdCents", shipping_locations AS "shippingLocations", online_payment_enabled AS "onlinePaymentEnabled", instapay_enabled AS "instapayEnabled", instapay_recipient AS "instapayRecipient", instapay_whatsapp_phone AS "instapayWhatsappPhone", announcement_enabled AS "announcementEnabled", announcement_text AS "announcementText", announcement_background_color AS "announcementBackgroundColor", announcement_text_color AS "announcementTextColor", announcement_pattern AS "announcementPattern", announcement_theme AS "announcementTheme", announcement_speed_seconds AS "announcementSpeedSeconds", signup_offer_enabled AS "signupOfferEnabled", signup_offer_delay_seconds AS "signupOfferDelaySeconds", signup_offer_title AS "signupOfferTitle", signup_offer_text AS "signupOfferText" FROM store_settings WHERE id = 1`,
+      `SELECT store_name AS "storeName", support_email AS "supportEmail", logo_url AS "logoUrl", currency, standard_shipping_cents AS "standardShippingCents", express_shipping_cents AS "expressShippingCents", free_shipping_threshold_cents AS "freeShippingThresholdCents", shipping_locations AS "shippingLocations", online_payment_enabled AS "onlinePaymentEnabled", instapay_enabled AS "instapayEnabled", instapay_recipient AS "instapayRecipient", instapay_whatsapp_phone AS "instapayWhatsappPhone", announcement_enabled AS "announcementEnabled", announcement_text AS "announcementText", announcement_background_color AS "announcementBackgroundColor", announcement_text_color AS "announcementTextColor", announcement_pattern AS "announcementPattern", announcement_theme AS "announcementTheme", announcement_speed_seconds AS "announcementSpeedSeconds", signup_offer_enabled AS "signupOfferEnabled", signup_offer_delay_seconds AS "signupOfferDelaySeconds", signup_offer_title AS "signupOfferTitle", signup_offer_text AS "signupOfferText" FROM store_settings WHERE id = 1`,
     );
     res
       .set("Cache-Control", "no-store")
@@ -3084,32 +3085,34 @@ router.patch(
       `UPDATE store_settings SET
       store_name = coalesce($1, store_name),
       support_email = coalesce($2, support_email),
-      currency = coalesce($3, currency),
-      standard_shipping_cents = coalesce($4, standard_shipping_cents),
-      express_shipping_cents = coalesce($5, express_shipping_cents),
-      free_shipping_threshold_cents = coalesce($6, free_shipping_threshold_cents),
-      online_payment_enabled = coalesce($7, online_payment_enabled),
-      instapay_enabled = coalesce($8, instapay_enabled),
-      instapay_recipient = coalesce($9, instapay_recipient),
-      instapay_whatsapp_phone = coalesce($10, instapay_whatsapp_phone),
-      shipping_locations = coalesce($11::jsonb, shipping_locations),
-      announcement_enabled = coalesce($12, announcement_enabled),
-      announcement_text = coalesce($13, announcement_text),
-      announcement_background_color = coalesce($14, announcement_background_color),
-      announcement_text_color = coalesce($15, announcement_text_color),
-      announcement_pattern = coalesce($16, announcement_pattern),
-      announcement_theme = coalesce($17, announcement_theme),
-      announcement_speed_seconds = coalesce($18, announcement_speed_seconds),
-      signup_offer_enabled = coalesce($19, signup_offer_enabled),
-      signup_offer_delay_seconds = coalesce($20, signup_offer_delay_seconds),
-      signup_offer_title = coalesce($21, signup_offer_title),
-      signup_offer_text = coalesce($22, signup_offer_text),
+      logo_url = coalesce($3, logo_url),
+      currency = coalesce($4, currency),
+      standard_shipping_cents = coalesce($5, standard_shipping_cents),
+      express_shipping_cents = coalesce($6, express_shipping_cents),
+      free_shipping_threshold_cents = coalesce($7, free_shipping_threshold_cents),
+      online_payment_enabled = coalesce($8, online_payment_enabled),
+      instapay_enabled = coalesce($9, instapay_enabled),
+      instapay_recipient = coalesce($10, instapay_recipient),
+      instapay_whatsapp_phone = coalesce($11, instapay_whatsapp_phone),
+      shipping_locations = coalesce($12::jsonb, shipping_locations),
+      announcement_enabled = coalesce($13, announcement_enabled),
+      announcement_text = coalesce($14, announcement_text),
+      announcement_background_color = coalesce($15, announcement_background_color),
+      announcement_text_color = coalesce($16, announcement_text_color),
+      announcement_pattern = coalesce($17, announcement_pattern),
+      announcement_theme = coalesce($18, announcement_theme),
+      announcement_speed_seconds = coalesce($19, announcement_speed_seconds),
+      signup_offer_enabled = coalesce($20, signup_offer_enabled),
+      signup_offer_delay_seconds = coalesce($21, signup_offer_delay_seconds),
+      signup_offer_title = coalesce($22, signup_offer_title),
+      signup_offer_text = coalesce($23, signup_offer_text),
       updated_at = NOW()
     WHERE id = 1
-    RETURNING store_name AS "storeName", support_email AS "supportEmail", currency, standard_shipping_cents AS "standardShippingCents", express_shipping_cents AS "expressShippingCents", free_shipping_threshold_cents AS "freeShippingThresholdCents", shipping_locations AS "shippingLocations", online_payment_enabled AS "onlinePaymentEnabled", instapay_enabled AS "instapayEnabled", instapay_recipient AS "instapayRecipient", instapay_whatsapp_phone AS "instapayWhatsappPhone", announcement_enabled AS "announcementEnabled", announcement_text AS "announcementText", announcement_background_color AS "announcementBackgroundColor", announcement_text_color AS "announcementTextColor", announcement_pattern AS "announcementPattern", announcement_theme AS "announcementTheme", announcement_speed_seconds AS "announcementSpeedSeconds", signup_offer_enabled AS "signupOfferEnabled", signup_offer_delay_seconds AS "signupOfferDelaySeconds", signup_offer_title AS "signupOfferTitle", signup_offer_text AS "signupOfferText"`,
+    RETURNING store_name AS "storeName", support_email AS "supportEmail", logo_url AS "logoUrl", currency, standard_shipping_cents AS "standardShippingCents", express_shipping_cents AS "expressShippingCents", free_shipping_threshold_cents AS "freeShippingThresholdCents", shipping_locations AS "shippingLocations", online_payment_enabled AS "onlinePaymentEnabled", instapay_enabled AS "instapayEnabled", instapay_recipient AS "instapayRecipient", instapay_whatsapp_phone AS "instapayWhatsappPhone", announcement_enabled AS "announcementEnabled", announcement_text AS "announcementText", announcement_background_color AS "announcementBackgroundColor", announcement_text_color AS "announcementTextColor", announcement_pattern AS "announcementPattern", announcement_theme AS "announcementTheme", announcement_speed_seconds AS "announcementSpeedSeconds", signup_offer_enabled AS "signupOfferEnabled", signup_offer_delay_seconds AS "signupOfferDelaySeconds", signup_offer_title AS "signupOfferTitle", signup_offer_text AS "signupOfferText"`,
       [
         s.storeName ?? null,
         s.supportEmail ?? null,
+        s.logoUrl ?? null,
         s.currency ?? null,
         s.standardShipping != null
           ? Math.round(s.standardShipping * 100)

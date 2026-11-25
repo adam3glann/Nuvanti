@@ -5,10 +5,6 @@ import { getWishlist } from "../services/wishlistService.js";
 import { openCartDrawer } from "./cartDrawer.js";
 import { fetchMenuLinks } from "../services/productService.js";
 import { startLiveRefresh } from "../services/liveRefresh.js";
-import {
-  getStoreTheme,
-  toggleStoreTheme,
-} from "../services/storeThemeService.js";
 
 export function renderHeader({
   transparentOnHero = false,
@@ -30,10 +26,9 @@ export function renderHeader({
             </ul>
           </nav>
         </div>
-        <a href="index.html" class="site-logo" aria-label="Nuvanti — Home"><img src="assets/img/brand/nuvanti-logo.png" alt="Nuvanti" class="site-logo__mark" id="headerLogoImg" /></a>
+        <a href="index.html" class="site-logo" aria-label="Nuvanti — Home"><img src="assets/img/brand/NUVANTI Star Logo.png" data-store-logo alt="Nuvanti" class="site-logo__mark" id="headerLogoImg" /></a>
         <div class="site-header__side site-header__side--end">
           <button class="icon-btn" id="openSearch" aria-label="Search">${icon("search")}</button>
-          <button class="icon-btn store-theme-toggle" type="button" data-store-theme-toggle aria-label="Switch to dark mode" title="Switch to dark mode"></button>
           <a class="icon-btn" href="account.html" aria-label="Account">${icon("user")}</a>
           <a class="icon-btn" href="wishlist.html" aria-label="Wishlist" style="position:relative">
             ${icon("heart")}
@@ -51,7 +46,7 @@ export function renderHeader({
 
     <nav class="mobile-nav" id="mobileNav" aria-label="Mobile" data-open="false">
       <div class="mobile-nav__top">
-        <a href="index.html" class="site-logo" aria-label="Nuvanti — Home"><img src="assets/img/brand/nuvanti-logo.png" alt="Nuvanti" class="site-logo__mark" /></a>
+        <a href="index.html" class="site-logo" aria-label="Nuvanti — Home"><img src="assets/img/brand/NUVANTI Star Logo.png" data-store-logo alt="Nuvanti" class="site-logo__mark" /></a>
         <button class="icon-btn" id="closeMobileNav" aria-label="Close menu">${icon("close")}</button>
       </div>
       <ul class="mobile-nav__list">
@@ -68,7 +63,6 @@ export function renderHeader({
       <div class="mobile-nav__foot">
         <a href="account.html" class="btn btn-outline btn-block">Account</a>
         <a href="wishlist.html" class="btn btn-text">Wishlist</a>
-        <button class="btn btn-outline btn-block store-theme-toggle--mobile" type="button" data-store-theme-toggle><span data-store-theme-icon></span><span data-store-theme-label>Dark mode</span></button>
       </div>
     </nav>
   `;
@@ -128,30 +122,7 @@ export function renderHeader({
       button.setAttribute("aria-expanded", String(!isOpen));
     }),
   );
-  const updateThemeToggle = () => {
-    const dark = getStoreTheme() === "dark";
-    const label = dark ? "Switch to light mode" : "Switch to dark mode";
-    document.querySelectorAll("[data-store-theme-toggle]").forEach((button) => {
-      button.setAttribute("aria-label", label);
-      button.setAttribute("title", label);
-      button.setAttribute("aria-pressed", String(dark));
-      const iconTarget = button.querySelector("[data-store-theme-icon]");
-      if (iconTarget) {
-        iconTarget.innerHTML = icon(dark ? "sun" : "moon");
-        button.querySelector("[data-store-theme-label]").textContent = dark
-          ? "Light mode"
-          : "Dark mode";
-      } else button.innerHTML = icon(dark ? "sun" : "moon");
-    });
-    updateHeaderLogoTheme();
-  };
-  document.querySelectorAll("[data-store-theme-toggle]").forEach((button) =>
-    button.addEventListener("click", () => {
-      toggleStoreTheme();
-      updateThemeToggle();
-    }),
-  );
-  updateThemeToggle();
+  updateHeaderLogoTheme();
 
   const refreshMenuLinks = async () => {
     const items = await fetchMenuLinks();
@@ -240,9 +211,7 @@ export function renderHeader({
   function updateHeaderLogoTheme() {
     const image = document.getElementById("headerLogoImg");
     if (!image) return;
-    const dark = getStoreTheme() === "dark";
-    const useWhiteMark = dark || (transparentOnHero && window.scrollY <= 40);
-    image.src = `assets/img/brand/nuvanti-logo${useWhiteMark ? "-white" : ""}.png`;
+    image.src = image.dataset.logoUrl || "assets/img/brand/NUVANTI Star Logo.png";
   }
 }
 

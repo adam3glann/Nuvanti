@@ -23,6 +23,10 @@ let currentStoreSettings = null;
 function applyStoreSettings(settings) {
   const previous = currentStoreSettings;
   currentStoreSettings = settings;
+  document.querySelectorAll("[data-store-logo]").forEach((image) => {
+    image.dataset.logoUrl = settings.logoUrl || "assets/img/brand/NUVANTI Star Logo.png";
+    image.src = image.dataset.logoUrl;
+  });
   const shippingThresholdChanged =
     !previous ||
     previous.freeShippingThresholdCents !== settings.freeShippingThresholdCents;

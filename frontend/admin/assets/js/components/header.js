@@ -24,7 +24,6 @@ export function renderAdminHeader({ title, session }) {
         <div class="admin-presence" id="storePresence" data-state="loading" role="status" aria-live="polite" title="Live storefront visitor count">
           <span class="admin-presence__dot" aria-hidden="true"></span><span id="storePresenceCount">Loading</span>
         </div>
-        <button class="icon-btn" id="themeToggle" aria-label="Toggle dark mode">${icon(document.documentElement.dataset.theme === 'dark' ? 'sun' : 'moon')}</button>
         <a class="icon-btn" href="orders.html" aria-label="View orders" title="View orders">${icon('bag')}</a>
         <div class="rel">
           <button class="user-menu-btn" id="userMenuBtn" aria-haspopup="true">
@@ -43,7 +42,6 @@ export function renderAdminHeader({ title, session }) {
   `;
 
   document.getElementById('adminHamburger')?.addEventListener('click', openMobileSidebar);
-  document.getElementById('themeToggle').addEventListener('click', toggleTheme);
   watchStorePresence();
 
   bindPopover('userMenuBtn', 'userPopover');
@@ -56,7 +54,6 @@ export function renderAdminHeader({ title, session }) {
     }
   });
 }
-
 function bindPopover(btnId, popId) {
   const btn = document.getElementById(btnId);
   const pop = document.getElementById(popId);
@@ -68,13 +65,4 @@ function bindPopover(btnId, popId) {
   });
   document.addEventListener('click', () => { pop.dataset.open = 'false'; });
   pop.addEventListener('click', (e) => e.stopPropagation());
-}
-
-function toggleTheme() {
-  const html = document.documentElement;
-  const next = html.dataset.theme === 'dark' ? 'light' : 'dark';
-  if (next === 'dark') html.dataset.theme = 'dark'; else delete html.dataset.theme;
-  localStorage.setItem('nuvanti_admin_theme', next);
-  const btn = document.getElementById('themeToggle');
-  btn.innerHTML = icon(next === 'dark' ? 'sun' : 'moon');
 }

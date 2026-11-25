@@ -17,6 +17,7 @@ function fromApi(value) {
     general: {
       storeName: value.storeName,
       contactEmail: value.supportEmail,
+      logoUrl: value.logoUrl || 'assets/img/brand/NUVANTI Star Logo.png',
       currency: value.currency,
     },
     shipping: {
@@ -64,7 +65,7 @@ export async function sendAdminTestEmail() {
 
 export async function saveSettingsSection(section, data) {
   const payload = section === 'general'
-    ? { storeName: data.storeName, supportEmail: data.contactEmail }
+    ? { storeName: data.storeName, supportEmail: data.contactEmail, logoUrl: data.logoUrl }
     : section === 'announcement'
       ? { announcementEnabled: data.enabled, announcementText: data.text, announcementBackgroundColor: data.backgroundColor, announcementTextColor: data.textColor, announcementPattern: data.pattern, announcementTheme: data.theme, announcementSpeedSeconds: data.speedSeconds }
       : section === 'signupOffer'

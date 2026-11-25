@@ -61,7 +61,7 @@ router.post(
 
 router.get("/settings", async (req, res) => {
   const emergencyLockdown = await isEmergencyLockdownActive();
-  const { rows } = await query(`SELECT store_name AS "storeName", currency,
+  const { rows } = await query(`SELECT store_name AS "storeName", logo_url AS "logoUrl", currency,
     standard_shipping_cents AS "standardShippingCents",
     express_shipping_cents AS "expressShippingCents",
     free_shipping_threshold_cents AS "freeShippingThresholdCents",

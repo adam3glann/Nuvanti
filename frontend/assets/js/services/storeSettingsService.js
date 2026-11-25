@@ -2,6 +2,7 @@ import { API_ORIGIN } from "../config.js";
 
 const DEFAULTS = Object.freeze({
   storeName: "Nuvanti",
+  logoUrl: "assets/img/brand/NUVANTI Star Logo.png",
   currency: "EGP",
   standardShippingCents: 7500,
   expressShippingCents: 15000,

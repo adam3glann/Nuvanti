@@ -4,6 +4,7 @@ import { hasPermission } from '../components/permissions.js';
 import { getEmailStatus, getSettings, saveSettingsSection, sendAdminTestEmail } from '../services/settingsService.js';
 import { escapeHtml } from '../components/utils.js';
 import { startLiveRefresh } from '../services/liveRefresh.js';
+import { uploadAdminImage } from '../services/imageUploadService.js?v=preserve-alpha-v1';
 
 const session = initAdminShell({ page: 'settings', title: 'Settings' });
 const canEdit = session && hasPermission(session.role, 'settings.edit');
@@ -44,6 +45,7 @@ function render() {
     root.innerHTML = section(`
       <div class="field"><label for="storeName">Store Name</label><input id="storeName" value="${escapeHtml(settings.general.storeName)}" maxlength="100" ${disabled()} /></div>
       <div class="field"><label for="contactEmail">Customer Support Email</label><input id="contactEmail" type="email" value="${escapeHtml(settings.general.contactEmail)}" maxlength="254" ${disabled()} /></div>
+      <div class="field"><label for="storeLogoUrl">Store logo</label><div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap"><img id="storeLogoPreview" src="${escapeHtml(settings.general.logoUrl)}" alt="Current store logo" style="width:120px;height:72px;object-fit:contain;background:var(--a-surface-raised);border:1px solid var(--a-border);border-radius:8px;padding:8px" /><button type="button" class="btn btn-outline" id="uploadStoreLogoBtn" ${disabled()}>Upload new logo</button><input id="storeLogoFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden ${disabled()} /></div><input id="storeLogoUrl" type="text" value="${escapeHtml(settings.general.logoUrl)}" maxlength="1000" placeholder="Upload a logo or paste an HTTPS image URL" style="margin-top:.6rem" ${disabled()} /><p id="storeLogoStatus" class="hint">Upload a PNG, JPEG, WebP, or GIF up to 5 MB. Save Changes to publish it.</p></div>
       <p class="hint">Prices are displayed in ${escapeHtml(settings.general.currency)}. Change your customer-facing support details here.</p>
     `);
   } else if (tab === 'announcement') {
@@ -139,7 +141,7 @@ document.getElementById('settingsRoot')?.addEventListener('click', async (event)
   if (!button || !canEdit || !settings) return;
   const sectionName = tab;
   const data = sectionName === 'general'
-    ? { storeName: value('storeName').trim(), contactEmail: value('contactEmail').trim() }
+    ? { storeName: value('storeName').trim(), contactEmail: value('contactEmail').trim(), logoUrl: value('storeLogoUrl').trim() }
     : sectionName === 'announcement'
       ? { enabled: document.getElementById('announcementEnabled').checked, text: value('announcementText').trim(), backgroundColor: colorValue('announcementBackgroundColor'), textColor: colorValue('announcementTextColor'), pattern: value('announcementPattern'), theme: value('announcementTheme'), speedSeconds: Number(value('announcementSpeedSeconds')) }
       : sectionName === 'signupOffer'
@@ -165,6 +167,10 @@ document.getElementById('settingsRoot')?.addEventListener('click', async (event)
   }
   if (sectionName === 'general' && (!data.storeName || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.contactEmail))) {
     showAdminToast('Enter a store name and a valid support email.', 'error');
+    return;
+  }
+  if (sectionName === 'general' && !(/^https:\/\//i.test(data.logoUrl) || /^assets\/[a-z0-9_./% -]+$/i.test(data.logoUrl))) {
+    showAdminToast('Enter an HTTPS image URL or upload a store logo.', 'error');
     return;
   }
   if (sectionName === 'announcement' && (!data.text || data.text.length > 240 || !/^#[0-9a-fA-F]{6}$/.test(data.backgroundColor) || !/^#[0-9a-fA-F]{6}$/.test(data.textColor))) {
@@ -193,6 +199,34 @@ document.getElementById('settingsRoot')?.addEventListener('click', async (event)
     button.disabled = false;
     button.textContent = 'Save Changes';
     showAdminToast(error.message, 'error');
+  }
+});
+
+document.getElementById('settingsPanel')?.addEventListener('click', (event) => {
+  if (event.target.closest('#uploadStoreLogoBtn')) document.getElementById('storeLogoFile')?.click();
+});
+document.getElementById('settingsPanel')?.addEventListener('change', async (event) => {
+  if (event.target.id === 'storeLogoUrl') {
+    const preview = document.getElementById('storeLogoPreview');
+    if (preview) preview.src = event.target.value;
+    return;
+  }
+  if (event.target.id !== 'storeLogoFile' || !event.target.files?.[0]) return;
+  const input = event.target;
+  const button = document.getElementById('uploadStoreLogoBtn');
+  const status = document.getElementById('storeLogoStatus');
+  button.disabled = true;
+  status.textContent = 'Uploading logo…';
+  try {
+    const uploaded = await uploadAdminImage(input.files[0], { endpoint: '/api/admin/uploads/product-image', onProgress: ({ phase, percent }) => { status.textContent = phase === 'optimizing' ? 'Preparing logo…' : `Uploading logo… ${percent}%`; } });
+    document.getElementById('storeLogoUrl').value = uploaded.url;
+    document.getElementById('storeLogoPreview').src = uploaded.url;
+    status.textContent = 'Logo uploaded. Save Changes to publish it.';
+  } catch (error) {
+    status.textContent = error.message;
+  } finally {
+    button.disabled = !canEdit;
+    input.value = '';
   }
 });
 

@@ -59,7 +59,7 @@ function normalizeLine(line) {
     name: String(line.name || "Nuvanti item").slice(0, 160),
     image: safeImage
       ? image.slice(0, 500)
-      : "assets/img/brand/nuvanti-logo.png",
+      : "assets/img/brand/NUVANTI Star Logo.png",
     price,
     size,
     color,

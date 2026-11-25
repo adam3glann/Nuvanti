@@ -59,7 +59,7 @@ function render() {
           (p) => `
         <article class="product-card">
           <a href="product.html?slug=${encodeURIComponent(p.slug)}" class="product-card__media">
-            <img src="${escapeHtml(p.images?.[0] || "assets/img/brand/nuvanti-logo.png")}" alt="${escapeHtml(p.name)}" loading="lazy" />
+            <img src="${escapeHtml(p.images?.[0] || "assets/img/brand/NUVANTI Star Logo.png")}" alt="${escapeHtml(p.name)}" loading="lazy" />
           </a>
           <a href="product.html?slug=${encodeURIComponent(p.slug)}"><p class="product-card__name">${escapeHtml(p.name)}</p></a>
           <p class="product-card__price" style="margin-bottom:.75rem">${formatPrice(p.price)}</p>

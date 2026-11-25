@@ -10,7 +10,7 @@ export function renderFooter() {
       <div class="container">
         <div class="footer-grid">
           <div class="footer-col footer-brand">
-            <a href="index.html" class="site-logo" aria-label="Nuvanti — Home"><img src="assets/img/brand/nuvanti-logo-white.png" alt="Nuvanti" class="site-logo__mark" /></a>
+            <a href="index.html" class="site-logo" aria-label="Nuvanti — Home"><img src="assets/img/brand/NUVANTI Star Logo.png" data-store-logo alt="Nuvanti" class="site-logo__mark" /></a>
             <p>Considered clothing for people who dress with intent. Designed in-house, made to last.</p>
             <div class="footer-social">
               <a class="icon-btn btn-ink-outline" style="border:1px solid var(--color-border-inverse)" href="https://www.instagram.com/_.nuvanti._/" target="_blank" rel="noopener" aria-label="Instagram">${icon("instagram")}</a>
