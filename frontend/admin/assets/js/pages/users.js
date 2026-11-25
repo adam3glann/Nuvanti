@@ -5,7 +5,7 @@ import { showAdminToast } from '../components/toast.js';
 import { typedConfirmDialog } from '../components/confirmDialog.js';
 import { createAdminModal } from '../components/modal.js';
 import { hasPermission, ROLES, ROLE_LABELS } from '../components/permissions.js';
-import { fetchAdminUsers, createAdminUser, toggleAdminUserStatus, deleteAdminUser } from '../services/adminUserService.js';
+import { fetchAdminUsers, createAdminUser, toggleAdminUserStatus, unblockAdminNetwork, deleteAdminUser } from '../services/adminUserService.js';
 import { startLiveRefresh } from '../services/liveRefresh.js';
 
 const session = initAdminShell({ page: 'users', title: 'Admin Users' });
@@ -43,6 +43,7 @@ async function load() {
       <td>${formatDate(u.createdAt)}</td>
       <td style="text-align:right">
         <button class="btn btn-outline btn-sm" data-toggle="${u.id}" ${isSelf ? 'disabled title="You cannot change your own account status"' : ''}>${u.isActive ? 'Disable' : 'Enable'}</button>
+        ${u.networkBlocked ? `<button class="btn btn-outline btn-sm" data-unblock-network="${u.id}">Unblock Network</button>` : ''}
         <button class="icon-btn" data-delete="${u.id}" aria-label="Delete" ${isSelf ? 'disabled title="You cannot delete your own account"' : ''}>✕</button>
       </td>
     </tr>
@@ -64,6 +65,17 @@ async function load() {
       showAdminToast('Administrator deleted.', 'success');
       load();
     } catch (error) { showAdminToast(error.message, 'error'); }
+  }));
+  document.querySelectorAll('[data-unblock-network]').forEach((btn) => btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    try {
+      const result = await unblockAdminNetwork(btn.dataset.unblockNetwork);
+      showAdminToast(result.clearedBlocks ? 'Network access restored for this admin.' : 'No active network block was found.', 'success');
+      load();
+    } catch (error) {
+      btn.disabled = false;
+      showAdminToast(error.message, 'error');
+    }
   }));
 }
 

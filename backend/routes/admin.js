@@ -21,6 +21,7 @@ import {
 } from "../lib/mail.js";
 import { adminPublicOrigin, storePublicOrigin } from "../lib/publicOrigins.js";
 import { restoreOrderInventory } from "../lib/orderLifecycle.js";
+import { clearAdminNetworkBlocks } from "../lib/adminLoginSecurity.js";
 import {
   restoreStoreBackup,
   validateStoreBackup,
@@ -2461,11 +2462,34 @@ router.get(
   requirePermission("admins.view"),
   async (req, res) => {
     const { rows } = await query(
-      `SELECT id::text, email, name, role, is_active AS "isActive", created_at AS "createdAt" FROM users WHERE role = ANY($1) ORDER BY created_at DESC`,
+      `SELECT u.id::text, u.email, u.name, u.role, u.is_active AS "isActive", u.created_at AS "createdAt",
+        EXISTS (SELECT 1 FROM admin_login_ip_blocks b WHERE b.user_id = u.id AND b.blocked_until > NOW()) AS "networkBlocked"
+       FROM users u WHERE u.role = ANY($1) ORDER BY u.created_at DESC`,
       [MANAGEABLE_ROLES],
     );
     res.json(rows);
   },
+);
+
+router.post(
+  "/admin-users/:id/unblock-network",
+  requirePermission("admins.manage"),
+  asyncRoute(async (req, res) => {
+    const { rows } = await query(
+      "SELECT id::text FROM users WHERE id = $1 AND role = ANY($2)",
+      [req.params.id, MANAGEABLE_ROLES],
+    );
+    if (!rows[0]) return res.status(404).json({ error: "Administrator not found." });
+    const cleared = await clearAdminNetworkBlocks(req.params.id);
+    await logAudit({
+      req,
+      action: "admin_user.network_unblocked",
+      targetType: "user",
+      targetId: req.params.id,
+      metadata: { clearedBlocks: cleared },
+    });
+    res.json({ success: true, clearedBlocks: cleared });
+  }),
 );
 
 router.post(

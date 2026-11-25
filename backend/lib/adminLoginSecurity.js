@@ -58,8 +58,8 @@ export async function recordAdminEmailCodeFailure(req, accountId) {
   const ipHash = fingerprintIp(ip, accountId);
   const { rows } = await query(
     `
-    INSERT INTO admin_login_ip_blocks (ip_hash, failed_attempts, window_started_at, blocked_until, updated_at)
-    VALUES ($1, 1, NOW(), NULL, NOW())
+    INSERT INTO admin_login_ip_blocks (ip_hash, user_id, failed_attempts, window_started_at, blocked_until, updated_at)
+    VALUES ($1, $3, 1, NOW(), NULL, NOW())
     ON CONFLICT (ip_hash) DO UPDATE SET
       failed_attempts = CASE
         WHEN admin_login_ip_blocks.window_started_at <= NOW() - INTERVAL '30 minutes' THEN 1
@@ -77,9 +77,18 @@ export async function recordAdminEmailCodeFailure(req, accountId) {
       END,
       updated_at = NOW()
     RETURNING failed_attempts AS "failedAttempts", blocked_until AS "blockedUntil"`,
-    [ipHash, IP_FAILURE_LIMIT],
+    [ipHash, IP_FAILURE_LIMIT, accountId],
   );
   return rows[0];
+}
+
+export async function clearAdminNetworkBlocks(accountId) {
+  if (!accountId) throw new Error("Admin account is required to clear network blocks.");
+  const { rowCount } = await query(
+    "DELETE FROM admin_login_ip_blocks WHERE user_id = $1",
+    [accountId],
+  );
+  return rowCount;
 }
 
 export async function clearAdminEmailCodeFailures(

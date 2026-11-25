@@ -18,4 +18,6 @@ export const toggleAdminUserStatus = async (id) => {
   return request(`/api/admin/admin-users/${id}`, { method: 'PATCH', body: JSON.stringify({ isActive: !user?.isActive }) });
 };
 
+export const unblockAdminNetwork = (id) => request(`/api/admin/admin-users/${id}/unblock-network`, { method: 'POST' });
+
 export const deleteAdminUser = (id) => request(`/api/admin/admin-users/${id}`, { method: 'DELETE' });
