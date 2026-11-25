@@ -366,6 +366,7 @@ export async function restoreStoreBackup(client, backup) {
       "store_name",
       "support_email",
       "logo_url",
+      "size_advisor_fields",
       "currency",
       "standard_shipping_cents",
       "express_shipping_cents",
@@ -379,6 +380,10 @@ export async function restoreStoreBackup(client, backup) {
       row.store_name,
       row.support_email,
       row.logo_url || "assets/img/brand/NUVANTI Star Logo.png",
+      row.size_advisor_fields || {
+        height: { enabled: true, label: "Height (cm)", placeholder: "e.g. 168" },
+        weight: { enabled: true, label: "Weight (kg)", placeholder: "e.g. 62" },
+      },
       row.currency,
       row.standard_shipping_cents,
       row.express_shipping_cents,

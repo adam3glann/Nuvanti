@@ -1,7 +1,7 @@
 import { initAdminShell } from '../components/shell.js';
 import { showAdminToast } from '../components/toast.js';
 import { hasPermission } from '../components/permissions.js';
-import { getEmailStatus, getSettings, saveSettingsSection, sendAdminTestEmail } from '../services/settingsService.js?v=permanent-dark-3';
+import { getEmailStatus, getSettings, saveSettingsSection, sendAdminTestEmail } from '../services/settingsService.js?v=size-advisor-admin-1';
 import { escapeHtml } from '../components/utils.js';
 import { startLiveRefresh } from '../services/liveRefresh.js';
 import { uploadAdminImage } from '../services/imageUploadService.js?v=preserve-alpha-v1';
@@ -42,10 +42,15 @@ function render() {
 
   const root = document.getElementById('settingsPanel');
   if (tab === 'general') {
+    const advisorFields = settings.general.sizeAdvisorFields;
     root.innerHTML = section(`
       <div class="field"><label for="storeName">Store Name</label><input id="storeName" value="${escapeHtml(settings.general.storeName)}" maxlength="100" ${disabled()} /></div>
       <div class="field"><label for="contactEmail">Customer Support Email</label><input id="contactEmail" type="email" value="${escapeHtml(settings.general.contactEmail)}" maxlength="254" ${disabled()} /></div>
       <div class="field"><label for="storeLogoUrl">Store logo</label><div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap"><img id="storeLogoPreview" src="${escapeHtml(settings.general.logoUrl)}" alt="Current store logo" style="width:120px;height:72px;object-fit:contain;background:var(--a-surface-raised);border:1px solid var(--a-border);border-radius:8px;padding:8px" /><button type="button" class="btn btn-outline" id="uploadStoreLogoBtn" ${disabled()}>Upload new logo</button><input id="storeLogoFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden ${disabled()} /></div><input id="storeLogoUrl" type="text" value="${escapeHtml(settings.general.logoUrl)}" maxlength="1000" placeholder="Upload a logo or paste an HTTPS image URL" style="margin-top:.6rem" ${disabled()} /><p id="storeLogoStatus" class="hint">Upload a PNG, JPEG, WebP, or GIF up to 5 MB. Save Changes to publish it.</p></div>
+      <div class="field"><label>Product size advisor</label><p class="hint">Customize these inputs across every product page.</p><div class="field-row">
+        ${renderAdvisorFieldSettings('height', 'Height', advisorFields.height)}
+        ${renderAdvisorFieldSettings('weight', 'Weight', advisorFields.weight)}
+      </div></div>
       <p class="hint">Prices are displayed in ${escapeHtml(settings.general.currency)}. Change your customer-facing support details here.</p>
     `);
   } else if (tab === 'announcement') {
@@ -141,7 +146,10 @@ document.getElementById('settingsRoot')?.addEventListener('click', async (event)
   if (!button || !canEdit || !settings) return;
   const sectionName = tab;
   const data = sectionName === 'general'
-    ? { storeName: value('storeName').trim(), contactEmail: value('contactEmail').trim(), logoUrl: value('storeLogoUrl').trim() }
+    ? { storeName: value('storeName').trim(), contactEmail: value('contactEmail').trim(), logoUrl: value('storeLogoUrl').trim(), sizeAdvisorFields: {
+      height: { enabled: document.getElementById('advisorHeightEnabled').checked, label: value('advisorHeightLabel').trim(), placeholder: value('advisorHeightPlaceholder').trim() },
+      weight: { enabled: document.getElementById('advisorWeightEnabled').checked, label: value('advisorWeightLabel').trim(), placeholder: value('advisorWeightPlaceholder').trim() },
+    } }
     : sectionName === 'announcement'
       ? { enabled: document.getElementById('announcementEnabled').checked, text: value('announcementText').trim(), backgroundColor: colorValue('announcementBackgroundColor'), textColor: colorValue('announcementTextColor'), pattern: value('announcementPattern'), theme: value('announcementTheme'), speedSeconds: Number(value('announcementSpeedSeconds')) }
       : sectionName === 'signupOffer'
@@ -171,6 +179,10 @@ document.getElementById('settingsRoot')?.addEventListener('click', async (event)
   }
   if (sectionName === 'general' && !(/^https:\/\//i.test(data.logoUrl) || /^assets\/[a-z0-9_./% -]+$/i.test(data.logoUrl))) {
     showAdminToast('Enter an HTTPS image URL or upload a store logo.', 'error');
+    return;
+  }
+  if (sectionName === 'general' && Object.values(data.sizeAdvisorFields).some((field) => !field.label || field.label.length > 60 || field.placeholder.length > 80)) {
+    showAdminToast('Enter a label (up to 60 characters) and placeholder (up to 80 characters) for each size advisor field.', 'error');
     return;
   }
   if (sectionName === 'announcement' && (!data.text || data.text.length > 240 || !/^#[0-9a-fA-F]{6}$/.test(data.backgroundColor) || !/^#[0-9a-fA-F]{6}$/.test(data.textColor))) {
@@ -294,6 +306,10 @@ function updateAnnouncementPreview() {
 }
 
 function disabled() { return canEdit ? '' : 'disabled'; }
+function renderAdvisorFieldSettings(key, title, field) {
+  const id = `advisor${title}`;
+  return `<div class="field"><div class="settings-row"><label for="${id}Enabled">Show ${title.toLowerCase()} field</label><label class="a-switch"><input type="checkbox" id="${id}Enabled" ${field.enabled ? 'checked' : ''} ${disabled()}><span class="a-switch-track"></span></label></div><label for="${id}Label">${title} label</label><input id="${id}Label" value="${escapeHtml(field.label)}" maxlength="60" ${disabled()}><label for="${id}Placeholder" style="margin-top:.5rem">Placeholder</label><input id="${id}Placeholder" value="${escapeHtml(field.placeholder)}" maxlength="80" ${disabled()}></div>`;
+}
 function value(id) { return document.getElementById(id)?.value ?? ''; }
 function colorValue(id) { return document.querySelector(`[data-color-text="${id}"]`)?.value ?? value(id); }
 function numberValue(id) { return Number(value(id)); }

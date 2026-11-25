@@ -3,6 +3,10 @@ import { API_ORIGIN } from "../config.js";
 const DEFAULTS = Object.freeze({
   storeName: "Nuvanti",
   logoUrl: "assets/img/brand/NUVANTI Star Logo.png",
+  sizeAdvisorFields: {
+    height: { enabled: true, label: "Height (cm)", placeholder: "e.g. 168" },
+    weight: { enabled: true, label: "Weight (kg)", placeholder: "e.g. 62" },
+  },
   currency: "EGP",
   standardShippingCents: 7500,
   expressShippingCents: 15000,
@@ -17,6 +21,19 @@ const DEFAULTS = Object.freeze({
 });
 let settingsPromise;
 
+function normalizeSizeAdvisorFields(value) {
+  const saved = value || {};
+  const defaults = DEFAULTS.sizeAdvisorFields;
+  return Object.fromEntries(Object.entries(defaults).map(([key, fallback]) => {
+    const field = saved[key] || fallback;
+    return [key, {
+      enabled: field.enabled !== false,
+      label: typeof field.label === "string" && field.label.trim() ? field.label : fallback.label,
+      placeholder: typeof field.placeholder === "string" ? field.placeholder : fallback.placeholder,
+    }];
+  }));
+}
+
 export function loadStoreSettings() {
   if (!settingsPromise) {
     settingsPromise = fetch(`${API_ORIGIN}/api/storefront/settings`, {
@@ -26,6 +43,10 @@ export function loadStoreSettings() {
         if (!response.ok) throw new Error("Store settings are unavailable.");
         return response.json();
       })
+      .then((settings) => ({
+        ...settings,
+        sizeAdvisorFields: normalizeSizeAdvisorFields(settings.sizeAdvisorFields),
+      }))
       .catch((error) => {
         settingsPromise = null;
         if (

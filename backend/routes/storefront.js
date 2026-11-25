@@ -61,7 +61,7 @@ router.post(
 
 router.get("/settings", async (req, res) => {
   const emergencyLockdown = await isEmergencyLockdownActive();
-  const { rows } = await query(`SELECT store_name AS "storeName", logo_url AS "logoUrl", currency,
+  const { rows } = await query(`SELECT store_name AS "storeName", logo_url AS "logoUrl", size_advisor_fields AS "sizeAdvisorFields", currency,
     standard_shipping_cents AS "standardShippingCents",
     express_shipping_cents AS "expressShippingCents",
     free_shipping_threshold_cents AS "freeShippingThresholdCents",
@@ -86,6 +86,10 @@ router.get("/settings", async (req, res) => {
     ...(rows[0] || {
       storeName: "Nuvanti",
       currency: "EGP",
+      sizeAdvisorFields: {
+        height: { enabled: true, label: "Height (cm)", placeholder: "e.g. 168" },
+        weight: { enabled: true, label: "Weight (kg)", placeholder: "e.g. 62" },
+      },
       standardShippingCents: 7500,
       expressShippingCents: 15000,
       freeShippingThresholdCents: 300000,

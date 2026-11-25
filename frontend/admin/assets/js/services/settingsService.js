@@ -1,5 +1,10 @@
 import { API_ORIGIN } from '../config.js';
 
+const DEFAULT_SIZE_ADVISOR_FIELDS = {
+  height: { enabled: true, label: 'Height (cm)', placeholder: 'e.g. 168' },
+  weight: { enabled: true, label: 'Weight (kg)', placeholder: 'e.g. 62' },
+};
+
 async function request(path, options = {}) {
   const response = await fetch(`${API_ORIGIN}${path}`, {
     credentials: 'include',
@@ -13,11 +18,20 @@ async function request(path, options = {}) {
 }
 
 function fromApi(value) {
+  const advisorFields = value.sizeAdvisorFields || DEFAULT_SIZE_ADVISOR_FIELDS;
   return {
     general: {
       storeName: value.storeName,
       contactEmail: value.supportEmail,
       logoUrl: value.logoUrl || 'assets/img/brand/NUVANTI Star Logo.png',
+      sizeAdvisorFields: Object.fromEntries(Object.entries(DEFAULT_SIZE_ADVISOR_FIELDS).map(([key, defaults]) => {
+        const field = advisorFields[key] || defaults;
+        return [key, {
+          enabled: field.enabled !== false,
+          label: typeof field.label === 'string' && field.label.trim() ? field.label : defaults.label,
+          placeholder: typeof field.placeholder === 'string' ? field.placeholder : defaults.placeholder,
+        }];
+      })),
       currency: value.currency,
     },
     shipping: {
@@ -65,7 +79,7 @@ export async function sendAdminTestEmail() {
 
 export async function saveSettingsSection(section, data) {
   const payload = section === 'general'
-    ? { storeName: data.storeName, supportEmail: data.contactEmail, logoUrl: data.logoUrl }
+    ? { storeName: data.storeName, supportEmail: data.contactEmail, logoUrl: data.logoUrl, sizeAdvisorFields: data.sizeAdvisorFields }
     : section === 'announcement'
       ? { announcementEnabled: data.enabled, announcementText: data.text, announcementBackgroundColor: data.backgroundColor, announcementTextColor: data.textColor, announcementPattern: data.pattern, announcementTheme: data.theme, announcementSpeedSeconds: data.speedSeconds }
       : section === 'signupOffer'

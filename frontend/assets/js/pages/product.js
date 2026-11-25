@@ -24,6 +24,7 @@ import { addToCart, addBundleToCart, variantStockRemaining } from "../services/c
 
 import { toggleWishlist, isWishlisted } from "../services/wishlistService.js";
 import { startLiveRefresh } from "../services/liveRefresh.js";
+import { DEFAULT_STORE_SETTINGS, loadStoreSettings } from "../services/storeSettingsService.js?v=size-advisor-admin-1";
 
 /* =========================================================
    PAGE SETUP
@@ -40,6 +41,7 @@ const params = new URLSearchParams(location.search);
 const slug = params.get("slug");
 
 let product = null;
+let sizeAdvisorFields = DEFAULT_STORE_SETTINGS.sizeAdvisorFields;
 let selectedColor = null;
 let selectedSize = null;
 let selectedQuantity = 1;
@@ -61,7 +63,12 @@ async function init() {
   }
 
   try {
-    product = await fetchProductBySlug(slug);
+    const [loadedProduct, storeSettings] = await Promise.all([
+      fetchProductBySlug(slug),
+      loadStoreSettings().catch(() => DEFAULT_STORE_SETTINGS),
+    ]);
+    product = loadedProduct;
+    sizeAdvisorFields = storeSettings.sizeAdvisorFields || DEFAULT_STORE_SETTINGS.sizeAdvisorFields;
   } catch {
     const root = document.getElementById("productRoot");
     root.innerHTML =
@@ -1524,7 +1531,8 @@ function garmentCircumferenceCm(column, rawValue, key) {
 
 function buildSizeAdvisorMarkup(columns, rows, title = "") {
   const bodyDimensions = sizeGuideDimensions(columns);
-  const profileDimensions = sizeGuideProfileDimensions(columns);
+  const enabledAdvisorFieldKeys = ["height", "weight"].filter((key) => sizeAdvisorFields[key]?.enabled !== false);
+  const profileDimensions = sizeGuideProfileDimensions(columns).filter(({ key }) => enabledAdvisorFieldKeys.includes(key));
   const hasProfileChart = profileDimensions.length > 0;
   const requiredProfileKeys = new Set(profileDimensions.map(({ key }) => key));
   const chartReady =
@@ -1534,14 +1542,20 @@ function buildSizeAdvisorMarkup(columns, rows, title = "") {
   const headingId = `sizeAdvisorTitle-${(title || "product").toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
   const heading = title ? `Find my ${escapeHtml(title.toLowerCase())} size` : "Find my size";
   const context = title ? `this ${escapeHtml(title.toLowerCase())}` : "this product";
+  const profileFields = enabledAdvisorFieldKeys.map((key) => {
+    const field = sizeAdvisorFields[key];
+    const bounds = key === "height" ? { min: 100, max: 230, step: 1 } : { min: 25, max: 250, step: 0.1 };
+    return `<label>${escapeHtml(field.label)}<input name="${key}" type="number" min="${bounds.min}" max="${bounds.max}" step="${bounds.step}" ${requiredProfileKeys.has(key) ? "required" : ""} inputmode="decimal" placeholder="${escapeHtml(field.placeholder)}" /></label>`;
+  }).join("");
+  const profileFieldNames = enabledAdvisorFieldKeys.map((key) => sizeAdvisorFields[key].label).join(" and ");
+  const bodyMeasurementNote = profileFieldNames
+    ? `${profileFieldNames} alone can’t reliably predict fit. Add a body measurement to compare with ${context}’s chart.`
+    : `Add a body measurement to compare with ${context}’s chart.`;
   return `<section class="size-advisor" aria-labelledby="${headingId}">
     <h4 id="${headingId}">${heading}</h4>
-    <p class="text-muted">${!chartReady ? `${context[0].toUpperCase()}${context.slice(1)}’s size chart needs measurements before it can recommend a size. Please contact us for help choosing.` : hasProfileChart ? `Enter your details to compare with ${context}’s size ranges.` : `Height and weight alone can’t reliably predict fit. Add a body measurement to compare with ${context}’s chart.`}</p>
+    <p class="text-muted">${!chartReady ? `${context[0].toUpperCase()}${context.slice(1)}’s size chart needs measurements before it can recommend a size. Please contact us for help choosing.` : hasProfileChart ? `Enter your details to compare with ${context}’s size ranges.` : bodyMeasurementNote}</p>
     <form data-size-advisor novalidate>
-      <div class="size-advisor__context">
-        <label>Height (cm)<input name="height" type="number" min="100" max="230" step="1" ${requiredProfileKeys.has("height") ? "required" : ""} inputmode="numeric" placeholder="e.g. 168" /></label>
-        <label>Weight (kg)<input name="weight" type="number" min="25" max="250" step="0.1" ${requiredProfileKeys.has("weight") ? "required" : ""} inputmode="decimal" placeholder="e.g. 62" /></label>
-      </div>
+      ${profileFields ? `<div class="size-advisor__context">${profileFields}</div>` : ""}
       ${
         bodyDimensions.length
           ? `<label>How do you like your clothes to fit?
