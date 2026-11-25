@@ -1502,26 +1502,45 @@ function normalizeAdvisorDimension(value) {
     .replace(/\s+/g, " ");
 }
 
-function sizeGuideProfileDimensions(columns) {
+function sizeGuideColumnIndex(columns, label) {
+  const normalizedLabel = normalizeAdvisorDimension(label);
+  if (!normalizedLabel) return -1;
+  return columns.findIndex((column) => {
+    const normalizedColumn = normalizeAdvisorDimension(column);
+    return normalizedColumn && (
+      normalizedColumn === normalizedLabel ||
+      normalizedColumn.includes(normalizedLabel) ||
+      normalizedLabel.includes(normalizedColumn)
+    );
+  });
+}
+
+function sizeGuideProfileDimensions(columns, excludedColumnIndexes = []) {
   return Object.entries(sizeAdvisorFields)
     .filter(([, field]) => field?.enabled !== false)
     .map(([key, field]) => {
       const label = String(field?.label || key);
-      const normalizedLabel = normalizeAdvisorDimension(label);
       return {
         key,
         label,
-        columnIndex: normalizedLabel
-          ? columns.findIndex((column) => {
-              const normalizedColumn = normalizeAdvisorDimension(column);
-              return normalizedColumn === normalizedLabel ||
-                normalizedColumn.includes(normalizedLabel) ||
-                normalizedLabel.includes(normalizedColumn);
-            })
-          : -1,
+        columnIndex: sizeGuideColumnIndex(columns, label),
       };
     })
-    .filter((measurement) => measurement.columnIndex >= 0);
+    .filter((measurement) => measurement.columnIndex >= 0 && !excludedColumnIndexes.includes(measurement.columnIndex));
+}
+
+function sizeGuideCustomDimensions(columns, bodyDimensions, profileDimensions) {
+  const configuredColumnIndexes = Object.values(sizeAdvisorFields)
+    .map((field) => sizeGuideColumnIndex(columns, field?.label))
+    .filter((columnIndex) => columnIndex >= 0);
+  const usedColumnIndexes = new Set([
+    ...bodyDimensions.map(({ columnIndex }) => columnIndex),
+    ...profileDimensions.map(({ columnIndex }) => columnIndex),
+    ...configuredColumnIndexes,
+  ]);
+  return columns
+    .map((label, columnIndex) => ({ key: `chart_${columnIndex}`, label: String(label || "").trim(), columnIndex }))
+    .filter((dimension) => dimension.label && !usedColumnIndexes.has(dimension.columnIndex));
 }
 
 function garmentCircumferenceCm(column, rawValue, key) {
@@ -1547,20 +1566,21 @@ function garmentCircumferenceCm(column, rawValue, key) {
 
 function buildSizeAdvisorMarkup(columns, rows, title = "") {
   const bodyDimensions = sizeGuideDimensions(columns);
-  const enabledAdvisorFieldKeys = Object.keys(sizeAdvisorFields).filter((key) => sizeAdvisorFields[key]?.enabled !== false);
-  const profileDimensions = sizeGuideProfileDimensions(columns);
+  const bodyColumnIndexes = bodyDimensions.map(({ columnIndex }) => columnIndex);
+  const profileDimensions = sizeGuideProfileDimensions(columns, bodyColumnIndexes);
+  const customDimensions = sizeGuideCustomDimensions(columns, bodyDimensions, profileDimensions);
+  const chartInputDimensions = [...profileDimensions, ...customDimensions];
   const hasProfileChart = profileDimensions.length > 0;
   const requiredProfileKeys = new Set(profileDimensions.map(({ key }) => key));
   const chartReady =
     rows.length > 0 &&
     rows.some((row) => row?.size) &&
-    (bodyDimensions.length > 0 || hasProfileChart);
+    (bodyDimensions.length > 0 || chartInputDimensions.length > 0);
   const headingId = `sizeAdvisorTitle-${(title || "product").toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
   const heading = title ? `Find my ${escapeHtml(title.toLowerCase())} size` : "Find my size";
   const context = title ? `this ${escapeHtml(title.toLowerCase())}` : "this product";
-  const profileFields = enabledAdvisorFieldKeys.map((key) => {
+  const profileFields = profileDimensions.map(({ key, label }) => {
     const field = sizeAdvisorFields[key];
-    const label = String(field.label || key);
     const normalizedLabel = normalizeAdvisorDimension(label);
     const bounds = normalizedLabel === "height"
       ? { min: 100, max: 230, step: 1 }
@@ -1569,15 +1589,20 @@ function buildSizeAdvisorMarkup(columns, rows, title = "") {
         : { min: 1, max: 300, step: 0.1 };
     return `<label>${escapeHtml(label)}<input name="${key}" type="number" min="${bounds.min}" max="${bounds.max}" step="${bounds.step}" ${requiredProfileKeys.has(key) ? "required" : ""} inputmode="decimal" placeholder="${escapeHtml(field.placeholder || "Enter a value")}" /></label>`;
   }).join("");
-  const profileFieldNames = enabledAdvisorFieldKeys.map((key) => sizeAdvisorFields[key].label).join(" and ");
+  const customFields = customDimensions.map(({ key, label, columnIndex }) => {
+    const example = rows.find((row) => row?.values?.[columnIndex])?.values?.[columnIndex];
+    return `<label>${escapeHtml(label)}<input name="${key}" type="number" min="1" max="300" step="0.1" inputmode="decimal" placeholder="e.g. ${escapeHtml(example || "Enter a value")}" /></label>`;
+  }).join("");
+  const profileFieldNames = chartInputDimensions.map(({ label }) => label).join(" and ");
   const bodyMeasurementNote = profileFieldNames
     ? `${profileFieldNames} alone can’t reliably predict fit. Add a body measurement to compare with ${context}’s chart.`
     : `Add a body measurement to compare with ${context}’s chart.`;
   return `<section class="size-advisor" aria-labelledby="${headingId}">
     <h4 id="${headingId}">${heading}</h4>
-    <p class="text-muted">${!chartReady ? `${context[0].toUpperCase()}${context.slice(1)}’s size chart needs measurements before it can recommend a size. Please contact us for help choosing.` : hasProfileChart ? `Enter your details to compare with ${context}’s size ranges.` : bodyMeasurementNote}</p>
+    <p class="text-muted">${!chartReady ? `${context[0].toUpperCase()}${context.slice(1)}’s size chart needs measurements before it can recommend a size. Please contact us for help choosing.` : customDimensions.length ? `Compare your measurements with ${context}’s size chart. For garment measurements, use a similar item laid flat.` : hasProfileChart ? `Enter your details to compare with ${context}’s size ranges.` : bodyMeasurementNote}</p>
     <form data-size-advisor novalidate>
       ${profileFields ? `<div class="size-advisor__context">${profileFields}</div>` : ""}
+      ${customFields ? `<fieldset><legend>Other size chart measurements</legend><div class="size-advisor__measurements">${customFields}</div><small>Measure a similar garment the same way as the measurements in the chart.</small></fieldset>` : ""}
       ${
         bodyDimensions.length
           ? `<label>How do you like your clothes to fit?
@@ -1626,7 +1651,13 @@ function bindSizeAdvisor(containerId, columns, rows, advisorProduct = product, a
       return;
     }
     const data = new FormData(form);
-    const profile = sizeGuideProfileDimensions(columns)
+    const bodyDimensions = sizeGuideDimensions(columns);
+    const profileDimensions = sizeGuideProfileDimensions(
+      columns,
+      bodyDimensions.map(({ columnIndex }) => columnIndex),
+    );
+    const customDimensions = sizeGuideCustomDimensions(columns, bodyDimensions, profileDimensions);
+    const profile = [...profileDimensions, ...customDimensions]
       .map(({ key, label, columnIndex }) => ({
         key,
         label,
@@ -1646,14 +1677,12 @@ function bindSizeAdvisor(containerId, columns, rows, advisorProduct = product, a
           Number.isFinite(measurement.value) && measurement.value > 0,
       );
     if (!measurements.length && !profile.length) {
-      const neededMeasurements = sizeGuideDimensions(columns).map(({ label }) => label.toLowerCase());
-      const advisorLabels = Object.entries(sizeAdvisorFields)
-        .filter(([, field]) => field?.enabled !== false)
-        .map(([, field]) => field.label)
-        .join(" or ");
-      result.textContent = neededMeasurements.length
-        ? `Enter at least one body measurement (${neededMeasurements.join(" or ")}) above. This chart has no matching ${advisorLabels} columns for the size advisor inputs.`
-        : `This ${title} chart has no matching ${advisorLabels} columns. Match the size advisor labels in Admin Settings to this product’s size chart.`;
+      const availableMeasurements = [...profileDimensions, ...customDimensions, ...bodyDimensions]
+        .map(({ label }) => label)
+        .filter((label, index, labels) => label && labels.indexOf(label) === index);
+      result.textContent = availableMeasurements.length
+        ? `Enter at least one measurement (${availableMeasurements.join(", ")}) above to compare with this size chart.`
+        : `This ${title} chart has no size measurements yet. Please use the size guide or contact the shop.`;
       return;
     }
     const fit = String(data.get("fit") || "regular");
