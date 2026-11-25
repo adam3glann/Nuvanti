@@ -710,6 +710,11 @@ router.post(
         .status(403)
         .json({ error: "Only a super admin can manage emergency lockdown." });
     }
+    if (!req.user?.totpEnabledAt) {
+      return res.status(403).json({
+        error: "Set up authenticator two-factor authentication to manage emergency lockdown.",
+      });
+    }
     const confirmation = req.body?.confirmation;
     if (confirmation === "RELEASE STORE LOCKDOWN") {
       const { rows } = await query(
@@ -2487,7 +2492,7 @@ router.post(
     const { rows: updated } = await query(
       `UPDATE users SET totp_secret_enc = NULL, totp_enabled_at = NULL,
         totp_recovery_codes = '[]'::jsonb, totp_pending_secret_enc = NULL,
-        totp_pending_expires_at = NULL, totp_last_step = -1,
+        totp_pending_expires_at = NULL, totp_last_step = -1, admin_mfa_exempt = true,
         session_version = session_version + 1
        WHERE id = $1 AND role = ANY($2) AND totp_enabled_at IS NOT NULL
        RETURNING id::text`,

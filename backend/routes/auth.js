@@ -861,7 +861,7 @@ router.post(
     const { codes, hashes } = createRecoveryCodes();
     const updated = await query(
       `UPDATE users SET totp_secret_enc = totp_pending_secret_enc, totp_pending_secret_enc = NULL, totp_pending_expires_at = NULL,
-    totp_enabled_at = NOW(), totp_last_step = $1, totp_recovery_codes = $2::jsonb, session_version = session_version + 1
+    totp_enabled_at = NOW(), totp_last_step = $1, totp_recovery_codes = $2::jsonb, admin_mfa_exempt = false, session_version = session_version + 1
     WHERE id = $3 AND totp_enabled_at IS NULL AND totp_pending_expires_at > NOW() AND totp_last_step < $1 RETURNING session_version AS "sessionVersion"`,
       [step, JSON.stringify(hashes), user.id],
     );
