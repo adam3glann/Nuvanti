@@ -5,7 +5,7 @@ import { showAdminToast } from '../components/toast.js';
 import { typedConfirmDialog } from '../components/confirmDialog.js';
 import { createAdminModal } from '../components/modal.js';
 import { hasPermission, ROLES, ROLE_LABELS } from '../components/permissions.js';
-import { fetchAdminUsers, createAdminUser, toggleAdminUserStatus, unblockAdminNetwork, deleteAdminUser } from '../services/adminUserService.js';
+import { fetchAdminUsers, createAdminUser, toggleAdminUserStatus, unblockAdminNetwork, disableAdminMfa, deleteAdminUser } from '../services/adminUserService.js';
 import { startLiveRefresh } from '../services/liveRefresh.js';
 
 const session = initAdminShell({ page: 'users', title: 'Admin Users' });
@@ -44,6 +44,7 @@ async function load() {
       <td style="text-align:right">
         <button class="btn btn-outline btn-sm" data-toggle="${u.id}" ${isSelf ? 'disabled title="You cannot change your own account status"' : ''}>${u.isActive ? 'Disable' : 'Enable'}</button>
         <button class="btn btn-outline btn-sm" data-unblock-network="${u.id}">Unblock Network</button>
+        <button class="btn btn-outline btn-sm" data-disable-mfa="${u.id}" ${!u.mfaEnabled || isSelf ? 'disabled title="2FA must be enabled, and you cannot change your own 2FA here"' : ''}>Disable 2FA</button>
         <button class="icon-btn" data-delete="${u.id}" aria-label="Delete" ${isSelf ? 'disabled title="You cannot delete your own account"' : ''}>✕</button>
       </td>
     </tr>
@@ -71,6 +72,24 @@ async function load() {
     try {
       const result = await unblockAdminNetwork(btn.dataset.unblockNetwork);
       showAdminToast(result.clearedBlocks ? 'Network access restored for this admin.' : 'No active network block was found.', 'success');
+      load();
+    } catch (error) {
+      btn.disabled = false;
+      showAdminToast(error.message, 'error');
+    }
+  }));
+  document.querySelectorAll('[data-disable-mfa]:not([disabled])').forEach((btn) => btn.addEventListener('click', async () => {
+    const ok = await typedConfirmDialog({
+      title: 'Disable this admin’s 2FA?',
+      body: 'This removes their authenticator and recovery codes and signs out their sessions. They can sign in with their password and email verification code, then set up 2FA again from Security.',
+      confirmWord: 'DISABLE',
+      confirmLabel: 'Disable 2FA',
+    });
+    if (!ok) return;
+    btn.disabled = true;
+    try {
+      await disableAdminMfa(btn.dataset.disableMfa);
+      showAdminToast('2FA disabled. The admin can sign in with email verification and set it up again from Security.', 'success');
       load();
     } catch (error) {
       btn.disabled = false;

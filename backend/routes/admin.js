@@ -2463,12 +2463,47 @@ router.get(
   async (req, res) => {
     const { rows } = await query(
       `SELECT u.id::text, u.email, u.name, u.role, u.is_active AS "isActive", u.created_at AS "createdAt",
-        EXISTS (SELECT 1 FROM admin_login_ip_blocks b WHERE b.user_id = u.id AND b.blocked_until > NOW()) AS "networkBlocked"
+        EXISTS (SELECT 1 FROM admin_login_ip_blocks b WHERE b.user_id = u.id AND b.blocked_until > NOW()) AS "networkBlocked",
+        u.totp_enabled_at IS NOT NULL AS "mfaEnabled"
        FROM users u WHERE u.role = ANY($1) ORDER BY u.created_at DESC`,
       [MANAGEABLE_ROLES],
     );
     res.json(rows);
   },
+);
+
+router.post(
+  "/admin-users/:id/disable-mfa",
+  requirePermission("admins.manage"),
+  asyncRoute(async (req, res) => {
+    if (String(req.user.sub) === String(req.params.id)) {
+      return res.status(400).json({ error: "You cannot disable 2FA on your own account here." });
+    }
+    const { rows: targets } = await query(
+      "SELECT id::text FROM users WHERE id = $1 AND role = ANY($2)",
+      [req.params.id, MANAGEABLE_ROLES],
+    );
+    if (!targets[0]) return res.status(404).json({ error: "Administrator not found." });
+    const { rows: updated } = await query(
+      `UPDATE users SET totp_secret_enc = NULL, totp_enabled_at = NULL,
+        totp_recovery_codes = '[]'::jsonb, totp_pending_secret_enc = NULL,
+        totp_pending_expires_at = NULL, totp_last_step = -1,
+        session_version = session_version + 1
+       WHERE id = $1 AND role = ANY($2) AND totp_enabled_at IS NOT NULL
+       RETURNING id::text`,
+      [req.params.id, MANAGEABLE_ROLES],
+    );
+    if (!updated[0]) {
+      return res.status(409).json({ error: "Two-factor authentication is not enabled for this admin." });
+    }
+    await logAudit({
+      req,
+      action: "admin_user.mfa_disabled_by_admin",
+      targetType: "user",
+      targetId: req.params.id,
+    });
+    res.json({ success: true });
+  }),
 );
 
 router.post(

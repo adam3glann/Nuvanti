@@ -20,4 +20,6 @@ export const toggleAdminUserStatus = async (id) => {
 
 export const unblockAdminNetwork = (id) => request(`/api/admin/admin-users/${id}/unblock-network`, { method: 'POST' });
 
+export const disableAdminMfa = (id) => request(`/api/admin/admin-users/${id}/disable-mfa`, { method: 'POST' });
+
 export const deleteAdminUser = (id) => request(`/api/admin/admin-users/${id}`, { method: 'DELETE' });
