@@ -1532,35 +1532,16 @@ function buildSizeAdvisorMarkup(columns, rows, title = "") {
     rows.some((row) => row?.size) &&
     (bodyDimensions.length > 0 || hasProfileChart);
   const headingId = `sizeAdvisorTitle-${(title || "product").toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
-  const canRecommendFromChart = bodyDimensions.length > 0 || hasProfileChart;
-  const chartTable = renderSizeGuideTable(columns, rows);
-  if (!canRecommendFromChart) {
-    const heading = title ? `${escapeHtml(title)} Size Guide` : "Size Guide";
-    const note = chartTable
-      ? "These are the measurements entered for each size. Compare them with a similar garment to choose your fit."
-      : "The store has not added a size chart for this product yet. Please contact us for help choosing.";
-    return `<section class="size-advisor" aria-labelledby="${headingId}">
-      <h4 id="${headingId}">${heading}</h4>
-      <p class="text-muted">${note}</p>
-      ${chartTable ? `<div class="size-guide-table-scroll size-advisor__chart" role="region" aria-label="Size measurements" tabindex="0">${chartTable}</div>` : ""}
-    </section>`;
-  }
   const heading = title ? `Find my ${escapeHtml(title.toLowerCase())} size` : "Find my size";
   const context = title ? `this ${escapeHtml(title.toLowerCase())}` : "this product";
-  const profileFields = profileDimensions.map(({ key, columnIndex }) => {
-    const limits = key === "height" ? { min: 100, max: 230, step: 1, placeholder: "e.g. 168" } : { min: 25, max: 250, step: 0.1, placeholder: "e.g. 62" };
-    return `<label>${escapeHtml(columns[columnIndex])}<input name="${key}" type="number" min="${limits.min}" max="${limits.max}" step="${limits.step}" ${requiredProfileKeys.has(key) ? "required" : ""} inputmode="decimal" placeholder="${limits.placeholder}" /></label>`;
-  }).join("");
-  const advisorNote = !chartReady
-    ? `${context[0].toUpperCase()}${context.slice(1)}’s size chart needs measurements before it can recommend a size. Please contact us for help choosing.`
-    : hasProfileChart
-      ? `Enter the details listed in ${context}’s size chart to compare sizes.`
-      : `Enter a body measurement below to compare with ${context}’s size chart.`;
   return `<section class="size-advisor" aria-labelledby="${headingId}">
     <h4 id="${headingId}">${heading}</h4>
-    <p class="text-muted">${advisorNote}</p>
+    <p class="text-muted">${!chartReady ? `${context[0].toUpperCase()}${context.slice(1)}’s size chart needs measurements before it can recommend a size. Please contact us for help choosing.` : hasProfileChart ? `Enter your details to compare with ${context}’s size ranges.` : `Height and weight alone can’t reliably predict fit. Add a body measurement to compare with ${context}’s chart.`}</p>
     <form data-size-advisor novalidate>
-      ${profileFields ? `<div class="size-advisor__context">${profileFields}</div>` : ""}
+      <div class="size-advisor__context">
+        <label>Height (cm)<input name="height" type="number" min="100" max="230" step="1" ${requiredProfileKeys.has("height") ? "required" : ""} inputmode="numeric" placeholder="e.g. 168" /></label>
+        <label>Weight (kg)<input name="weight" type="number" min="25" max="250" step="0.1" ${requiredProfileKeys.has("weight") ? "required" : ""} inputmode="decimal" placeholder="e.g. 62" /></label>
+      </div>
       ${
         bodyDimensions.length
           ? `<label>How do you like your clothes to fit?

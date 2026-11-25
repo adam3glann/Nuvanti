@@ -772,10 +772,6 @@
   overflow-x: auto;
   overscroll-behavior-inline: contain;
 }
-.size-advisor__chart .size-table {
-  min-width: max-content;
-  margin: 0;
-}
 .size-advisor {
   margin-top: var(--space-6);
   padding-top: var(--space-5);
