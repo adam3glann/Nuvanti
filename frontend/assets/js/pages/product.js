@@ -1786,12 +1786,15 @@ function bindSizeAdvisor(containerId, columns, rows, advisorProduct = product, a
       cautions.push("This recommendation is calculated from the measurements and size ranges in this product’s chart.");
     }
     const caution = ` ${cautions.join(" ")}`;
+    const alternativeNote = alternative
+      ? ` ${alternative.size} is the next closest match; compare its chart measurements if you want another option.`
+      : "";
     const recommendation = document.createElement("strong");
     recommendation.textContent = `${best.fitWarnings.length || profileConflict ? "Closest size" : "Recommended size"}: ${best.size}`;
     result.replaceChildren(
       recommendation,
       document.createTextNode(
-        `${alternative ? ` (also consider ${alternative.size} if you prefer more room).` : "."}${caution}`,
+        `${alternativeNote || "."}${caution}`,
       ),
     );
     result.className =
