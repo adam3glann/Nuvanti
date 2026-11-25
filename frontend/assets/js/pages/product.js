@@ -1493,18 +1493,34 @@ function sizeGuideDimensions(columns) {
   })).filter((measurement) => measurement.columnIndex >= 0);
 }
 
+function normalizeAdvisorDimension(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/\b(?:cm|kg|mm|inches?|range|ranges)\b/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
 function sizeGuideProfileDimensions(columns) {
-  return [
-    { key: "height", aliases: ["height"] },
-    { key: "weight", aliases: ["weight"] },
-  ]
-    .map((measurement) => ({
-      ...measurement,
-      columnIndex: columns.findIndex((column) => {
-        const name = String(column || "").toLowerCase();
-        return measurement.aliases.some((alias) => name.includes(alias));
-      }),
-    }))
+  return Object.entries(sizeAdvisorFields)
+    .filter(([, field]) => field?.enabled !== false)
+    .map(([key, field]) => {
+      const label = String(field?.label || key);
+      const normalizedLabel = normalizeAdvisorDimension(label);
+      return {
+        key,
+        label,
+        columnIndex: normalizedLabel
+          ? columns.findIndex((column) => {
+              const normalizedColumn = normalizeAdvisorDimension(column);
+              return normalizedColumn === normalizedLabel ||
+                normalizedColumn.includes(normalizedLabel) ||
+                normalizedLabel.includes(normalizedColumn);
+            })
+          : -1,
+      };
+    })
     .filter((measurement) => measurement.columnIndex >= 0);
 }
 
@@ -1531,8 +1547,8 @@ function garmentCircumferenceCm(column, rawValue, key) {
 
 function buildSizeAdvisorMarkup(columns, rows, title = "") {
   const bodyDimensions = sizeGuideDimensions(columns);
-  const enabledAdvisorFieldKeys = ["height", "weight"].filter((key) => sizeAdvisorFields[key]?.enabled !== false);
-  const profileDimensions = sizeGuideProfileDimensions(columns).filter(({ key }) => enabledAdvisorFieldKeys.includes(key));
+  const enabledAdvisorFieldKeys = Object.keys(sizeAdvisorFields).filter((key) => sizeAdvisorFields[key]?.enabled !== false);
+  const profileDimensions = sizeGuideProfileDimensions(columns);
   const hasProfileChart = profileDimensions.length > 0;
   const requiredProfileKeys = new Set(profileDimensions.map(({ key }) => key));
   const chartReady =
@@ -1544,8 +1560,14 @@ function buildSizeAdvisorMarkup(columns, rows, title = "") {
   const context = title ? `this ${escapeHtml(title.toLowerCase())}` : "this product";
   const profileFields = enabledAdvisorFieldKeys.map((key) => {
     const field = sizeAdvisorFields[key];
-    const bounds = key === "height" ? { min: 100, max: 230, step: 1 } : { min: 25, max: 250, step: 0.1 };
-    return `<label>${escapeHtml(field.label)}<input name="${key}" type="number" min="${bounds.min}" max="${bounds.max}" step="${bounds.step}" ${requiredProfileKeys.has(key) ? "required" : ""} inputmode="decimal" placeholder="${escapeHtml(field.placeholder)}" /></label>`;
+    const label = String(field.label || key);
+    const normalizedLabel = normalizeAdvisorDimension(label);
+    const bounds = normalizedLabel === "height"
+      ? { min: 100, max: 230, step: 1 }
+      : normalizedLabel === "weight"
+        ? { min: 25, max: 250, step: 0.1 }
+        : { min: 1, max: 300, step: 0.1 };
+    return `<label>${escapeHtml(label)}<input name="${key}" type="number" min="${bounds.min}" max="${bounds.max}" step="${bounds.step}" ${requiredProfileKeys.has(key) ? "required" : ""} inputmode="decimal" placeholder="${escapeHtml(field.placeholder || "Enter a value")}" /></label>`;
   }).join("");
   const profileFieldNames = enabledAdvisorFieldKeys.map((key) => sizeAdvisorFields[key].label).join(" and ");
   const bodyMeasurementNote = profileFieldNames
@@ -1590,10 +1612,8 @@ function bindSizeAdvisor(containerId, columns, rows, advisorProduct = product, a
     result.className = "size-advisor__result size-advisor__result--error";
     const invalidField = form.querySelector(":invalid");
     if (invalidField) {
-      const label =
+      const label = sizeAdvisorFields[invalidField.name]?.label ||
         {
-          height: "Height",
-          weight: "Weight",
           chest: "Chest",
           waist: "Waist",
           hips: "Hips",
@@ -1607,8 +1627,9 @@ function bindSizeAdvisor(containerId, columns, rows, advisorProduct = product, a
     }
     const data = new FormData(form);
     const profile = sizeGuideProfileDimensions(columns)
-      .map(({ key, columnIndex }) => ({
+      .map(({ key, label, columnIndex }) => ({
         key,
+        label,
         value: Number(data.get(key)),
         columnIndex,
       }))
@@ -1626,9 +1647,13 @@ function bindSizeAdvisor(containerId, columns, rows, advisorProduct = product, a
       );
     if (!measurements.length && !profile.length) {
       const neededMeasurements = sizeGuideDimensions(columns).map(({ label }) => label.toLowerCase());
+      const advisorLabels = Object.entries(sizeAdvisorFields)
+        .filter(([, field]) => field?.enabled !== false)
+        .map(([, field]) => field.label)
+        .join(" or ");
       result.textContent = neededMeasurements.length
-        ? `Enter at least one body measurement (${neededMeasurements.join(" or ")}) above. This chart has no height or weight ranges, so those details alone can’t recommend a size.`
-        : `This ${title} chart needs body measurements or height/weight ranges before it can recommend a size. Please use the size chart or contact the shop.`;
+        ? `Enter at least one body measurement (${neededMeasurements.join(" or ")}) above. This chart has no matching ${advisorLabels} columns for the size advisor inputs.`
+        : `This ${title} chart has no matching ${advisorLabels} columns. Match the size advisor labels in Admin Settings to this product’s size chart.`;
       return;
     }
     const fit = String(data.get("fit") || "regular");
@@ -1742,7 +1767,7 @@ function bindSizeAdvisor(containerId, columns, rows, advisorProduct = product, a
     const cautions = [];
     if (profileConflict) {
       cautions.push(
-        `Your body measurements point to ${best.size}, but this chart’s height/weight ranges point to ${profileBest.size}. The chart gives conflicting guidance; confirm the product measurements before ordering.`,
+        `Your body measurements point to ${best.size}, but this chart’s ${profile.map(({ label }) => label).join(" and ")} ranges point to ${profileBest.size}. The chart gives conflicting guidance; confirm the product measurements before ordering.`,
       );
     }
     if (best.fitWarnings.length) {
