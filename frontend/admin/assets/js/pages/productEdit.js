@@ -132,7 +132,7 @@ function renderForm(product, cats, cols, products) {
             <div class="field"><label>Measurement table (one row per size)</label>
               <div class="field-row"><input id="guideColumns" aria-label="Measurement columns" placeholder="Chest (cm), Length (cm)" value="${esc((product.sizeGuideMeasurements?.columns || []).join(', '))}" /></div>
               <div id="guideRows"></div>
-              <small class="hint">Label each measurement clearly: use “Chest circumference (cm)” for a full-around value, or “Chest width laid flat (cm)” for a flat width (the calculator doubles flat widths). Customer measurements are taken around the body. To recommend by height/weight alone, add matching range columns and ranges for every size.</small>
+              <small class="hint">The storefront size chart shows these column names and values exactly. Use “Chest circumference (cm)” for a full-around value or “Chest width laid flat (cm)” for a flat width. Size recommendations appear only for supported body measurements (chest, waist, hips) or height/weight ranges.</small>
             </div>
           </div>
         </div>

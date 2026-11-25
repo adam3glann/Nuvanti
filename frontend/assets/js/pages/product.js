@@ -1336,8 +1336,9 @@ function openComponentSizeGuide(component, title) {
   const guide = component?.sizeGuideMeasurements || {};
   const columns = Array.isArray(guide.columns) ? guide.columns : [];
   const rows = Array.isArray(guide.rows) ? guide.rows : [];
-  const table = columns.length && rows.length
-    ? `<table class="size-table"><thead><tr><th>Size</th>${columns.map((column) => `<th>${escapeHtml(column)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr><td>${escapeHtml(row.size)}</td>${columns.map((_, index) => `<td>${escapeHtml(row.values?.[index] || "—")}</td>`).join("")}</tr>`).join("")}</tbody></table>`
+  const renderedTable = renderSizeGuideTable(columns, rows);
+  const table = renderedTable
+    ? `<div class="size-guide-table-scroll">${renderedTable}</div>`
     : "<p class=\"text-muted\">The size chart has not been added yet. Please contact us for help choosing.</p>";
   const image = component?.sizeGuideImage
     ? `<img src="${escapeAttribute(component.sizeGuideImage)}" alt="${escapeAttribute(`${title} size chart`)}" style="display:block;width:100%;height:auto;margin:0 0 1rem;border-radius:8px" />`
@@ -1346,6 +1347,11 @@ function openComponentSizeGuide(component, title) {
     ? `<p class="text-muted" style="font-size:.85rem">${escapeHtml(component.sizeGuide).replace(/\n/g, "<br>")}</p>`
     : "";
   createModal({ title: `${title} Size Chart`, bodyHTML: `${image}${table}${notes}` }).open();
+}
+
+function renderSizeGuideTable(columns, rows) {
+  if (!columns.length || !rows.length) return "";
+  return `<table class="size-table"><thead><tr><th>Size</th>${columns.map((column) => `<th>${escapeHtml(column)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr><td>${escapeHtml(row.size)}</td>${columns.map((_, index) => `<td>${escapeHtml(row.values?.[index] || "—")}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
 }
 
 function openSizeGuide() {
@@ -1358,10 +1364,7 @@ function openSizeGuide() {
     columns.length ||
     rows.length
   ) {
-    const table =
-      columns.length && rows.length
-        ? `<table class="size-table"><thead><tr><th>Size</th>${columns.map((column) => `<th>${escapeHtml(column)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr><td>${escapeHtml(row.size)}</td>${columns.map((_, index) => `<td>${escapeHtml(row.values?.[index] || "—")}</td>`).join("")}</tr>`).join("")}</tbody></table>`
-        : "";
+    const table = renderSizeGuideTable(columns, rows);
     const image = product.sizeGuideImage
       ? `<img src="${escapeHtml(product.sizeGuideImage)}" alt="${escapeHtml(product.name)} size guide" style="display:block;width:100%;height:auto;margin:0 0 1rem;border-radius:8px" />`
       : "";
@@ -1529,16 +1532,35 @@ function buildSizeAdvisorMarkup(columns, rows, title = "") {
     rows.some((row) => row?.size) &&
     (bodyDimensions.length > 0 || hasProfileChart);
   const headingId = `sizeAdvisorTitle-${(title || "product").toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+  const canRecommendFromChart = bodyDimensions.length > 0 || hasProfileChart;
+  const chartTable = renderSizeGuideTable(columns, rows);
+  if (!canRecommendFromChart) {
+    const heading = title ? `${escapeHtml(title)} Size Guide` : "Size Guide";
+    const note = chartTable
+      ? "These are the measurements entered for each size. Compare them with a similar garment to choose your fit."
+      : "The store has not added a size chart for this product yet. Please contact us for help choosing.";
+    return `<section class="size-advisor" aria-labelledby="${headingId}">
+      <h4 id="${headingId}">${heading}</h4>
+      <p class="text-muted">${note}</p>
+      ${chartTable ? `<div class="size-guide-table-scroll size-advisor__chart" role="region" aria-label="Size measurements" tabindex="0">${chartTable}</div>` : ""}
+    </section>`;
+  }
   const heading = title ? `Find my ${escapeHtml(title.toLowerCase())} size` : "Find my size";
   const context = title ? `this ${escapeHtml(title.toLowerCase())}` : "this product";
+  const profileFields = profileDimensions.map(({ key, columnIndex }) => {
+    const limits = key === "height" ? { min: 100, max: 230, step: 1, placeholder: "e.g. 168" } : { min: 25, max: 250, step: 0.1, placeholder: "e.g. 62" };
+    return `<label>${escapeHtml(columns[columnIndex])}<input name="${key}" type="number" min="${limits.min}" max="${limits.max}" step="${limits.step}" ${requiredProfileKeys.has(key) ? "required" : ""} inputmode="decimal" placeholder="${limits.placeholder}" /></label>`;
+  }).join("");
+  const advisorNote = !chartReady
+    ? `${context[0].toUpperCase()}${context.slice(1)}’s size chart needs measurements before it can recommend a size. Please contact us for help choosing.`
+    : hasProfileChart
+      ? `Enter the details listed in ${context}’s size chart to compare sizes.`
+      : `Enter a body measurement below to compare with ${context}’s size chart.`;
   return `<section class="size-advisor" aria-labelledby="${headingId}">
     <h4 id="${headingId}">${heading}</h4>
-    <p class="text-muted">${!chartReady ? `${context[0].toUpperCase()}${context.slice(1)}’s size chart needs measurements before it can recommend a size. Please contact us for help choosing.` : hasProfileChart ? `Enter your details to compare with ${context}’s size ranges.` : `Height and weight alone can’t reliably predict fit. Add a body measurement to compare with ${context}’s chart.`}</p>
+    <p class="text-muted">${advisorNote}</p>
     <form data-size-advisor novalidate>
-      <div class="size-advisor__context">
-        <label>Height (cm)<input name="height" type="number" min="100" max="230" step="1" ${requiredProfileKeys.has("height") ? "required" : ""} inputmode="numeric" placeholder="e.g. 168" /></label>
-        <label>Weight (kg)<input name="weight" type="number" min="25" max="250" step="0.1" ${requiredProfileKeys.has("weight") ? "required" : ""} inputmode="decimal" placeholder="e.g. 62" /></label>
-      </div>
+      ${profileFields ? `<div class="size-advisor__context">${profileFields}</div>` : ""}
       ${
         bodyDimensions.length
           ? `<label>How do you like your clothes to fit?

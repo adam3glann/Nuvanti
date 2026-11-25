@@ -767,6 +767,15 @@
   text-transform: uppercase;
   letter-spacing: var(--ls-label);
 }
+.size-guide-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+.size-advisor__chart .size-table {
+  min-width: max-content;
+  margin: 0;
+}
 .size-advisor {
   margin-top: var(--space-6);
   padding-top: var(--space-5);
