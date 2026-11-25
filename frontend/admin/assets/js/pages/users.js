@@ -43,7 +43,7 @@ async function load() {
       <td>${formatDate(u.createdAt)}</td>
       <td style="text-align:right">
         <button class="btn btn-outline btn-sm" data-toggle="${u.id}" ${isSelf ? 'disabled title="You cannot change your own account status"' : ''}>${u.isActive ? 'Disable' : 'Enable'}</button>
-        ${u.networkBlocked ? `<button class="btn btn-outline btn-sm" data-unblock-network="${u.id}">Unblock Network</button>` : ''}
+        <button class="btn btn-outline btn-sm" data-unblock-network="${u.id}">Unblock Network</button>
         <button class="icon-btn" data-delete="${u.id}" aria-label="Delete" ${isSelf ? 'disabled title="You cannot delete your own account"' : ''}>✕</button>
       </td>
     </tr>
