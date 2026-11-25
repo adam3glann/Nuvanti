@@ -1,4 +1,4 @@
-import { initShell } from "../main.js?v=store-logo-dark-2";
+import { initShell } from "../main.js?v=permanent-dark-3";
 import { icon } from "../components/icons.js";
 
 initShell({ currentPage: "faq" });

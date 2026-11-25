@@ -1,7 +1,7 @@
 import {
   initShell,
   initScrollReveal,
-} from "../main.js?v=store-logo-dark-2";
+} from "../main.js?v=permanent-dark-3";
 import { icon } from "../components/icons.js";
 import {
   productCardHTML,

@@ -1,4 +1,4 @@
-import { initShell } from "../main.js?v=store-logo-dark-2";
+import { initShell } from "../main.js?v=permanent-dark-3";
 import { formatPrice, escapeHtml } from "../components/productCard.js?v=set-effects-v4";
 import { createWhatsAppUrl } from "../services/whatsapp.js";
 

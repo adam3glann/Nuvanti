@@ -1,7 +1,7 @@
 import { initAdminShell } from '../components/shell.js';
 import { showAdminToast } from '../components/toast.js';
 import { hasPermission } from '../components/permissions.js';
-import { getEmailStatus, getSettings, saveSettingsSection, sendAdminTestEmail } from '../services/settingsService.js?v=store-logo-dark-2';
+import { getEmailStatus, getSettings, saveSettingsSection, sendAdminTestEmail } from '../services/settingsService.js?v=permanent-dark-3';
 import { escapeHtml } from '../components/utils.js';
 import { startLiveRefresh } from '../services/liveRefresh.js';
 import { uploadAdminImage } from '../services/imageUploadService.js?v=preserve-alpha-v1';
